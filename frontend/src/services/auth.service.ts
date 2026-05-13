@@ -1,3 +1,5 @@
+import axios from 'axios';
+
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 /**
@@ -11,7 +13,7 @@ interface AuthResponse {
   };
   session: {
     access_token: string;
-    [key: string]: any;
+    [key: string]: unknown;
   };
 }
 
@@ -30,26 +32,25 @@ export const authService = {
    * @throws Error if the API call fails or returns an error status.
    */
   async login(email: string, password: string): Promise<AuthResponse> {
-    const response = await fetch(`${API_URL}/auth/login`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ email, password }),
-    });
+    try {
+      const response = await axios.post<AuthResponse>(`${API_URL}/auth/login`, {
+        email,
+        password,
+      });
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || 'Authentication failed');
+      const authData = response.data;
+      
+      // Persistent storage of session details
+      localStorage.setItem('session', JSON.stringify(authData.session));
+      localStorage.setItem('user', JSON.stringify(authData.user));
+      
+      return authData;
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        throw new Error(error.response?.data?.message || 'Authentication failed');
+      }
+      throw error;
     }
-
-    const authData: AuthResponse = await response.json();
-    
-    // Persistent storage of session details
-    localStorage.setItem('session', JSON.stringify(authData.session));
-    localStorage.setItem('user', JSON.stringify(authData.user));
-    
-    return authData;
   },
 
   /**
@@ -80,7 +81,7 @@ export const authService = {
     if (!sessionData) return null;
     try {
       const session = JSON.parse(sessionData);
-      return session.access_token || null;
+      return (session as Record<string, string>).access_token || null;
     } catch {
       return null;
     }

@@ -1,5 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import LoginPage from './pages/LoginPage';
+import DashboardPage from './pages/DashboardPage';
+import AdminPanelPage from './pages/AdminPanelPage';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import { ROUTES } from './constants/routes';
 
@@ -18,13 +20,16 @@ function App() {
           path={ROUTES.DASHBOARD} 
           element={
             <ProtectedRoute>
-              <div style={{ padding: '2rem' }}>
-                <h1>Admin Dashboard</h1>
-                <p>Welcome to the MIS Administrative Portal.</p>
-                <button onClick={() => { localStorage.clear(); window.location.href = ROUTES.LOGIN; }}>
-                  Logout
-                </button>
-              </div>
+              <DashboardPage />
+            </ProtectedRoute>
+          } 
+        />
+
+        <Route 
+          path={ROUTES.ADMIN_PANEL} 
+          element={
+            <ProtectedRoute>
+              <AdminPanelPage />
             </ProtectedRoute>
           } 
         />
