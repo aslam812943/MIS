@@ -32,3 +32,6 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .eslintcache
+
+# Project Memory
+project_memory.md
