@@ -1,10 +1,10 @@
 import type { User } from '../../models/user.model.js';
 
-export interface LoginResponse {
+export interface AuthResponse {
   user: User;
-  session: any;
+  session: Record<string, unknown>;
 }
 
 export interface IAuthService {
-  login(email: string, password: string): Promise<LoginResponse>;
+  login(email: string, password: string): Promise<AuthResponse>;
 }

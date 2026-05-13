@@ -1,6 +1,6 @@
 import { supabase } from '../config/supabase.js';
 import type { IUserRepository } from '../repositories/interfaces/IUserRepository.js';
-import type { IAuthService, LoginResponse } from './interfaces/IAuthService.js';
+import type { IAuthService, AuthResponse } from './interfaces/IAuthService.js';
 import { UserRole } from '../models/user.model.js';
 
 /**
@@ -19,10 +19,10 @@ export class AuthService implements IAuthService {
    * 
    * @param email User's email address.
    * @param password User's password.
-   * @returns A Promise resolving to a LoginResponse containing user profile and session.
+   * @returns A Promise resolving to an AuthResponse containing user profile and session.
    * @throws Error if credentials are invalid, profile is missing, or user lacks admin role.
    */
-  async login(email: string, password: string): Promise<LoginResponse> {
+  async login(email: string, password: string): Promise<AuthResponse> {
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -47,7 +47,7 @@ export class AuthService implements IAuthService {
 
     return {
       user: userProfile,
-      session: authData.session,
+      session: authData.session as unknown as Record<string, unknown>,
     };
   }
 }
