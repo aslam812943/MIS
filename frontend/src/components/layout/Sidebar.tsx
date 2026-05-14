@@ -1,11 +1,14 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { ROUTES } from '../../constants/routes';
+import { authService } from '../../services/auth.service';
 
 /**
  * Premium Sidebar component for dashboard navigation.
  */
 const Sidebar: React.FC = () => {
+  const user = authService.getCurrentUser();
+  const isAdmin = user?.role === 'admin';
   return (
     <aside className="w-[280px] bg-slate-900 border-r border-slate-800 flex flex-col p-6 sticky top-0 h-screen">
       <div className="mb-10">
@@ -25,17 +28,19 @@ const Sidebar: React.FC = () => {
           Dashboard
         </NavLink>
 
-        <NavLink 
-          to={ROUTES.ADMIN_PANEL} 
-          className={({ isActive }) => 
-            `flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all ${
-              isActive ? 'bg-indigo-500/10 text-indigo-400' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
-            }`
-          }
-        >
-          <span className="text-xl">🛡️</span>
-          Admin Panel
-        </NavLink>
+        {isAdmin && (
+          <NavLink 
+            to={ROUTES.ADMIN_PANEL} 
+            className={({ isActive }) => 
+              `flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all ${
+                isActive ? 'bg-indigo-500/10 text-indigo-400' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+              }`
+            }
+          >
+            <span className="text-xl">🛡️</span>
+            Admin Panel
+          </NavLink>
+        )}
       </nav>
 
       <div className="pt-6 border-t border-slate-800">

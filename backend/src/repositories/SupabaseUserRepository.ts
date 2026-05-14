@@ -9,6 +9,11 @@ interface ProfileRow {
   id: string;
   email: string;
   role: string;
+  full_name?: string;
+  branch_id?: string;
+  department_id?: string;
+  allowed_modules?: string[];
+  status?: 'active' | 'blocked';
   created_at: string;
   updated_at: string;
 }
@@ -53,6 +58,19 @@ export class SupabaseUserRepository implements IUserRepository {
   }
 
   /**
+   * Retrieves all user profiles.
+   */
+  async findAll(): Promise<User[]> {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) throw new Error(error.message);
+    return (data as ProfileRow[]).map(row => this.mapToUser(row));
+  }
+
+  /**
    * Creates a new user profile record.
    * 
    * @param user Partial user data to be inserted.
@@ -71,6 +89,39 @@ export class SupabaseUserRepository implements IUserRepository {
   }
 
   /**
+   * Updates an existing user profile.
+   * 
+   * @param id The UUID of the user.
+   * @param user Partial user data to be updated.
+   * @returns A Promise resolving to the updated User.
+   */
+  async update(id: string, user: Partial<User>): Promise<User> {
+    const { data, error } = await supabase
+      .from('profiles')
+      .update(user)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw new Error(error.message);
+    return this.mapToUser(data as ProfileRow);
+  }
+
+  /**
+   * Deletes a user profile record.
+   * 
+   * @param id The UUID of the user.
+   */
+  async delete(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('profiles')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw new Error(error.message);
+  }
+
+  /**
    * Maps a raw database row to the User model.
    * 
    * @param data The raw ProfileRow from the database.
@@ -82,6 +133,11 @@ export class SupabaseUserRepository implements IUserRepository {
       id: data.id,
       email: data.email,
       role: data.role as UserRole,
+      full_name: data.full_name,
+      branch_id: data.branch_id,
+      department_id: data.department_id,
+      allowed_modules: data.allowed_modules,
+      status: data.status,
       created_at: data.created_at,
       updated_at: data.updated_at,
     };
