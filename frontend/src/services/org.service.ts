@@ -39,6 +39,21 @@ export interface Module {
 }
 
 /**
+ * Interface for User data.
+ */
+export interface User {
+  id: string;
+  email: string;
+  role: 'admin' | 'ceo' | 'managing_director' | 'director' | 'executive' | 'hod' | 'regional_manager' | 'employee';
+  full_name?: string;
+  branch_id?: string;
+  department_id?: string;
+  allowed_modules?: string[];
+  status?: 'active' | 'blocked';
+  created_at?: string;
+}
+
+/**
  * Service to handle organizational API calls (Branches, Departments, and Modules).
  */
 export const orgService = {
@@ -133,5 +148,38 @@ export const orgService = {
    */
   async deleteModule(id: string): Promise<void> {
     await api.delete(`/admin/modules/${id}`);
+  },
+
+  /**
+   * Fetches all users.
+   */
+  async getUsers(): Promise<User[]> {
+    const response = await api.get('/admin/users');
+    return response.data;
+  },
+
+  /**
+   * Creates a new user.
+   */
+  async createUser(userData: Partial<User> & { password?: string }): Promise<User> {
+    const response = await api.post('/admin/users', userData);
+    return response.data;
+  },
+
+  /**
+   * Deletes a user.
+   */
+  async deleteUser(id: string): Promise<void> {
+    await api.delete(`/admin/users/${id}`);
+  },
+
+  async updateUser(id: string, userData: Partial<User>): Promise<User> {
+    const response = await api.patch(`/admin/users/${id}`, userData);
+    return response.data;
+  },
+
+  async updateUserStatus(id: string, status: 'active' | 'blocked'): Promise<User> {
+    const response = await api.patch(`/admin/users/${id}/status`, { status });
+    return response.data;
   }
 };
