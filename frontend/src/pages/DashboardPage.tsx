@@ -7,26 +7,26 @@ import Sidebar from '../components/layout/Sidebar';
  */
 const DashboardPage: React.FC = () => {
   return (
-    <div className="dashboard-layout">
+    <div className="flex min-h-screen bg-slate-950 text-slate-50">
       <Sidebar />
-      <main className="dashboard-content">
-        <header className="content-header">
-          <h1 className="text-gradient">Welcome back, Admin</h1>
-          <p>Here is an overview of the MIS system status.</p>
+      <main className="flex-1 p-10 overflow-y-auto">
+        <header className="mb-10">
+          <h1 className="text-4xl font-extrabold mb-2 bg-gradient-to-r from-indigo-500 to-purple-500 bg-clip-text text-transparent">Welcome back, Admin</h1>
+          <p className="text-slate-400">Here is an overview of the MIS system status.</p>
         </header>
 
-        <div className="admin-actions">
-          <div className="admin-card">
-            <h2>System Overview</h2>
-            <p>Use the sidebar to manage branches, departments, and user roles.</p>
-            <div style={{ marginTop: '2rem', display: 'flex', gap: '1rem' }}>
-              <div className="glass" style={{ padding: '1.5rem', borderRadius: '1rem', flex: 1 }}>
-                <h3>10</h3>
-                <p style={{ opacity: 0.7 }}>Total Branches</p>
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+          <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-3xl p-8">
+            <h2 className="text-xl font-bold mb-4">System Overview</h2>
+            <p className="text-slate-400 mb-8">Use the sidebar to manage branches, departments, and user roles.</p>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-white/5 border border-slate-800 p-6 rounded-2xl">
+                <h3 className="text-3xl font-bold text-indigo-400">10</h3>
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 mt-1">Total Branches</p>
               </div>
-              <div className="glass" style={{ padding: '1.5rem', borderRadius: '1rem', flex: 1 }}>
-                <h3>42</h3>
-                <p style={{ opacity: 0.7 }}>Departments</p>
+              <div className="bg-white/5 border border-slate-800 p-6 rounded-2xl">
+                <h3 className="text-3xl font-bold text-purple-400">42</h3>
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 mt-1">Departments</p>
               </div>
             </div>
           </div>

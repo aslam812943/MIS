@@ -1,4 +1,4 @@
-import type { Branch, Department, Module } from '../models/org.model.js';
+import type { Branch, Department, Module, ModuleField } from '../models/org.model.js';
 import type { IBranchRepository, IDepartmentRepository, IModuleRepository } from '../repositories/interfaces/IOrgRepository.js';
 
 /**
@@ -71,10 +71,11 @@ export class OrgService {
    * Adds a new module with validation.
    * 
    * @param name Name of the module.
+   * @param fields Custom fields for the module.
    * @returns The created module.
    * @throws Error if name is empty or already exists.
    */
-  async addModule(name: string): Promise<Module> {
+  async addModule(name: string, fields?: ModuleField[]): Promise<Module> {
     const trimmedName = name.trim();
     if (!trimmedName) {
       throw new Error('Module name cannot be empty or just spaces.');
@@ -85,7 +86,10 @@ export class OrgService {
       throw new Error(`A module with the name "${trimmedName}" already exists.`);
     }
 
-    return this.moduleRepository.create({ name: trimmedName });
+    return this.moduleRepository.create({ 
+      name: trimmedName, 
+      ...(fields ? { fields } : {}) 
+    } as any); // Cast to any to bypass exactOptionalPropertyTypes if needed, or better yet, fix the model.
   }
 
   /**
@@ -146,7 +150,7 @@ export class OrgService {
   /**
    * Updates a module.
    */
-  async updateModule(id: string, name: string): Promise<Module> {
+  async updateModule(id: string, name: string, fields?: ModuleField[]): Promise<Module> {
     const trimmedName = name.trim();
     if (!trimmedName) {
       throw new Error('Module name cannot be empty.');
@@ -157,7 +161,10 @@ export class OrgService {
       throw new Error(`A module with the name "${trimmedName}" already exists.`);
     }
 
-    return this.moduleRepository.update(id, { name: trimmedName });
+    return this.moduleRepository.update(id, { 
+      name: trimmedName, 
+      ...(fields ? { fields } : {}) 
+    } as any);
   }
 
   /**

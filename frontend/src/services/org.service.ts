@@ -21,11 +21,20 @@ export interface Department {
 }
 
 /**
+ * Represents a field within a module.
+ */
+export interface ModuleField {
+  name: string;
+  type: 'text' | 'number' | 'date';
+}
+
+/**
  * Interface for Module data.
  */
 export interface Module {
   id: string;
   name: string;
+  fields?: ModuleField[];
   created_at: string;
 }
 
@@ -76,8 +85,8 @@ export const orgService = {
   /**
    * Adds a new module.
    */
-  async addModule(name: string): Promise<Module> {
-    const response = await api.post('/admin/modules', { name });
+  async addModule(name: string, fields?: ModuleField[]): Promise<Module> {
+    const response = await api.post('/admin/modules', { name, fields });
     return response.data;
   },
 
@@ -114,8 +123,8 @@ export const orgService = {
   /**
    * Updates a module.
    */
-  async updateModule(id: string, name: string): Promise<Module> {
-    const response = await api.patch(`/admin/modules/${id}`, { name });
+  async updateModule(id: string, name: string, fields?: ModuleField[]): Promise<Module> {
+    const response = await api.patch(`/admin/modules/${id}`, { name, fields });
     return response.data;
   },
 

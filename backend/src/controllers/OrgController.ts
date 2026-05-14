@@ -67,8 +67,8 @@ export class OrgController {
    */
   addModule = async (req: Request, res: Response): Promise<void> => {
     try {
-      const { name } = req.body;
-      const module = await this.orgService.addModule(name);
+      const { name, fields } = req.body;
+      const module = await this.orgService.addModule(name, fields);
       res.status(HttpStatus.CREATED).json(module);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Failed to add module';
@@ -153,8 +153,8 @@ export class OrgController {
   updateModule = async (req: Request, res: Response): Promise<void> => {
     try {
       const id = req.params.id as string;
-      const { name } = req.body;
-      const module = await this.orgService.updateModule(id, name);
+      const { name, fields } = req.body;
+      const module = await this.orgService.updateModule(id, name, fields);
       res.status(HttpStatus.OK).json(module);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Failed to update module';
