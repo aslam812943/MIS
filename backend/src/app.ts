@@ -22,7 +22,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Routes
-app.use('/api/auth', loginRateLimiter, authRoutes);
+app.use('/api/auth', authRoutes);
 app.use('/api/admin', protectedRoutes);
 
 // Health Check

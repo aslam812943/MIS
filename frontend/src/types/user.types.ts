@@ -16,8 +16,12 @@ export interface User {
   email: string;
   role: UserRole;
   full_name?: string;
+  phone_number?: string;
+  avatar_url?: string;
   branch_id?: string;
+  branch_name?: string;
   department_id?: string;
+  department_name?: string;
   allowed_modules?: string[];
   status?: 'active' | 'blocked';
   created_at?: string;

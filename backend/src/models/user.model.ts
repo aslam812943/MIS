@@ -14,8 +14,12 @@ export interface User {
   email: string;
   role: UserRole;
   full_name?: string | undefined;
+  phone_number?: string | undefined;
+  avatar_url?: string | undefined;
   branch_id?: string | undefined;
+  branch_name?: string | undefined;
   department_id?: string | undefined;
+  department_name?: string | undefined;
   allowed_modules?: string[] | undefined;
   status?: 'active' | 'blocked' | undefined;
   created_at?: string | undefined;

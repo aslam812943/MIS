@@ -37,4 +37,17 @@ api.interceptors.response.use(
   }
 );
 
+// Response interceptor to handle unauthorized access (401)
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response && error.response.status === 401) {
+      // Clear user data and redirect to login if token is invalid/expired
+      localStorage.removeItem('user');
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
+
 export default api;
