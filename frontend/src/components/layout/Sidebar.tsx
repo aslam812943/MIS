@@ -41,12 +41,24 @@ const Sidebar: React.FC = () => {
             Admin Panel
           </NavLink>
         )}
+
+        <NavLink 
+          to={ROUTES.PROFILE} 
+          className={({ isActive }) => 
+            `flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all ${
+              isActive ? 'bg-indigo-500/10 text-indigo-400' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+            }`
+          }
+        >
+          <span className="text-xl">👤</span>
+          My Profile
+        </NavLink>
       </nav>
 
       <div className="pt-6 border-t border-slate-800">
         <button 
           className="w-full p-3 rounded-xl border border-slate-800 text-red-400 font-semibold hover:bg-red-400/10 transition-all cursor-pointer"
-          onClick={() => { localStorage.clear(); window.location.href = ROUTES.LOGIN; }}
+          onClick={() => authService.logout()}
         >
           Logout
         </button>

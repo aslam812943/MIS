@@ -2,8 +2,10 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import AdminPanelPage from './pages/AdminPanelPage';
+import ProfilePage from './pages/ProfilePage';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import { ROUTES } from './constants/routes';
+import { Toaster } from 'react-hot-toast';
 
 /**
  * Main Application component that handles routing and global layouts.
@@ -11,6 +13,7 @@ import { ROUTES } from './constants/routes';
 function App() {
   return (
     <Router>
+      <Toaster position="top-right" />
       <Routes>
         {/* Authentication Routes */}
         <Route path={ROUTES.LOGIN} element={<LoginPage />} />
@@ -30,6 +33,15 @@ function App() {
           element={
             <ProtectedRoute>
               <AdminPanelPage />
+            </ProtectedRoute>
+          } 
+        />
+        
+        <Route 
+          path={ROUTES.PROFILE} 
+          element={
+            <ProtectedRoute>
+              <ProfilePage />
             </ProtectedRoute>
           } 
         />

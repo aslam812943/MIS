@@ -10,8 +10,12 @@ interface ProfileRow {
   email: string;
   role: string;
   full_name?: string;
+  phone_number?: string;
+  avatar_url?: string;
   branch_id?: string;
   department_id?: string;
+  branches?: { name: string };
+  departments?: { name: string };
   allowed_modules?: string[];
   status?: 'active' | 'blocked';
   created_at: string;
@@ -32,7 +36,7 @@ export class SupabaseUserRepository implements IUserRepository {
   async findById(id: string): Promise<User | null> {
     const { data, error } = await supabase
       .from('profiles')
-      .select('*')
+      .select('*, branches(name), departments(name)')
       .eq('id', id)
       .single();
 
@@ -49,7 +53,7 @@ export class SupabaseUserRepository implements IUserRepository {
   async findByEmail(email: string): Promise<User | null> {
     const { data, error } = await supabase
       .from('profiles')
-      .select('*')
+      .select('*, branches(name), departments(name)')
       .eq('email', email)
       .single();
 
@@ -81,7 +85,7 @@ export class SupabaseUserRepository implements IUserRepository {
     const { data, error } = await supabase
       .from('profiles')
       .insert([user])
-      .select()
+      .select('*, branches(name), departments(name)')
       .single();
 
     if (error) throw new Error(error.message);
@@ -100,7 +104,7 @@ export class SupabaseUserRepository implements IUserRepository {
       .from('profiles')
       .update(user)
       .eq('id', id)
-      .select()
+      .select('*, branches(name), departments(name)')
       .single();
 
     if (error) throw new Error(error.message);
@@ -134,8 +138,12 @@ export class SupabaseUserRepository implements IUserRepository {
       email: data.email,
       role: data.role as UserRole,
       full_name: data.full_name,
+      phone_number: data.phone_number,
+      avatar_url: data.avatar_url,
       branch_id: data.branch_id,
+      branch_name: data.branches?.name,
       department_id: data.department_id,
+      department_name: data.departments?.name,
       allowed_modules: data.allowed_modules,
       status: data.status,
       created_at: data.created_at,

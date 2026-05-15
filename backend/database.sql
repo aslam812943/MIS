@@ -31,6 +31,8 @@ CREATE TABLE IF NOT EXISTS profiles (
     email TEXT NOT NULL,
     role TEXT DEFAULT 'employee' CHECK (role IN ('admin', 'ceo', 'managing_director', 'director', 'executive', 'hod', 'regional_manager', 'employee')),
     full_name TEXT,
+    phone_number TEXT,
+    avatar_url TEXT,
     branch_id UUID REFERENCES branches(id) ON DELETE SET NULL,
     department_id UUID REFERENCES departments(id) ON DELETE SET NULL,
     allowed_modules TEXT[] DEFAULT '{}', -- Array of module IDs user can access
@@ -38,6 +40,12 @@ CREATE TABLE IF NOT EXISTS profiles (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
+
+-- 5. STORAGE BUCKETS (Supabase Storage)
+-- Run these in SQL Editor to set up image storage
+-- INSERT INTO storage.buckets (id, name, public) VALUES ('avatars', 'avatars', true) ON CONFLICT (id) DO NOTHING;
+-- CREATE POLICY "Public Access" ON storage.objects FOR SELECT USING ( bucket_id = 'avatars' );
+-- CREATE POLICY "Users can upload avatars" ON storage.objects FOR INSERT WITH CHECK ( bucket_id = 'avatars' AND auth.role() = 'authenticated' );
 
 -- 5. ROW LEVEL SECURITY (RLS)
 -- Disable RLS for now to allow backend access, or set up policies
