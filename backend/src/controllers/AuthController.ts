@@ -1,6 +1,7 @@
 import { type Request, type Response } from 'express';
 import type { IAuthService } from '../services/interfaces/IAuthService.js';
 import { HttpStatus } from '../utils/httpStatus.js';
+import jwt from 'jsonwebtoken';
 
 /**
  * Controller responsible for handling authentication-related requests.
@@ -13,26 +14,55 @@ export class AuthController {
 
   /**
    * Processes the user login request.
-   * Validates input, calls the auth service, and returns the result or an error message.
-   * 
-   * @param req Express Request object containing email and password in the body.
-   * @param res Express Response object.
-   * @returns A Promise that resolves to void.
+   * Validates input, calls the auth service, generates a JWT, and sets a secure cookie.
    */
   login = async (req: Request, res: Response): Promise<void> => {
     try {
-      const { email, password } = req.body;
+      const { email, password, role } = req.body;
 
-      if (!email || !password) {
-        res.status(HttpStatus.BAD_REQUEST).json({ message: 'Email and password are required' });
+      if (!email || !password || !role) {
+        res.status(HttpStatus.BAD_REQUEST).json({ message: 'Email, password, and role are required' });
         return;
       }
 
-      const loginResult = await this.authService.login(email, password);
-      res.status(HttpStatus.OK).json(loginResult);
+      const loginResult = await this.authService.login(email, password, role);
+
+      // Generate secure JWT token
+      const token = jwt.sign(
+        { 
+          id: loginResult.user.id, 
+          email: loginResult.user.email, 
+          role: loginResult.user.role 
+        },
+        process.env.JWT_SECRET || 'mis-super-secret-key-2025',
+        { expiresIn: '2h' }
+      );
+
+      // Set secure HTTP-only cookie
+      res.cookie('token', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 2 * 60 * 60 * 1000, // 2 hours in milliseconds
+      });
+
+      // Send user data back (but not the session token as it's in the cookie)
+      res.status(HttpStatus.OK).json({
+        user: loginResult.user,
+        message: 'Login successful'
+      });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred during login';
       res.status(HttpStatus.UNAUTHORIZED).json({ message: errorMessage });
     }
+  };
+
+  /**
+   * Processes the user logout request.
+   * Clears the authentication cookie.
+   */
+  logout = async (req: Request, res: Response): Promise<void> => {
+    res.clearCookie('token');
+    res.status(HttpStatus.OK).json({ message: 'Logged out successfully' });
   };
 }

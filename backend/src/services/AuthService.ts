@@ -14,15 +14,15 @@ export class AuthService implements IAuthService {
   constructor(private userRepository: IUserRepository) {}
 
   /**
-   * Authenticates a user with email and password.
+   * Authenticates a user with email, password, and selected role.
    * Verifies credentials via Supabase Auth and validates the user role.
    * 
    * @param email User's email address.
    * @param password User's password.
+   * @param role User's selected role.
    * @returns A Promise resolving to an AuthResponse containing user profile and session.
-   * @throws Error if credentials are invalid, profile is missing, or user lacks admin role.
    */
-  async login(email: string, password: string): Promise<AuthResponse> {
+  async login(email: string, password: string, role: string): Promise<AuthResponse> {
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -38,11 +38,18 @@ export class AuthService implements IAuthService {
       throw new Error('User profile not found in MIS database');
     }
 
-    // Role-Based Access Control: Ensure only administrators can access this portal
-    if (userProfile.role !== UserRole.ADMIN) {
-      // Security: Sign out the user immediately if they lack the required role
+    // Security: Prevent login if account is blocked
+    if (userProfile.status === 'blocked') {
       await supabase.auth.signOut();
-      throw new Error('Access denied: Administrator privileges are required');
+      throw new Error('Access denied: Your account has been suspended. Please contact the administrator.');
+    }
+
+    // Role-Based Access Control: Validate selected role against database role
+    if (userProfile.role !== role) {
+      // Security: Sign out the user immediately if the role doesn't match
+      await supabase.auth.signOut();
+      // Secure Message: Don't reveal the user's actual role to prevent mapping
+      throw new Error('Access denied: Invalid role selection for this account');
     }
 
     return {

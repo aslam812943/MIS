@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { ROUTES } from '../constants/routes';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
@@ -24,24 +25,26 @@ interface AuthResponse {
 export const authService = {
   /**
    * Authenticates a user against the backend API.
-   * On success, stores the session and user data in local storage.
+   * On success, stores user data in local storage.
    * 
    * @param email User's email address.
    * @param password User's password.
+   * @param role User's selected role.
    * @returns A Promise resolving to the authentication data.
-   * @throws Error if the API call fails or returns an error status.
    */
-  async login(email: string, password: string): Promise<AuthResponse> {
+  async login(email: string, password: string, role: string): Promise<AuthResponse> {
     try {
       const response = await axios.post<AuthResponse>(`${API_URL}/auth/login`, {
         email,
         password,
+        role
+      }, {
+        withCredentials: true // Essential for sending/receiving cookies
       });
 
       const authData = response.data;
       
-      // Persistent storage of session details
-      localStorage.setItem('session', JSON.stringify(authData.session));
+      // Persistent storage of user data
       localStorage.setItem('user', JSON.stringify(authData.user));
       
       return authData;
@@ -54,17 +57,21 @@ export const authService = {
   },
 
   /**
-   * Clears the current user session from local storage.
+   * Clears the current user session from local storage and backend cookies.
    */
-  logout(): void {
-    localStorage.removeItem('session');
-    localStorage.removeItem('user');
+  async logout(): Promise<void> {
+    try {
+      await axios.post(`${API_URL}/auth/logout`, {}, { withCredentials: true });
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      localStorage.removeItem('user');
+      window.location.href = ROUTES.LOGIN;
+    }
   },
 
   /**
    * Retrieves the currently logged-in user's profile from local storage.
-   * 
-   * @returns The user object or null if no session exists.
    */
   getCurrentUser(): AuthResponse['user'] | null {
     const userData = localStorage.getItem('user');
@@ -72,18 +79,9 @@ export const authService = {
   },
 
   /**
-   * Retrieves the current access token from the stored session.
-   * 
-   * @returns The access token string or null if not found.
+   * Checks if a user is currently authenticated (has a profile in local storage).
    */
-  getToken(): string | null {
-    const sessionData = localStorage.getItem('session');
-    if (!sessionData) return null;
-    try {
-      const session = JSON.parse(sessionData);
-      return (session as Record<string, string>).access_token || null;
-    } catch {
-      return null;
-    }
+  isAuthenticated(): boolean {
+    return !!localStorage.getItem('user');
   }
 };
