@@ -1,5 +1,4 @@
 import axios from 'axios';
-import { authService } from './auth.service';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
@@ -9,18 +8,15 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
  */
 const api = axios.create({
   baseURL: API_URL,
+  withCredentials: true, // Enable cookies for all requests
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Request interceptor to add authorization header
+// Request interceptor (Simplified as tokens are now handled by cookies)
 api.interceptors.request.use(
   (config) => {
-    const token = authService.getToken();
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
     return config;
   },
   (error) => {

@@ -15,10 +15,8 @@ interface ProtectedRouteProps {
  * @param children The component(s) to render if authenticated.
  */
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
-  const token = authService.getToken();
-
-  if (!token) {
-    // No token found, redirect to login
+  if (!authService.isAuthenticated()) {
+    // No user profile found, redirect to login
     return <Navigate to={ROUTES.LOGIN} replace />;
   }
 
