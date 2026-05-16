@@ -4,6 +4,7 @@ import rateLimit from 'express-rate-limit';
 import { AuthController } from '../controllers/AuthController.js';
 import { AuthService } from '../services/AuthService.js';
 import { SupabaseUserRepository } from '../repositories/SupabaseUserRepository.js';
+import { EmailService } from '../services/EmailService.js';
 import { ProfileController } from '../controllers/ProfileController.js';
 import { ProfileService } from '../services/ProfileService.js';
 import { requireAuth } from '../middlewares/requireAuth.js';
@@ -23,7 +24,8 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 // Dependency Injection
 const userRepository = new SupabaseUserRepository();
-const authService = new AuthService(userRepository);
+const emailService = new EmailService();
+const authService = new AuthService(userRepository, emailService);
 const authController = new AuthController(authService);
 
 const profileService = new ProfileService(userRepository);
@@ -32,6 +34,8 @@ const profileController = new ProfileController(profileService);
 // Public Routes
 router.post('/login', loginRateLimiter, authController.login);
 router.post('/logout', authController.logout);
+router.post('/forgot-password/request-otp', loginRateLimiter, authController.requestOTP);
+router.post('/forgot-password/reset', loginRateLimiter, authController.resetPassword);
 
 // Protected Profile Routes
 router.get('/me', requireAuth, profileController.getMe);
