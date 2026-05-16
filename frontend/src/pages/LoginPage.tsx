@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import LoginForm from '../components/auth/LoginForm';
+import ForgotPasswordForm from '../components/auth/ForgotPasswordForm';
 import RoleSelector from '../components/auth/RoleSelector';
 import { UserRole } from '../types/user.types';
 
 const LoginPage: React.FC = () => {
   const [selectedRole, setSelectedRole] = useState<UserRole>(UserRole.ADMIN);
+  const [showForgotPassword, setShowForgotPassword] = useState<boolean>(false);
 
   return (
     <div className="min-h-screen bg-brand-dark flex flex-col items-center justify-center p-6 relative overflow-hidden">
@@ -29,9 +31,19 @@ const LoginPage: React.FC = () => {
             <RoleSelector selectedRole={selectedRole} onSelect={setSelectedRole} />
           </div>
 
-          {/* Right Side: Login Form */}
+          {/* Right Side: Auth Form */}
           <div className="w-full max-w-md flex flex-col items-center">
-            <LoginForm selectedRole={selectedRole} />
+            {showForgotPassword ? (
+              <ForgotPasswordForm 
+                selectedRole={selectedRole} 
+                onBackToLogin={() => setShowForgotPassword(false)} 
+              />
+            ) : (
+              <LoginForm 
+                selectedRole={selectedRole} 
+                onForgotPassword={() => setShowForgotPassword(true)} 
+              />
+            )}
           </div>
         </div>
         

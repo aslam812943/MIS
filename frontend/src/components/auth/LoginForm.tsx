@@ -5,13 +5,14 @@ import { UserRole } from '../../types/user.types';
 
 interface LoginFormProps {
   selectedRole: UserRole;
+  onForgotPassword: () => void;
 }
 
 /**
  * Component for the authenticated login form.
  * Handles user input, validation, and interaction with the Auth Service.
  */
-const LoginForm: React.FC<LoginFormProps> = ({ selectedRole }) => {
+const LoginForm: React.FC<LoginFormProps> = ({ selectedRole, onForgotPassword }) => {
   const [email, setEmail] = useState<string>('admin@gmail.com');
   const [password, setPassword] = useState<string>('111111');
   const [error, setError] = useState<string>('');
@@ -94,6 +95,16 @@ const LoginForm: React.FC<LoginFormProps> = ({ selectedRole }) => {
             className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-primary/50 focus:border-brand-primary transition-all"
             required
           />
+        </div>
+
+        <div className="flex justify-end -mt-4">
+          <button
+            type="button"
+            onClick={onForgotPassword}
+            className="text-xs font-medium text-brand-primary hover:text-brand-primary/80 transition-colors"
+          >
+            Forgot Password?
+          </button>
         </div>
 
         {error && (

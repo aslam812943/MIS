@@ -65,4 +65,44 @@ export class AuthController {
     res.clearCookie('token');
     res.status(HttpStatus.OK).json({ message: 'Logged out successfully' });
   };
+
+  /**
+   * Handles the request to send a password reset OTP.
+   */
+  requestOTP = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { email, role } = req.body;
+
+      if (!email || !role) {
+        res.status(HttpStatus.BAD_REQUEST).json({ message: 'Email and role are required' });
+        return;
+      }
+
+      await this.authService.requestPasswordReset(email, role);
+      res.status(HttpStatus.OK).json({ message: 'If an account exists, an OTP has been sent to your email.' });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to request OTP';
+      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ message: errorMessage });
+    }
+  };
+
+  /**
+   * Handles the password reset request using OTP.
+   */
+  resetPassword = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { email, otp, newPassword, role } = req.body;
+
+      if (!email || !otp || !newPassword || !role) {
+        res.status(HttpStatus.BAD_REQUEST).json({ message: 'Email, OTP, new password, and role are required' });
+        return;
+      }
+
+      await this.authService.resetPassword(email, otp, newPassword, role);
+      res.status(HttpStatus.OK).json({ message: 'Password reset successful. You can now log in with your new password.' });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to reset password';
+      res.status(HttpStatus.BAD_REQUEST).json({ message: errorMessage });
+    }
+  };
 }

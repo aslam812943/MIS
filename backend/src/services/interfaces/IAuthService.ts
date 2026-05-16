@@ -15,4 +15,22 @@ export interface IAuthService {
    * @returns A Promise resolving to an AuthResponse.
    */
   login(email: string, password: string, role: string): Promise<AuthResponse>;
+
+  /**
+   * Requests a password reset OTP for the given email and role.
+   * 
+   * @param email User's email address.
+   * @param role User's selected role.
+   */
+  requestPasswordReset(email: string, role: string): Promise<void>;
+
+  /**
+   * Resets the user's password using the provided OTP.
+   * 
+   * @param email User's email address.
+   * @param otp 6-digit OTP.
+   * @param newPassword New password to set.
+   * @param role User's selected role.
+   */
+  resetPassword(email: string, otp: string, newPassword: string, role: string): Promise<void>;
 }

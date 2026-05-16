@@ -83,5 +83,33 @@ export const authService = {
    */
   isAuthenticated(): boolean {
     return !!localStorage.getItem('user');
+  },
+
+  /**
+   * Requests a password reset OTP.
+   */
+  async requestOTP(email: string, role: string): Promise<void> {
+    try {
+      await axios.post(`${API_URL}/auth/forgot-password/request-otp`, { email, role });
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        throw new Error(error.response?.data?.message || 'Failed to request OTP');
+      }
+      throw error;
+    }
+  },
+
+  /**
+   * Resets the password using the OTP.
+   */
+  async resetPassword(email: string, otp: string, newPassword: string, role: string): Promise<void> {
+    try {
+      await axios.post(`${API_URL}/auth/forgot-password/reset`, { email, otp, newPassword, role });
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        throw new Error(error.response?.data?.message || 'Failed to reset password');
+      }
+      throw error;
+    }
   }
 };
