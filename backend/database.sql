@@ -50,10 +50,20 @@ CREATE TABLE IF NOT EXISTS data_entries (
     user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
     entry_date DATE NOT NULL,
     data JSONB NOT NULL DEFAULT '{}'::jsonb,
+    department_id UUID REFERENCES departments(id) ON DELETE CASCADE,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    verified_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
+    verified_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
     UNIQUE(module_id, user_id, entry_date)
 );
+
+-- Note: Run these SQL queries in your Supabase SQL Editor if you are updating an existing database:
+-- ALTER TABLE data_entries ADD COLUMN IF NOT EXISTS department_id UUID REFERENCES departments(id) ON DELETE CASCADE;
+-- ALTER TABLE data_entries ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'pending';
+-- ALTER TABLE data_entries ADD COLUMN IF NOT EXISTS verified_by UUID REFERENCES profiles(id) ON DELETE SET NULL;
+-- ALTER TABLE data_entries ADD COLUMN IF NOT EXISTS verified_at TIMESTAMP WITH TIME ZONE;
 
 -- Note: If you already created the data_entries table, run this to apply the new constraint:
 -- ALTER TABLE data_entries DROP CONSTRAINT IF EXISTS data_entries_module_id_branch_id_entry_date_key;

@@ -88,5 +88,7 @@ router.delete('/users/:id', requireAuth, requireAdmin, userController.deleteUser
  */
 router.get('/data-entries', requireAuth, dataEntryController.getEntry);
 router.post('/data-entries', requireAuth, dataEntryController.saveEntry);
+router.get('/department-entries', requireAuth, dataEntryController.getDepartmentEntries);
+router.post('/data-entries/:id/verify', requireAuth, dataEntryController.verifyEntry);
 
 export default router;
