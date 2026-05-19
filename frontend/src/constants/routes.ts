@@ -7,6 +7,7 @@ export const ROUTES = {
   DASHBOARD: '/dashboard',
   ADMIN_PANEL: '/admin-panel',
   PROFILE: '/profile',
+  DATA_ENTRY: '/data-entry',
   ROOT: '/',
 } as const;
 

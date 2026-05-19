@@ -28,6 +28,19 @@ const Sidebar: React.FC = () => {
           Dashboard
         </NavLink>
 
+        <NavLink 
+          to={ROUTES.DATA_ENTRY} 
+          className={({ isActive }) => 
+            `flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all ${
+              isActive ? 'bg-indigo-500/10 text-indigo-400' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+            }`
+          }
+        >
+          <span className="text-xl">📝</span>
+          Data Entry
+        </NavLink>
+
+
         {isAdmin && (
           <NavLink 
             to={ROUTES.ADMIN_PANEL} 

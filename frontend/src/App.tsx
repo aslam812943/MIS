@@ -3,7 +3,9 @@ import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import AdminPanelPage from './pages/AdminPanelPage';
 import ProfilePage from './pages/ProfilePage';
+import DataEntryPage from './pages/DataEntry/DataEntryPage';
 import ProtectedRoute from './components/auth/ProtectedRoute';
+
 import { ROUTES } from './constants/routes';
 import { Toaster } from 'react-hot-toast';
 
@@ -42,6 +44,15 @@ function App() {
           element={
             <ProtectedRoute>
               <ProfilePage />
+            </ProtectedRoute>
+          } 
+        />
+        
+        <Route 
+          path={ROUTES.DATA_ENTRY} 
+          element={
+            <ProtectedRoute>
+              <DataEntryPage />
             </ProtectedRoute>
           } 
         />
