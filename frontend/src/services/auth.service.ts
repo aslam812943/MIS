@@ -3,15 +3,13 @@ import { ROUTES } from '../constants/routes';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
+import type { User } from '../types/user.types';
+
 /**
  * Interface representing the login response from the backend.
  */
 interface AuthResponse {
-  user: {
-    id: string;
-    email: string;
-    role: string;
-  };
+  user: User;
   session: {
     access_token: string;
     [key: string]: unknown;
@@ -73,7 +71,7 @@ export const authService = {
   /**
    * Retrieves the currently logged-in user's profile from local storage.
    */
-  getCurrentUser(): AuthResponse['user'] | null {
+  getCurrentUser(): User | null {
     const userData = localStorage.getItem('user');
     return userData ? JSON.parse(userData) : null;
   },

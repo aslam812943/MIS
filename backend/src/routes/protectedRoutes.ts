@@ -13,6 +13,9 @@ import { SupabaseUserRepository } from '../repositories/SupabaseUserRepository.j
 import { UserService } from '../services/UserService.js';
 import { UserController } from '../controllers/UserController.js';
 import { EmailService } from '../services/EmailService.js';
+import { SupabaseDataEntryRepository } from '../repositories/SupabaseDataEntryRepository.js';
+import { DataEntryService } from '../services/DataEntryService.js';
+import { DataEntryController } from '../controllers/DataEntryController.js';
 
 const router = Router();
 
@@ -29,7 +32,12 @@ const emailService = new EmailService();
 const userService = new UserService(userRepository, emailService);
 const userController = new UserController(userService);
 
+const dataEntryRepository = new SupabaseDataEntryRepository();
+const dataEntryService = new DataEntryService(dataEntryRepository, userRepository);
+const dataEntryController = new DataEntryController(dataEntryService);
+
 /**
+
  * Dashboard endpoints
  */
 router.get('/dashboard-data', requireAuth, (req, res) => {
@@ -74,5 +82,11 @@ router.post('/users', requireAuth, requireAdmin, userController.createUser);
 router.patch('/users/:id', requireAuth, requireAdmin, userController.updateUser);
 router.patch('/users/:id/status', requireAuth, requireAdmin, userController.updateStatus);
 router.delete('/users/:id', requireAuth, requireAdmin, userController.deleteUser);
+
+/**
+ * Data entry endpoints
+ */
+router.get('/data-entries', requireAuth, dataEntryController.getEntry);
+router.post('/data-entries', requireAuth, dataEntryController.saveEntry);
 
 export default router;
