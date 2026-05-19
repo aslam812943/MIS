@@ -4,6 +4,7 @@ import DashboardPage from './pages/DashboardPage';
 import AdminPanelPage from './pages/AdminPanelPage';
 import ProfilePage from './pages/ProfilePage';
 import DataEntryPage from './pages/DataEntry/DataEntryPage';
+import VerifyEntriesPage from './pages/DataEntry/VerifyEntriesPage';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 
 import { ROUTES } from './constants/routes';
@@ -53,6 +54,15 @@ function App() {
           element={
             <ProtectedRoute>
               <DataEntryPage />
+            </ProtectedRoute>
+          } 
+        />
+
+        <Route 
+          path={ROUTES.VERIFY_ENTRIES} 
+          element={
+            <ProtectedRoute>
+              <VerifyEntriesPage />
             </ProtectedRoute>
           } 
         />

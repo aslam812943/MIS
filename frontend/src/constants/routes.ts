@@ -8,6 +8,7 @@ export const ROUTES = {
   ADMIN_PANEL: '/admin-panel',
   PROFILE: '/profile',
   DATA_ENTRY: '/data-entry',
+  VERIFY_ENTRIES: '/verify-entries',
   ROOT: '/',
 } as const;
 
