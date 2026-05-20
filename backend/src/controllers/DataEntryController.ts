@@ -1,6 +1,7 @@
 import { type Request, type Response } from 'express';
 import { DataEntryService } from '../services/DataEntryService.js';
 import { HttpStatus } from '../utils/httpStatus.js';
+import { logAudit } from '../utils/auditLogger.js';
 
 export class DataEntryController {
   constructor(private dataEntryService: DataEntryService) {}
@@ -46,7 +47,22 @@ export class DataEntryController {
         user_id: targetUserId
       };
 
+      // Audit Log pre-fetch
+      let oldEntry = null;
+      if (payload.entry_date && payload.module_id && payload.user_id) {
+        oldEntry = await this.dataEntryService.getEntry(
+          payload.entry_date,
+          payload.module_id,
+          payload.user_id
+        );
+      }
+
       const entry = await this.dataEntryService.saveEntry(payload, requesterId, requesterRole);
+
+      // Audit Log trigger
+      const action = oldEntry ? 'UPDATE' : 'INSERT';
+      logAudit(req, action, 'data_entries', entry.id, oldEntry, entry);
+
       res.status(HttpStatus.OK).json(entry);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to save data entry';
@@ -81,6 +97,7 @@ export class DataEntryController {
   verifyEntry = async (req: Request, res: Response): Promise<void> => {
     try {
       const { id } = req.params;
+      const entryId = id as string;
       const requesterId = (req as any).user?.id;
       const requesterRole = (req as any).user?.role;
 
@@ -89,12 +106,17 @@ export class DataEntryController {
         return;
       }
 
-      if (!id) {
+      if (!entryId) {
         res.status(HttpStatus.BAD_REQUEST).json({ message: 'Entry ID is required.' });
         return;
       }
 
-      const entry = await this.dataEntryService.verifyEntry(id as string, requesterId);
+      const oldEntry = await this.dataEntryService.getEntryById(entryId);
+      const entry = await this.dataEntryService.verifyEntry(entryId, requesterId);
+
+      // Audit Log
+      logAudit(req, 'UPDATE', 'data_entries', entryId, oldEntry, entry);
+
       res.status(HttpStatus.OK).json(entry);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to verify entry';

@@ -181,4 +181,11 @@ export class UserService {
     // 2. Update status in profiles table
     return this.userRepository.update(id, { status });
   }
+
+  /**
+   * Helper method to retrieve user profiles for auditing/history.
+   */
+  async getUserById(id: string): Promise<User | null> {
+    return this.userRepository.findById(id);
+  }
 }

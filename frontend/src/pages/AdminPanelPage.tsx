@@ -5,11 +5,13 @@ import { orgService } from '../services/org.service';
 import type { Branch, Department, Module } from '../services/org.service';
 import Sidebar from '../components/layout/Sidebar';
 import ConfirmModal from '../components/common/ConfirmModal';
+import AuditLogsTab from '../components/admin/AuditLogsTab';
 
 /**
  * Admin Panel Page for managing organizational entities.
  */
 const AdminPanelPage: React.FC = () => {
+  const [mainTab, setMainTab] = useState<'management' | 'audit'>('management');
   const [branches, setBranches] = useState<Branch[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [modules, setModules] = useState<Module[]>([]);
@@ -436,33 +438,61 @@ const AdminPanelPage: React.FC = () => {
       <Sidebar />
       <main className="flex-1 p-10 overflow-y-auto">
         <Toaster position="top-right" />
-        <header className="mb-10 flex justify-between items-end">
-          <div>
-            <h1 className="text-4xl font-extrabold mb-2 bg-gradient-to-r from-indigo-500 to-purple-500 bg-clip-text text-transparent">Admin Panel</h1>
-            <p className="text-slate-400">Configure organizational branches, departments, modules, and user access.</p>
+
+        {/* ── Page Header ───────────────────────────────── */}
+        <header className="mb-8">
+          <div className="flex justify-between items-start mb-6">
+            <div>
+              <h1 className="text-4xl font-extrabold mb-2 bg-gradient-to-r from-indigo-500 to-purple-500 bg-clip-text text-transparent">Admin Panel</h1>
+              <p className="text-slate-400">Manage your organisation and review the full system activity history.</p>
+            </div>
+            {mainTab === 'management' && (
+              <button
+                onClick={() => {
+                  setUserData({ full_name: '', email: '', password: '', role: 'employee', branch_id: '', department_id: '', allowed_modules: [] });
+                  setEditingId(null);
+                  setIsEditingUser(false);
+                  setIsUserModalOpen(true);
+                }}
+                className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl px-6 py-3 font-bold flex items-center gap-2 transition-all hover:scale-[1.02] shadow-lg shadow-indigo-600/20"
+              >
+                <span>+</span> Add User
+              </button>
+            )}
           </div>
-          <button 
-            onClick={() => {
-              setUserData({
-                full_name: '',
-                email: '',
-                password: '',
-                role: 'employee',
-                branch_id: '',
-                department_id: '',
-                allowed_modules: []
-              });
-              setEditingId(null);
-              setIsEditingUser(false);
-              setIsUserModalOpen(true);
-            }}
-            className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl px-6 py-3 font-bold flex items-center gap-2 transition-all hover:scale-[1.02] shadow-lg shadow-indigo-600/20"
-          >
-            <span>+</span> Add User
-          </button>
+
+          {/* ── Main Tab Navigation ─────────────────────── */}
+          <div className="flex gap-1 p-1.5 bg-slate-900/60 border border-slate-800 rounded-2xl w-fit">
+            <button
+              id="tab-management"
+              onClick={() => setMainTab('management')}
+              className={`flex items-center gap-2.5 px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${
+                mainTab === 'management'
+                  ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+              }`}
+            >
+              <span>🛠️</span> Management Control
+            </button>
+            <button
+              id="tab-audit"
+              onClick={() => setMainTab('audit')}
+              className={`flex items-center gap-2.5 px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${
+                mainTab === 'audit'
+                  ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+              }`}
+            >
+              <span>📜</span> System History Logs
+            </button>
+          </div>
         </header>
 
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+        {/* ── Audit Logs Tab ─────────────────────────────── */}
+        {mainTab === 'audit' && <AuditLogsTab />}
+
+        {/* ── Management Tab ─────────────────────────────── */}
+        {mainTab === 'management' && <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
           {/* Branches Section */}
           <section className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-3xl p-8">
             <div className="mb-6">
@@ -864,7 +894,7 @@ const AdminPanelPage: React.FC = () => {
               </table>
             </div>
           </section>
-        </div>
+        </div>}
       </main>
 
       {/* Add New User Modal */}
