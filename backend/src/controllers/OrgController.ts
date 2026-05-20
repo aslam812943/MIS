@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import { OrgService } from '../services/OrgService.js';
 import { HttpStatus } from '../utils/httpStatus.js';
+import { logAudit } from '../utils/auditLogger.js';
 
 /**
  * Controller for organizational management (Branches/Departments/Modules).
@@ -15,6 +16,10 @@ export class OrgController {
     try {
       const { name } = req.body;
       const branch = await this.orgService.addBranch(name);
+      
+      // Audit Log
+      logAudit(req, 'INSERT', 'branches', branch.id, null, branch);
+
       res.status(HttpStatus.CREATED).json(branch);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Failed to add branch';
@@ -42,6 +47,10 @@ export class OrgController {
     try {
       const { name } = req.body;
       const department = await this.orgService.addDepartment(name);
+
+      // Audit Log
+      logAudit(req, 'INSERT', 'departments', department.id, null, department);
+
       res.status(HttpStatus.CREATED).json(department);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Failed to add department';
@@ -69,6 +78,10 @@ export class OrgController {
     try {
       const { name, fields } = req.body;
       const module = await this.orgService.addModule(name, fields);
+
+      // Audit Log
+      logAudit(req, 'INSERT', 'modules', module.id, null, module);
+
       res.status(HttpStatus.CREATED).json(module);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Failed to add module';
@@ -96,7 +109,13 @@ export class OrgController {
     try {
       const id = req.params.id as string;
       const { name } = req.body;
+
+      const oldBranch = await this.orgService.getBranchById(id);
       const branch = await this.orgService.updateBranch(id, name);
+
+      // Audit Log
+      logAudit(req, 'UPDATE', 'branches', id, oldBranch, branch);
+
       res.status(HttpStatus.OK).json(branch);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Failed to update branch';
@@ -110,7 +129,13 @@ export class OrgController {
   deleteBranch = async (req: Request, res: Response): Promise<void> => {
     try {
       const id = req.params.id as string;
+      
+      const oldBranch = await this.orgService.getBranchById(id);
       await this.orgService.deleteBranch(id);
+
+      // Audit Log
+      logAudit(req, 'DELETE', 'branches', id, oldBranch, null);
+
       res.status(HttpStatus.NO_CONTENT).send();
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Failed to delete branch';
@@ -125,7 +150,13 @@ export class OrgController {
     try {
       const id = req.params.id as string;
       const { name } = req.body;
+
+      const oldDept = await this.orgService.getDepartmentById(id);
       const department = await this.orgService.updateDepartment(id, name);
+
+      // Audit Log
+      logAudit(req, 'UPDATE', 'departments', id, oldDept, department);
+
       res.status(HttpStatus.OK).json(department);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Failed to update department';
@@ -139,7 +170,13 @@ export class OrgController {
   deleteDepartment = async (req: Request, res: Response): Promise<void> => {
     try {
       const id = req.params.id as string;
+      
+      const oldDept = await this.orgService.getDepartmentById(id);
       await this.orgService.deleteDepartment(id);
+
+      // Audit Log
+      logAudit(req, 'DELETE', 'departments', id, oldDept, null);
+
       res.status(HttpStatus.NO_CONTENT).send();
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Failed to delete department';
@@ -154,7 +191,13 @@ export class OrgController {
     try {
       const id = req.params.id as string;
       const { name, fields } = req.body;
+
+      const oldModule = await this.orgService.getModuleById(id);
       const module = await this.orgService.updateModule(id, name, fields);
+
+      // Audit Log
+      logAudit(req, 'UPDATE', 'modules', id, oldModule, module);
+
       res.status(HttpStatus.OK).json(module);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Failed to update module';
@@ -168,7 +211,13 @@ export class OrgController {
   deleteModule = async (req: Request, res: Response): Promise<void> => {
     try {
       const id = req.params.id as string;
+
+      const oldModule = await this.orgService.getModuleById(id);
       await this.orgService.deleteModule(id);
+
+      // Audit Log
+      logAudit(req, 'DELETE', 'modules', id, oldModule, null);
+
       res.status(HttpStatus.NO_CONTENT).send();
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Failed to delete module';

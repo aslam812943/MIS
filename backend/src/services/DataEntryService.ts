@@ -133,4 +133,11 @@ export class DataEntryService {
 
     return await this.dataEntryRepository.verify(id, verifiedBy);
   }
+
+  /**
+   * Helper method to retrieve data entries for auditing/history.
+   */
+  async getEntryById(id: string): Promise<DataEntry | null> {
+    return this.dataEntryRepository.findById(id);
+  }
 }

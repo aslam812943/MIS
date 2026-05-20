@@ -16,6 +16,7 @@ import { EmailService } from '../services/EmailService.js';
 import { SupabaseDataEntryRepository } from '../repositories/SupabaseDataEntryRepository.js';
 import { DataEntryService } from '../services/DataEntryService.js';
 import { DataEntryController } from '../controllers/DataEntryController.js';
+import { AuditController } from '../controllers/AuditController.js';
 
 const router = Router();
 
@@ -35,6 +36,8 @@ const userController = new UserController(userService);
 const dataEntryRepository = new SupabaseDataEntryRepository();
 const dataEntryService = new DataEntryService(dataEntryRepository, userRepository);
 const dataEntryController = new DataEntryController(dataEntryService);
+
+const auditController = new AuditController();
 
 /**
 
@@ -90,5 +93,10 @@ router.get('/data-entries', requireAuth, dataEntryController.getEntry);
 router.post('/data-entries', requireAuth, dataEntryController.saveEntry);
 router.get('/department-entries', requireAuth, dataEntryController.getDepartmentEntries);
 router.post('/data-entries/:id/verify', requireAuth, dataEntryController.verifyEntry);
+
+/**
+ * Audit Log endpoints
+ */
+router.get('/audit-logs', requireAuth, requireAdmin, auditController.getAuditLogs);
 
 export default router;

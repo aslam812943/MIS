@@ -173,4 +173,19 @@ export class OrgService {
   async deleteModule(id: string): Promise<void> {
     return this.moduleRepository.delete(id);
   }
+
+  /**
+   * Helper methods to retrieve entities for auditing/history.
+   */
+  async getBranchById(id: string): Promise<Branch | null> {
+    return this.branchRepository.findById(id);
+  }
+
+  async getDepartmentById(id: string): Promise<Department | null> {
+    return this.departmentRepository.findById(id);
+  }
+
+  async getModuleById(id: string): Promise<Module | null> {
+    return this.moduleRepository.findById(id);
+  }
 }
