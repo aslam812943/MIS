@@ -24,24 +24,30 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
-        <div className="p-8">
-          <h3 className="text-xl font-bold text-white mb-2">{title}</h3>
-          <p className="text-slate-400">{message}</p>
+    <div className="mis-modal-backdrop" onClick={onCancel} role="presentation">
+      <div
+        className="mis-modal max-w-md"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="confirm-modal-title"
+      >
+        <div className="mis-modal-header" style={{ borderBottom: 'none', paddingBottom: 0 }}>
+          <div>
+            <h3 id="confirm-modal-title" className="text-lg font-bold m-0 mb-1" style={{ color: 'var(--text-primary)' }}>
+              {title}
+            </h3>
+            <p className="m-0 text-sm" style={{ color: 'var(--text-secondary)' }}>{message}</p>
+          </div>
         </div>
-        <div className="flex gap-3 p-6 bg-black/20 border-t border-slate-800">
-          <button
-            onClick={onCancel}
-            className="flex-1 px-6 py-3 rounded-xl font-semibold text-slate-400 hover:bg-white/5 transition-colors"
-          >
+        <div className="mis-modal-footer">
+          <button type="button" onClick={onCancel} className="mis-btn mis-btn-ghost flex-1 justify-center">
             {cancelLabel}
           </button>
           <button
+            type="button"
             onClick={onConfirm}
-            className={`flex-1 px-6 py-3 rounded-xl font-semibold text-white transition-all hover:scale-[1.02] active:scale-[0.98] ${
-              isDanger ? 'bg-red-600 hover:bg-red-500 shadow-lg shadow-red-600/20' : 'bg-indigo-600 hover:bg-indigo-500 shadow-lg shadow-indigo-600/20'
-            }`}
+            className={`mis-btn flex-1 justify-center ${isDanger ? 'mis-btn-danger' : 'mis-btn-primary'}`}
           >
             {confirmLabel}
           </button>

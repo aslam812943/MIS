@@ -8,7 +8,7 @@ import VerifyEntriesPage from './pages/DataEntry/VerifyEntriesPage';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 
 import { ROUTES } from './constants/routes';
-import { Toaster } from 'react-hot-toast';
+import AppToaster from './components/common/AppToaster';
 
 /**
  * Main Application component that handles routing and global layouts.
@@ -16,7 +16,7 @@ import { Toaster } from 'react-hot-toast';
 function App() {
   return (
     <Router>
-      <Toaster position="top-right" />
+      <AppToaster />
       <Routes>
         {/* Authentication Routes */}
         <Route path={ROUTES.LOGIN} element={<LoginPage />} />

@@ -1,0 +1,451 @@
+/* ═══════════════════════════════════════════════
+   LIGHT MODE — Carry Nest–style palette
+   Applied via [data-theme="light"] on <html>
+   ═══════════════════════════════════════════════ */
+
+[data-theme="light"] {
+  color-scheme: light;
+
+  /* Backgrounds */
+  --bg-base:    #f3f4f6;
+  --bg-surface: #ffffff;
+  --bg-card:    #ffffff;
+  --bg-card-2:  #f9fafb;
+  --bg-hover:   rgba(15, 23, 42, 0.04);
+  --bg-hover-2: rgba(15, 23, 42, 0.06);
+
+  /* Borders */
+  --border:       #e5e7eb;
+  --border-hover: #d1d5db;
+  --border-accent: rgba(67, 56, 202, 0.35);
+
+  /* Accent — indigo/navy (reference admin UI) */
+  --accent:         #4338ca;
+  --accent-hover:   #4f46e5;
+  --accent-dark:    #3730a3;
+  --accent-bg:      rgba(67, 56, 202, 0.08);
+  --accent-bg-2:    rgba(67, 56, 202, 0.14);
+  --accent-glow:    rgba(67, 56, 202, 0.12);
+  --accent-glow-sm: rgba(67, 56, 202, 0.08);
+
+  /* Text */
+  --text-primary:   #111827;
+  --text-secondary: #4b5563;
+  --text-muted:     #9ca3af;
+  --text-accent:    #4338ca;
+  --text-heading:   #1e2a4a;
+
+  /* Surfaces & chrome */
+  --overlay-bg: rgba(15, 23, 42, 0.35);
+  --modal-backdrop: rgba(15, 23, 42, 0.4);
+  --modal-shadow: 0 20px 50px rgba(15, 23, 42, 0.12);
+  --glass-bg: rgba(255, 255, 255, 0.92);
+  --glass-bg-strong: rgba(255, 255, 255, 0.96);
+  --panel-inset: #f9fafb;
+  --panel-inset-soft: #f3f4f6;
+  --list-row-border: #f3f4f6;
+  --table-header-bg: #f9fafb;
+  --scrollbar-thumb: rgba(15, 23, 42, 0.12);
+  --scrollbar-thumb-hover: rgba(15, 23, 42, 0.22);
+  --card-shadow: 0 1px 2px rgba(15, 23, 42, 0.05), 0 4px 14px rgba(15, 23, 42, 0.06);
+
+  /* Primary actions — black buttons like reference */
+  --btn-primary-bg: #111827;
+  --btn-primary-color: #ffffff;
+  --btn-primary-hover-bg: #1f2937;
+
+  /* Status */
+  --success-muted-bg: #ecfdf5;
+  --success-muted-border: #a7f3d0;
+  --success-muted-text: #047857;
+  --warning-muted-text: #b45309;
+  --danger-text: #dc2626;
+  --danger-bg: #fef2f2;
+  --danger-border: #fecaca;
+  --danger-bg-hover: #fee2e2;
+
+  --badge-success-text: #15803d;
+  --badge-success-bg: #dcfce7;
+  --badge-success-border: #bbf7d0;
+  --badge-warning-text: #b45309;
+  --badge-warning-bg: #fef3c7;
+  --badge-warning-border: #fde68a;
+  --badge-danger-text: #dc2626;
+  --badge-danger-bg: #fee2e2;
+  --badge-danger-border: #fecaca;
+}
+
+/* Scrollbar */
+[data-theme="light"] ::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+}
+[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}
+
+/* Layout */
+[data-theme="light"] .mis-overlay {
+  background: var(--overlay-bg);
+}
+
+/* Sidebar active — solid indigo pill */
+[data-theme="light"] .mis-nav-item.active {
+  background: var(--accent-dark);
+  color: #ffffff;
+  font-weight: 600;
+}
+[data-theme="light"] .mis-nav-item.active::before {
+  display: none;
+}
+[data-theme="light"] .mis-nav-item.active svg {
+  opacity: 1;
+  color: #ffffff;
+}
+[data-theme="light"] .mis-nav-badge {
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+[data-theme="light"] .mis-logo-name,
+[data-theme="light"] .mis-topbar-brand {
+  background: linear-gradient(135deg, #3730a3, #4f46e5);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+[data-theme="light"] .mis-user-avatar,
+[data-theme="light"] .mis-logo-icon {
+  background: linear-gradient(135deg, #4f46e5, #3730a3);
+  color: #fff;
+}
+
+[data-theme="light"] .mis-logout-btn {
+  background: var(--danger-bg);
+  border-color: var(--danger-border);
+  color: var(--danger-text);
+}
+[data-theme="light"] .mis-logout-btn:hover {
+  background: var(--danger-bg-hover);
+  border-color: #fca5a5;
+  color: #b91c1c;
+}
+
+/* Cards & shadows */
+[data-theme="light"] .mis-card,
+[data-theme="light"] .mis-stat-card,
+[data-theme="light"] .mis-table-wrap,
+[data-theme="light"] .mis-modal {
+  box-shadow: var(--card-shadow);
+}
+
+[data-theme="light"] .mis-card-glass,
+[data-theme="light"] .glass {
+  background: var(--glass-bg);
+}
+
+/* Typography */
+[data-theme="light"] .mis-page-title,
+[data-theme="light"] .mis-section-title {
+  color: var(--text-heading);
+}
+
+[data-theme="light"] .mis-page-title-accent {
+  background: linear-gradient(135deg, #3730a3 0%, #4f46e5 50%, #6366f1 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+[data-theme="light"] .text-accent {
+  background: linear-gradient(135deg, #3730a3, #4f46e5);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Buttons */
+[data-theme="light"] .mis-btn-primary {
+  background: var(--btn-primary-bg) !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 8px rgba(17, 24, 39, 0.15);
+}
+[data-theme="light"] .mis-btn-primary:hover:not(:disabled) {
+  background: var(--btn-primary-hover-bg) !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 12px rgba(17, 24, 39, 0.2);
+}
+
+[data-theme="light"] .mis-btn-primary span {
+  color: inherit;
+}
+
+/* Tabs — white text on indigo active pill */
+[data-theme="light"] .mis-tab.active,
+[data-theme="light"] .mis-module-tab.active {
+  background: var(--accent-dark) !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 8px rgba(55, 48, 163, 0.25);
+}
+
+[data-theme="light"] .mis-tabs {
+  background: var(--bg-card-2);
+  border-color: var(--border);
+}
+
+[data-theme="light"] .mis-module-tabs,
+[data-theme="light"] .mis-panel-inset-soft {
+  background: var(--panel-inset-soft) !important;
+}
+
+[data-theme="light"] .mis-btn-danger {
+  background: var(--danger-bg);
+  color: var(--danger-text);
+  border: 1px solid var(--danger-border);
+}
+
+/* Tables & lists */
+[data-theme="light"] .mis-list-row {
+  border-bottom-color: var(--list-row-border);
+}
+
+[data-theme="light"] .mis-table thead {
+  background: var(--table-header-bg);
+}
+
+[data-theme="light"] .mis-table tbody tr:hover {
+  background: var(--bg-hover);
+}
+
+/* Modals */
+[data-theme="light"] .mis-modal-backdrop {
+  background: var(--modal-backdrop);
+}
+
+[data-theme="light"] .mis-modal {
+  box-shadow: var(--modal-shadow);
+}
+
+/* Alerts & badges */
+[data-theme="light"] .mis-alert-warning {
+  background: var(--badge-warning-bg);
+  border-color: var(--badge-warning-border);
+  color: var(--badge-warning-text);
+}
+
+[data-theme="light"] .mis-alert-success {
+  background: var(--badge-success-bg);
+  border-color: var(--badge-success-border);
+  color: var(--badge-success-text);
+}
+
+[data-theme="light"] .mis-alert-error {
+  background: var(--badge-danger-bg);
+  border-color: var(--badge-danger-border);
+  color: var(--badge-danger-text);
+}
+
+[data-theme="light"] .mis-badge-success {
+  color: var(--badge-success-text);
+  background: var(--badge-success-bg);
+  border-color: var(--badge-success-border);
+}
+
+[data-theme="light"] .mis-badge-warning {
+  color: var(--badge-warning-text);
+  background: var(--badge-warning-bg);
+  border-color: var(--badge-warning-border);
+}
+
+[data-theme="light"] .mis-badge-info {
+  color: var(--badge-info-text, var(--accent));
+  background: var(--accent-bg);
+  border-color: var(--border-accent);
+}
+
+[data-theme="light"] {
+  --badge-info-text: #4338ca;
+}
+
+[data-theme="light"] .mis-icon-btn.danger:hover:not(:disabled) {
+  color: var(--danger-text);
+  background: var(--danger-bg);
+  border-color: var(--danger-border);
+}
+
+/* Login */
+[data-theme="light"] .mis-login-shell::before {
+  background:
+    radial-gradient(ellipse 70% 45% at 15% 0%, rgba(79, 70, 229, 0.08), transparent 55%),
+    radial-gradient(ellipse 50% 40% at 90% 100%, rgba(67, 56, 202, 0.06), transparent 50%),
+    linear-gradient(rgba(15, 23, 42, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(15, 23, 42, 0.04) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 32px 32px, 32px 32px;
+}
+
+[data-theme="light"] .mis-login-brand h1 .text-accent {
+  background: linear-gradient(135deg, #3730a3, #4f46e5);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Inputs */
+[data-theme="light"] .mis-input,
+[data-theme="light"] .mis-select,
+[data-theme="light"] .mis-textarea {
+  background: #ffffff;
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .mis-input:focus,
+[data-theme="light"] .mis-select:focus,
+[data-theme="light"] .mis-textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-bg);
+}
+
+/* Audit / diff panes */
+[data-theme="light"] .mis-diff-pane {
+  background: var(--bg-card-2);
+}
+
+[data-theme="light"] .mis-diff-pane--before {
+  border-color: #fecaca;
+}
+
+[data-theme="light"] .mis-diff-pane--after {
+  border-color: #bbf7d0;
+}
+
+[data-theme="light"] .mis-diff-pane--before .mis-diff-pane-head {
+  color: #dc2626;
+  background: #fef2f2;
+}
+
+[data-theme="light"] .mis-diff-pane--after .mis-diff-pane-head {
+  color: #047857;
+  background: #ecfdf5;
+}
+
+[data-theme="light"] .mis-audit-diff-footer {
+  background: var(--bg-card-2);
+}
+
+/* Theme toggle */
+.mis-theme-toggle {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--bg-card-2);
+  color: var(--text-secondary);
+  font-size: 0.825rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all var(--transition);
+  margin-bottom: 8px;
+}
+
+.mis-theme-toggle:hover {
+  background: var(--bg-hover-2);
+  color: var(--text-primary);
+  border-color: var(--border-hover);
+}
+
+[data-theme="light"] .mis-theme-toggle {
+  background: #ffffff;
+  color: var(--text-primary) !important;
+  border-color: var(--border);
+}
+
+[data-theme="light"] .mis-theme-toggle svg {
+  color: var(--accent-dark);
+}
+
+.mis-login-theme-toggle {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 20;
+  width: auto;
+  margin: 0;
+}
+
+/* Utility classes for inline-style replacements */
+[data-theme="light"] .mis-btn-success-soft {
+  background: var(--success-muted-bg) !important;
+  border: 1px solid var(--success-muted-border) !important;
+  color: var(--success-muted-text) !important;
+}
+
+[data-theme="light"] .mis-stat-pending {
+  border-color: var(--badge-warning-border) !important;
+}
+[data-theme="light"] .mis-stat-pending .mis-stat-label,
+[data-theme="light"] .mis-stat-pending .mis-stat-value {
+  color: var(--badge-warning-text) !important;
+}
+
+[data-theme="light"] .mis-stat-verified {
+  border-color: var(--badge-success-border) !important;
+}
+[data-theme="light"] .mis-stat-verified .mis-stat-label,
+[data-theme="light"] .mis-stat-verified .mis-stat-value {
+  color: var(--badge-success-text) !important;
+}
+
+[data-theme="light"] .mis-panel-inset {
+  background: var(--panel-inset) !important;
+}
+
+[data-theme="light"] .mis-panel-inset-soft {
+  background: var(--panel-inset-soft) !important;
+}
+
+[data-theme="light"] .mis-badge-blocked {
+  color: var(--badge-danger-text) !important;
+  background: var(--badge-danger-bg) !important;
+  border-color: var(--badge-danger-border) !important;
+}
+
+[data-theme="light"] .mis-chip {
+  background: var(--bg-card-2);
+  border-color: var(--border);
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .mis-skeleton,
+[data-theme="light"] .bg-slate-800 {
+  background: var(--bg-card-2) !important;
+}
+
+[data-theme="light"] .mis-diff-field-val {
+  background: #ffffff;
+}
+
+[data-theme="light"] .mis-diff-field-key {
+  color: var(--text-secondary);
+  font-weight: 700;
+}
+
+[data-theme="light"] .mis-audit-diff-grid--split {
+  align-items: stretch;
+}
+
+[data-theme="light"] .mis-stat-card::after {
+  opacity: 0.35;
+}
+
+[data-theme="light"] .mis-sidebar {
+  box-shadow: 1px 0 0 var(--border);
+}
+
+[data-theme="light"] .mis-login-card,
+[data-theme="light"] .mis-auth-card {
+  box-shadow: var(--card-shadow);
+}

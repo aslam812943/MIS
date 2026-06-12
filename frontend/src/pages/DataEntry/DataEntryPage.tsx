@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import Sidebar from '../../components/layout/Sidebar';
-import DataEntrySidebar from '../../components/DataEntry/DataEntrySidebar';
+import DashboardLayout from '../../components/layout/DashboardLayout';
 import DataEntryForm from '../../components/DataEntry/DataEntryForm';
 import { orgService, type Module } from '../../services/org.service';
 import { authService } from '../../services/auth.service';
@@ -17,8 +16,7 @@ const DataEntryPage: React.FC = () => {
       setIsLoading(true);
       try {
         const allModules = await orgService.getModules();
-        
-        // Filter modules based on user's allowed_modules
+
         const user = authService.getCurrentUser();
         let allowed = allModules;
         if (user && user.role !== 'admin') {
@@ -43,55 +41,58 @@ const DataEntryPage: React.FC = () => {
   const selectedModule = modules.find(m => m.id === selectedModuleId);
 
   return (
-    <div className="flex min-h-screen bg-slate-950 text-slate-200 font-sans">
-      <Sidebar />
-      
-      <main className="flex-1 flex overflow-hidden">
-        {/* Secondary Sidebar for Sections (Modules) */}
-        <DataEntrySidebar 
-          modules={modules}
-          selectedModuleId={selectedModuleId}
-          onSelectModule={setSelectedModuleId}
-        />
-
-        {/* Main Content Area */}
-        <div className="flex-1 flex flex-col overflow-y-auto">
-          {/* Header */}
-          <header className="bg-slate-900 border-b border-slate-800 p-6 flex justify-between items-center sticky top-0 z-10">
-            <div>
-              <h1 className="text-2xl font-bold text-white">Data Entry</h1>
-              <p className="text-sm text-slate-400 mt-1">Enter daily metrics for your branch</p>
+    <DashboardLayout>
+      <div className="mis-page mis-animate-in">
+        <div className="mis-data-entry-layout">
+          {/* Toolbar: title + date in one aligned bar */}
+          <div className="mis-data-entry-toolbar">
+            <div className="mis-data-entry-toolbar-title">
+              <h1>Data Entry</h1>
+              <p>Record daily metrics for your assigned modules.</p>
             </div>
-            <div className="flex items-center gap-4">
-              <input 
+            <div className="mis-data-entry-date-field mis-field" style={{ margin: 0 }}>
+              <label className="mis-label">Entry date</label>
+              <input
                 type="date"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
-                className="bg-slate-800 border border-slate-700 text-white rounded-xl px-4 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="mis-input"
               />
             </div>
-          </header>
+          </div>
 
-          {/* Form Area */}
-          <div className="flex-1 bg-slate-950">
-            {isLoading ? (
-              <div className="p-8 flex justify-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500"></div>
-              </div>
-            ) : selectedModule ? (
-              <DataEntryForm 
-                module={selectedModule} 
-                selectedDate={selectedDate}
-              />
-            ) : (
-              <div className="p-8 text-center text-slate-500 italic">
-                Please select a section from the left sidebar to enter data.
-              </div>
+          {/* Module selector */}
+          <div className="mis-data-entry-modules" role="tablist" aria-label="Data modules">
+            {modules.map((module) => (
+              <button
+                key={module.id}
+                type="button"
+                role="tab"
+                aria-selected={selectedModuleId === module.id}
+                onClick={() => setSelectedModuleId(module.id)}
+                className={`mis-module-tab ${selectedModuleId === module.id ? 'active' : ''}`}
+              >
+                {module.name}
+              </button>
+            ))}
+            {modules.length === 0 && !isLoading && (
+              <span className="px-3 py-2 text-sm" style={{ color: 'var(--text-muted)' }}>
+                No modules assigned to your account.
+              </span>
             )}
           </div>
+
+          {/* Form panel */}
+          {isLoading ? (
+            <div className="mis-loading-center py-20">
+              <div className="mis-spinner" />
+            </div>
+          ) : selectedModule ? (
+            <DataEntryForm module={selectedModule} selectedDate={selectedDate} />
+          ) : null}
         </div>
-      </main>
-    </div>
+      </div>
+    </DashboardLayout>
   );
 };
 

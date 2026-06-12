@@ -2,93 +2,212 @@ import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { ROUTES } from '../../constants/routes';
 import { authService } from '../../services/auth.service';
+import { useLayout } from './LayoutContext';
+import { useTheme } from '../../context/ThemeContext';
 
-/**
- * Premium Sidebar component for dashboard navigation.
- */
+/* ── SVG Icon Components ─────────────────────────────────── */
+const IconDashboard = () => (
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="3" width="7" height="7" rx="1.5"/>
+    <rect x="14" y="3" width="7" height="7" rx="1.5"/>
+    <rect x="14" y="14" width="7" height="7" rx="1.5"/>
+    <rect x="3" y="14" width="7" height="7" rx="1.5"/>
+  </svg>
+);
+
+const IconDataEntry = () => (
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 20h9"/>
+    <path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/>
+  </svg>
+);
+
+const IconVerify = () => (
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M9 11l3 3L22 4"/>
+    <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
+  </svg>
+);
+
+const IconShield = () => (
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+  </svg>
+);
+
+const IconUser = () => (
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="8" r="4"/>
+    <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+  </svg>
+);
+
+const IconLogout = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
+    <polyline points="16 17 21 12 16 7"/>
+    <line x1="21" y1="12" x2="9" y2="12"/>
+  </svg>
+);
+
+const IconSun = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="4"/>
+    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
+  </svg>
+);
+
+const IconMoon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
+  </svg>
+);
+
+const IconClose = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18"/>
+    <line x1="6" y1="6" x2="18" y2="18"/>
+  </svg>
+);
+
+/* ── Nav Item ─────────────────────────────────────────────── */
+interface NavItemProps {
+  to: string;
+  icon: React.ReactNode;
+  label: string;
+  badge?: string;
+  onClick?: () => void;
+}
+const NavItem: React.FC<NavItemProps> = ({ to, icon, label, badge, onClick }) => (
+  <NavLink
+    to={to}
+    onClick={onClick}
+    className={({ isActive }) =>
+      `mis-nav-item${isActive ? ' active' : ''}`
+    }
+  >
+    {icon}
+    <span className="flex-1 min-w-0">{label}</span>
+    {badge && <span className="mis-nav-badge">{badge}</span>}
+  </NavLink>
+);
+
+/* ── Sidebar Component ────────────────────────────────────── */
 const Sidebar: React.FC = () => {
+  const { sidebarOpen, setSidebarOpen } = useLayout();
+  const { theme, toggleTheme } = useTheme();
   const user = authService.getCurrentUser();
   const isAdmin = user?.role === 'admin';
   const isHOD = user?.role === 'hod';
-  return (
-    <aside className="w-[280px] bg-slate-900 border-r border-slate-800 flex flex-col p-6 sticky top-0 h-screen">
-      <div className="mb-10">
-        <h2 className="text-2xl font-extrabold bg-gradient-to-r from-indigo-500 to-purple-500 bg-clip-text text-transparent">MIS Portal</h2>
-      </div>
-      
-      <nav className="flex-1 flex flex-col gap-2">
-        <NavLink 
-          to={ROUTES.DASHBOARD} 
-          className={({ isActive }) => 
-            `flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all ${
-              isActive ? 'bg-indigo-500/10 text-indigo-400' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
-            }`
-          }
-        >
-          <span className="text-xl">📊</span>
-          Dashboard
-        </NavLink>
+  const isEmployee = user?.role === 'employee';
 
-        <NavLink 
-          to={ROUTES.DATA_ENTRY} 
-          className={({ isActive }) => 
-            `flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all ${
-              isActive ? 'bg-indigo-500/10 text-indigo-400' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
-            }`
-          }
+
+  const closeOnMobile = () => setSidebarOpen(false);
+
+  const initials = user?.full_name
+    ? user.full_name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()
+    : 'U';
+
+  return (
+    <aside className={`mis-sidebar${sidebarOpen ? ' open' : ''}`}>
+      {/* Header */}
+      <div className="mis-sidebar-header">
+        <div className="mis-sidebar-logo">
+          <div className="mis-logo-icon">M</div>
+          <div className="mis-logo-text">
+            <span className="mis-logo-name">MIS Portal</span>
+            <span className="mis-logo-sub">Management System</span>
+          </div>
+        </div>
+        <button
+          className="mis-sidebar-close"
+          onClick={() => setSidebarOpen(false)}
+          aria-label="Close sidebar"
         >
-          <span className="text-xl">📝</span>
-          Data Entry
-        </NavLink>
+          <IconClose />
+        </button>
+      </div>
+
+      {/* Navigation */}
+      <nav className="mis-sidebar-nav">
+        <span className="mis-sidebar-section-label">Main</span>
+
+        <NavItem
+          to={ROUTES.DASHBOARD}
+          icon={<IconDashboard />}
+          label="Dashboard"
+          onClick={closeOnMobile}
+        />
+
+        {(isEmployee || isHOD) && (
+          <NavItem
+            to={ROUTES.DATA_ENTRY}
+            icon={<IconDataEntry />}
+            label="Data Entry"
+            onClick={closeOnMobile}
+          />
+        )}
 
         {isHOD && (
-          <NavLink 
-            to={ROUTES.VERIFY_ENTRIES} 
-            className={({ isActive }) => 
-              `flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all ${
-                isActive ? 'bg-indigo-500/10 text-indigo-400' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
-              }`
-            }
-          >
-            <span className="text-xl">✅</span>
-            Verify Entries
-          </NavLink>
+          <NavItem
+            to={ROUTES.VERIFY_ENTRIES}
+            icon={<IconVerify />}
+            label="Verify Entries"
+            onClick={closeOnMobile}
+          />
         )}
-
 
         {isAdmin && (
-          <NavLink 
-            to={ROUTES.ADMIN_PANEL} 
-            className={({ isActive }) => 
-              `flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all ${
-                isActive ? 'bg-indigo-500/10 text-indigo-400' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
-              }`
-            }
-          >
-            <span className="text-xl">🛡️</span>
-            Admin Panel
-          </NavLink>
+          <>
+            <span className="mis-sidebar-section-label">Administration</span>
+            <NavItem
+              to={ROUTES.ADMIN_PANEL}
+              icon={<IconShield />}
+              label="Admin Panel"
+              badge="ADMIN"
+              onClick={closeOnMobile}
+            />
+          </>
         )}
 
-        <NavLink 
-          to={ROUTES.PROFILE} 
-          className={({ isActive }) => 
-            `flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all ${
-              isActive ? 'bg-indigo-500/10 text-indigo-400' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
-            }`
-          }
-        >
-          <span className="text-xl">👤</span>
-          My Profile
-        </NavLink>
+        <span className="mis-sidebar-section-label">Account</span>
+        <NavItem
+          to={ROUTES.PROFILE}
+          icon={<IconUser />}
+          label="My Profile"
+          onClick={closeOnMobile}
+        />
       </nav>
 
-      <div className="pt-6 border-t border-slate-800">
-        <button 
-          className="w-full p-3 rounded-xl border border-slate-800 text-red-400 font-semibold hover:bg-red-400/10 transition-all cursor-pointer"
+      {/* Footer */}
+      <div className="mis-sidebar-footer">
+        {/* User card */}
+        {user && (
+          <div className="mis-user-card">
+            <div className="mis-user-avatar">{initials}</div>
+            <div className="mis-user-info">
+              <div className="mis-user-name">{user.full_name || user.email || 'User'}</div>
+              <div className="mis-user-role">{user.role || 'Member'}</div>
+            </div>
+          </div>
+        )}
+
+        <button
+          type="button"
+          className="mis-theme-toggle"
+          onClick={toggleTheme}
+          aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+        >
+          {theme === 'dark' ? <IconSun /> : <IconMoon />}
+          {theme === 'dark' ? 'Light mode' : 'Dark mode'}
+        </button>
+
+        <button
+          className="mis-logout-btn"
           onClick={() => authService.logout()}
         >
-          Logout
+          <IconLogout />
+          Sign Out
         </button>
       </div>
     </aside>

@@ -4,6 +4,8 @@ import { dataEntryService } from '../../services/dataEntry.service';
 import { toast } from 'react-hot-toast';
 import { format } from 'date-fns';
 import { authService } from '../../services/auth.service';
+import ConfirmModal from '../common/ConfirmModal';
+import { INITIAL_CONFIRM_STATE, type ConfirmDialogState } from '../../types/confirm.types';
 
 interface DataEntryFormProps {
   module: Module;
@@ -15,6 +17,7 @@ const DataEntryForm: React.FC<DataEntryFormProps> = ({ module, selectedDate }) =
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [entryStatus, setEntryStatus] = useState<'pending' | 'verified' | null>(null);
+  const [confirmModal, setConfirmModal] = useState<ConfirmDialogState>(INITIAL_CONFIRM_STATE);
 
   const currentUser = authService.getCurrentUser();
   const branchId = currentUser?.branch_id;
@@ -26,7 +29,7 @@ const DataEntryForm: React.FC<DataEntryFormProps> = ({ module, selectedDate }) =
   useEffect(() => {
     const fetchEntry = async () => {
       if (!branchId) return;
-      
+
       setIsLoading(true);
       try {
         const entry = await dataEntryService.getEntry(selectedDate, module.id);
@@ -37,7 +40,6 @@ const DataEntryForm: React.FC<DataEntryFormProps> = ({ module, selectedDate }) =
           }
         } else {
           setEntryStatus(null);
-          // Initialize empty
           const initialData: Record<string, any> = {};
           module.fields?.forEach(f => {
             initialData[f.name] = f.type === 'number' ? 0 : '';
@@ -53,14 +55,14 @@ const DataEntryForm: React.FC<DataEntryFormProps> = ({ module, selectedDate }) =
     };
 
     fetchEntry();
-  }, [module.id, selectedDate]);
+  }, [module.id, selectedDate, branchId]);
 
   const handleInputChange = (fieldName: string, value: any, type: string) => {
     let parsedValue = value;
     if (type === 'number') {
       parsedValue = value === '' ? '' : Number(value);
     }
-    
+
     setFormData(prev => ({
       ...prev,
       [fieldName]: parsedValue
@@ -68,11 +70,23 @@ const DataEntryForm: React.FC<DataEntryFormProps> = ({ module, selectedDate }) =
   };
 
   const handleClear = () => {
-    const initialData: Record<string, any> = {};
-    module.fields?.forEach(f => {
-      initialData[f.name] = f.type === 'number' ? 0 : '';
+    setConfirmModal({
+      isOpen: true,
+      title: 'Clear Form',
+      message: `Clear all entered values for ${module.name}? This cannot be undone until you save again.`,
+      confirmLabel: 'Clear',
+      cancelLabel: 'Cancel',
+      isDanger: true,
+      onConfirm: () => {
+        const initialData: Record<string, any> = {};
+        module.fields?.forEach(f => {
+          initialData[f.name] = f.type === 'number' ? 0 : '';
+        });
+        setFormData(initialData);
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        toast.success('Form cleared.');
+      },
     });
-    setFormData(initialData);
   };
 
   const handleSave = async () => {
@@ -81,7 +95,6 @@ const DataEntryForm: React.FC<DataEntryFormProps> = ({ module, selectedDate }) =
       return;
     }
 
-    // Validate that all fields are filled
     const missingFields: string[] = [];
     module.fields?.forEach((field) => {
       const val = formData[field.name];
@@ -96,16 +109,17 @@ const DataEntryForm: React.FC<DataEntryFormProps> = ({ module, selectedDate }) =
     }
 
     setIsSaving(true);
+    const toastId = toast.loading('Saving entry...');
     try {
       await dataEntryService.saveEntry({
         module_id: module.id,
         entry_date: selectedDate,
         data: formData
       });
-      toast.success('Entry saved successfully!');
+      toast.success(`${module.name} entry saved successfully.`, { id: toastId });
     } catch (error) {
       console.error('Save error:', error);
-      toast.error('Failed to save entry');
+      toast.error('Failed to save entry', { id: toastId });
     } finally {
       setIsSaving(false);
     }
@@ -113,133 +127,140 @@ const DataEntryForm: React.FC<DataEntryFormProps> = ({ module, selectedDate }) =
 
   if (!branchId) {
     return (
-      <div className="p-8 text-center text-slate-400">
-        You need to be assigned to a branch to use Data Entry.
+      <div className="mis-data-entry-panel">
+        <div className="mis-empty">You need to be assigned to a branch to use Data Entry.</div>
       </div>
     );
   }
 
   if (isLoading) {
     return (
-      <div className="p-8 flex justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500"></div>
+      <div className="mis-data-entry-panel">
+        <div className="mis-loading-center py-16">
+          <div className="mis-spinner" />
+        </div>
       </div>
     );
   }
 
-  return (
-    <div className="p-8 max-w-4xl">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
-        <div className="flex justify-between items-center mb-6">
-          <div>
-            <h2 className="text-xl font-bold text-white">{module.name}</h2>
-            <p className="text-slate-400 text-sm mt-1">
-              Branch: {branchName} • {format(new Date(selectedDate), 'dd MMM yyyy')}
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            {entryStatus === 'verified' && (
-              <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 animate-pulse">
-                <span>✓</span> Verified
-              </span>
-            )}
-            {entryStatus === 'pending' && (
-              <span className="bg-amber-500/10 text-amber-400 border border-amber-500/20 px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5">
-                <span>🕒</span> Pending Approval
-              </span>
-            )}
-            <div className="bg-indigo-500/10 text-indigo-400 px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-2">
-              <span>{module.fields?.length || 0} fields</span>
-            </div>
-          </div>
-        </div>
+  const formattedDate = format(new Date(selectedDate + 'T12:00:00'), 'dd MMM yyyy');
 
+  return (
+    <div className="mis-data-entry-panel">
+      <div className="mis-data-entry-panel-head">
+        <div>
+          <h2>{module.name}</h2>
+          <p className="mis-data-entry-meta-line">
+            Branch: {branchName} · {formattedDate}
+          </p>
+        </div>
+        <div className="mis-data-entry-badges">
+          {entryStatus === 'verified' && (
+            <span className="mis-badge mis-badge-success">Verified</span>
+          )}
+          {entryStatus === 'pending' && (
+            <span className="mis-badge mis-badge-warning">Pending</span>
+          )}
+          <span className="mis-badge mis-badge-neutral">
+            {module.fields?.length || 0} fields
+          </span>
+        </div>
+      </div>
+
+      <div className="mis-data-entry-panel-body">
         {isLocked && (
-          <div className="mb-6 bg-amber-500/10 border border-amber-500/20 text-amber-300 px-4 py-3.5 rounded-xl text-sm flex items-center gap-3">
-            <span className="text-lg">🔒</span>
-            <div>
-              <strong>Locked by Department Head:</strong> This submission has been verified and cannot be edited.
-            </div>
+          <div className="mis-alert mis-alert-warning mb-4">
+            <span>This entry is verified and locked. Contact your HOD if changes are required.</span>
           </div>
         )}
 
         {!isLocked && entryStatus === 'verified' && isHOD && (
-          <div className="mb-6 bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 px-4 py-3.5 rounded-xl text-sm flex items-center gap-3">
-            <span className="text-lg">⚙️</span>
-            <div>
-              <strong>Verified Status:</strong> You are entering as the HOD. You may still edit and override this entry.
-            </div>
+          <div className="mis-alert mis-alert-success mb-4">
+            <span>HOD mode: you can edit and override this verified entry.</span>
           </div>
         )}
 
         {(!module.fields || module.fields.length === 0) ? (
-          <p className="text-slate-500 italic py-4">No fields configured for this module.</p>
+          <p className="mis-empty py-6">No fields configured for this module.</p>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          <div className="mis-data-entry-fields">
             {module.fields.map((field, idx) => (
-              <div key={idx} className="flex flex-col gap-2">
-                <label className="text-sm font-medium text-slate-300">
-                  {field.name}
-                </label>
+              <div key={idx} className="mis-data-entry-field-card">
+                <label htmlFor={`field-${idx}`}>{field.name}</label>
                 {field.type === 'text' && (
                   <input
+                    id={`field-${idx}`}
                     type="text"
                     value={formData[field.name] || ''}
                     onChange={(e) => handleInputChange(field.name, e.target.value, field.type)}
                     disabled={isLocked}
-                    className="bg-slate-950 border border-slate-800 text-white rounded-xl px-4 py-2.5 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="mis-input disabled:opacity-50 disabled:cursor-not-allowed"
                   />
                 )}
                 {field.type === 'number' && (
                   <input
+                    id={`field-${idx}`}
                     type="number"
                     value={formData[field.name] !== undefined ? formData[field.name] : ''}
                     onChange={(e) => handleInputChange(field.name, e.target.value, field.type)}
                     disabled={isLocked}
-                    className="bg-slate-950 border border-slate-800 text-white rounded-xl px-4 py-2.5 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="mis-input disabled:opacity-50 disabled:cursor-not-allowed"
                   />
                 )}
                 {field.type === 'date' && (
                   <input
+                    id={`field-${idx}`}
                     type="date"
                     value={formData[field.name] || ''}
                     onChange={(e) => handleInputChange(field.name, e.target.value, field.type)}
                     disabled={isLocked}
-                    className="bg-slate-950 border border-slate-800 text-white rounded-xl px-4 py-2.5 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="mis-input disabled:opacity-50 disabled:cursor-not-allowed"
                   />
                 )}
               </div>
             ))}
           </div>
         )}
+      </div>
 
-        <div className="flex flex-col sm:flex-row justify-between items-center pt-6 border-t border-slate-800">
-          <div className="flex items-center gap-2 text-sm text-slate-400 mb-4 sm:mb-0">
-            <span className="text-indigo-400">🕒</span>
-            Entering as <strong className="text-white ml-1">{userName}</strong>
-          </div>
-          <div className="flex gap-3">
-            <button
-              onClick={handleClear}
-              disabled={isLocked}
-              className="px-6 py-2 rounded-xl text-slate-300 hover:text-white border border-slate-700 hover:bg-slate-800 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Clear
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={isSaving || isLocked || !module.fields || module.fields.length === 0}
-              className="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2 rounded-xl transition-all font-semibold shadow-lg shadow-indigo-500/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              {isSaving ? (
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-              ) : (
-                <span>💾 Save Entry</span>
-              )}
-            </button>
-          </div>
+      <div className="mis-data-entry-footer">
+        <p className="mis-data-entry-user">
+          Entering as <strong>{userName}</strong>
+        </p>
+        <div className="mis-data-entry-actions">
+          <button
+            type="button"
+            onClick={handleClear}
+            disabled={isLocked}
+            className="mis-btn mis-btn-ghost"
+          >
+            Clear
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={isSaving || isLocked || !module.fields || module.fields.length === 0}
+            className="mis-btn mis-btn-primary"
+          >
+            {isSaving ? (
+              <span className="mis-spinner" style={{ width: '1.1rem', height: '1.1rem', borderWidth: '2px' }} />
+            ) : (
+              'Save Entry'
+            )}
+          </button>
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        confirmLabel={confirmModal.confirmLabel}
+        cancelLabel={confirmModal.cancelLabel}
+        isDanger={confirmModal.isDanger}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 };
