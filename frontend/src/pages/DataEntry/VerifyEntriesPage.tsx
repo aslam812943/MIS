@@ -3,6 +3,9 @@ import { dataEntryService } from '../../services/dataEntry.service';
 import { orgService } from '../../services/org.service';
 import { toast } from 'react-hot-toast';
 import { format } from 'date-fns';
+import DashboardLayout from '../../components/layout/DashboardLayout';
+import ConfirmModal from '../../components/common/ConfirmModal';
+import { INITIAL_CONFIRM_STATE, type ConfirmDialogState } from '../../types/confirm.types';
 
 interface DepartmentEntry {
   id: string;
@@ -36,6 +39,7 @@ const VerifyEntriesPage: React.FC = () => {
   const [editFormData, setEditFormData] = useState<Record<string, any>>({});
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [branches, setBranches] = useState<any[]>([]);
+  const [confirmModal, setConfirmModal] = useState<ConfirmDialogState>(INITIAL_CONFIRM_STATE);
 
   const fetchEntries = async () => {
     setIsLoading(true);
@@ -66,15 +70,33 @@ const VerifyEntriesPage: React.FC = () => {
     fetchEntries();
   }, [selectedDate]);
 
-  const handleVerify = async (id: string) => {
-    try {
-      await dataEntryService.verifyEntry(id);
-      toast.success('Entry verified successfully!');
-      fetchEntries();
-    } catch (error) {
-      console.error('Verify error:', error);
-      toast.error('Failed to verify entry');
-    }
+  const entryLabel = (entry: DepartmentEntry) => {
+    const employee = entry.profiles?.full_name?.trim() || entry.profiles?.email || 'this employee';
+    const moduleName = entry.modules?.name || 'entry';
+    return `${employee} — ${moduleName}`;
+  };
+
+  const handleVerify = (entry: DepartmentEntry) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Approve Entry',
+      message: `Approve and verify the ${entry.modules?.name || 'data'} entry submitted by ${entry.profiles?.full_name || entry.profiles?.email}? This marks the record as verified.`,
+      confirmLabel: 'Approve',
+      cancelLabel: 'Cancel',
+      isDanger: false,
+      onConfirm: async () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        const toastId = toast.loading('Verifying entry...');
+        try {
+          await dataEntryService.verifyEntry(entry.id);
+          toast.success(`Entry for ${entryLabel(entry)} verified successfully.`, { id: toastId });
+          fetchEntries();
+        } catch (error) {
+          console.error('Verify error:', error);
+          toast.error('Failed to verify entry', { id: toastId });
+        }
+      },
+    });
   };
 
   const handleOpenEdit = (entry: DepartmentEntry) => {
@@ -93,10 +115,9 @@ const VerifyEntriesPage: React.FC = () => {
     }));
   };
 
-  const handleSaveEdit = async () => {
-    if (!editingEntry) return;
+  const validateEditForm = (): boolean => {
+    if (!editingEntry) return false;
 
-    // Validate that all fields are filled
     const missingFields: string[] = [];
     editingEntry.modules?.fields?.forEach((field) => {
       const val = editFormData[field.name];
@@ -107,10 +128,16 @@ const VerifyEntriesPage: React.FC = () => {
 
     if (missingFields.length > 0) {
       toast.error(`Please fill in all fields: ${missingFields.join(', ')}`);
-      return;
+      return false;
     }
+    return true;
+  };
+
+  const performSaveEdit = async () => {
+    if (!editingEntry) return;
 
     setIsSavingEdit(true);
+    const toastId = toast.loading('Saving and verifying entry...');
     try {
       await dataEntryService.saveEntry({
         module_id: editingEntry.module_id,
@@ -118,18 +145,34 @@ const VerifyEntriesPage: React.FC = () => {
         entry_date: editingEntry.entry_date,
         data: editFormData
       });
-      toast.success('Entry updated and verified successfully!');
+      toast.success(`Entry for ${entryLabel(editingEntry)} updated and verified successfully.`, { id: toastId });
       setEditingEntry(null);
       fetchEntries();
     } catch (error) {
       console.error('Save edit error:', error);
-      toast.error('Failed to update entry');
+      toast.error('Failed to update entry', { id: toastId });
     } finally {
       setIsSavingEdit(false);
     }
   };
 
-  // Filter entries based on selected branch
+  const handleSaveEdit = () => {
+    if (!editingEntry || !validateEditForm()) return;
+
+    setConfirmModal({
+      isOpen: true,
+      title: 'Verify & Save',
+      message: `Save changes and verify the entry for ${entryLabel(editingEntry)}? The employee's submitted data will be updated.`,
+      confirmLabel: 'Verify & Save',
+      cancelLabel: 'Cancel',
+      isDanger: false,
+      onConfirm: async () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        await performSaveEdit();
+      },
+    });
+  };
+
   const filteredEntries = entries.filter((entry) => {
     if (selectedBranch === 'all') return true;
     return entry.profiles?.branches?.name === selectedBranch;
@@ -139,134 +182,128 @@ const VerifyEntriesPage: React.FC = () => {
   const verifiedCount = filteredEntries.filter(e => e.status === 'verified').length;
 
   return (
-    <div className="p-8 max-w-6xl mx-auto">
-      {/* Header section */}
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-        <div>
-          <h1 className="text-3xl font-extrabold text-white tracking-tight">Department Approvals</h1>
-          <p className="text-slate-400 mt-1">Review, edit, and verify daily metrics entered by your department's employees.</p>
-        </div>
-        <div className="flex flex-col sm:flex-row gap-3">
-          {/* Branch Filter dropdown */}
-          <div className="flex items-center gap-3 bg-slate-900 border border-slate-800 p-2 rounded-xl">
-            <span className="text-slate-400 text-sm font-semibold px-2">Filter Branch:</span>
-            <select
-              value={selectedBranch}
-              onChange={(e) => setSelectedBranch(e.target.value)}
-              className="bg-slate-950 border border-slate-800 text-white rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-indigo-500 min-w-[120px] cursor-pointer"
-            >
-              <option value="all">All Branches</option>
-              {branches.map((branch) => (
-                <option key={branch.id} value={branch.name}>
-                  {branch.name.toUpperCase()}
-                </option>
-              ))}
-            </select>
+    <DashboardLayout>
+      <div className="mis-page mis-animate-in max-w-7xl mx-auto">
+        <header className="mis-page-header-row mb-6">
+          <div className="mis-page-header" style={{ marginBottom: 0 }}>
+            <h1 className="mis-page-title">Department Approvals</h1>
+            <p className="mis-page-desc">
+              Review, edit, and verify daily metrics entered by your department employees.
+            </p>
           </div>
+          <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+            <div className="mis-filter-bar flex-1 sm:flex-initial">
+              <span className="mis-filter-label">Branch</span>
+              <select
+                value={selectedBranch}
+                onChange={(e) => setSelectedBranch(e.target.value)}
+                className="mis-select py-2 text-sm min-w-[8rem] flex-1"
+              >
+                <option value="all">All Branches</option>
+                {branches.map((branch) => (
+                  <option key={branch.id} value={branch.name}>
+                    {branch.name.toUpperCase()}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="mis-filter-bar flex-1 sm:flex-initial">
+              <span className="mis-filter-label">Date</span>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="mis-input py-2 text-sm flex-1"
+              />
+            </div>
+          </div>
+        </header>
 
-          {/* Date Selector */}
-          <div className="flex items-center gap-3 bg-slate-900 border border-slate-800 p-2 rounded-xl">
-            <span className="text-slate-400 text-sm font-semibold px-2">Select Date:</span>
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="bg-slate-950 border border-slate-800 text-white rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-indigo-500"
-            />
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+          <div className="mis-stat-card">
+            <div className="mis-stat-label">Total Submissions</div>
+            <div className="mis-stat-value">{filteredEntries.length}</div>
+          </div>
+          <div className="mis-stat-card mis-stat-pending" style={{ borderColor: 'rgba(245, 158, 11, 0.2)' }}>
+            <div className="mis-stat-label" style={{ color: '#fbbf24' }}>Pending Verification</div>
+            <div className="mis-stat-value" style={{ color: '#fbbf24' }}>{pendingCount}</div>
+          </div>
+          <div className="mis-stat-card mis-stat-verified" style={{ borderColor: 'rgba(16, 185, 129, 0.2)' }}>
+            <div className="mis-stat-label" style={{ color: '#34d399' }}>Verified Entries</div>
+            <div className="mis-stat-value" style={{ color: '#34d399' }}>{verifiedCount}</div>
           </div>
         </div>
-      </header>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-5 shadow-lg backdrop-blur-sm">
-          <div className="text-slate-400 text-sm font-semibold mb-1">Total Submissions</div>
-          <div className="text-3xl font-extrabold text-white">{filteredEntries.length}</div>
-        </div>
-        <div className="bg-amber-500/5 border border-amber-500/10 rounded-2xl p-5 shadow-lg backdrop-blur-sm">
-          <div className="text-amber-400 text-sm font-semibold mb-1">Pending Verification</div>
-          <div className="text-3xl font-extrabold text-amber-300">{pendingCount}</div>
-        </div>
-        <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-2xl p-5 shadow-lg backdrop-blur-sm">
-          <div className="text-emerald-400 text-sm font-semibold mb-1">Verified Entries</div>
-          <div className="text-3xl font-extrabold text-emerald-300">{verifiedCount}</div>
-        </div>
-      </div>
-
-      {/* Entries List */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-xl overflow-hidden">
-        {isLoading ? (
-          <div className="p-16 flex justify-center">
-            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-500"></div>
-          </div>
-        ) : filteredEntries.length === 0 ? (
-          <div className="p-16 text-center text-slate-500 italic">
-            No entries matching filter criteria for this date.
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+        <div className="mis-table-wrap">
+          {isLoading ? (
+            <div className="mis-loading-center py-16">
+              <div className="mis-spinner" />
+            </div>
+          ) : filteredEntries.length === 0 ? (
+            <div className="mis-empty">No entries matching filter criteria for this date.</div>
+          ) : (
+            <table className="mis-table">
               <thead>
-                <tr className="border-b border-slate-800 bg-slate-950 text-slate-300 font-semibold text-xs uppercase tracking-wider">
-                  <th className="px-6 py-4">Employee</th>
-                  <th className="px-6 py-4">Module Section</th>
-                  <th className="px-6 py-4">Data Submitted</th>
-                  <th className="px-6 py-4">Status</th>
-                  <th className="px-6 py-4 text-right">Actions</th>
+                <tr>
+                  <th>Employee</th>
+                  <th>Module</th>
+                  <th>Data Submitted</th>
+                  <th>Status</th>
+                  <th style={{ textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/60">
+              <tbody>
                 {filteredEntries.map((entry) => (
-                  <tr key={entry.id} className="hover:bg-slate-800/30 transition-all">
-                    <td className="px-6 py-4">
-                      <div className="font-semibold text-white">{entry.profiles?.full_name || 'N/A'}</div>
-                      <div className="text-xs text-slate-400">{entry.profiles?.email}</div>
+                  <tr key={entry.id}>
+                    <td>
+                      <div className="font-semibold" style={{ color: 'var(--text-primary)' }}>
+                        {entry.profiles?.full_name || 'N/A'}
+                      </div>
+                      <div className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>{entry.profiles?.email}</div>
                       {entry.profiles?.branches?.name && (
-                        <div className="text-[10px] text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-1.5 py-0.5 rounded font-bold uppercase mt-1 w-max flex items-center gap-1">
-                          <span>📍</span> {entry.profiles.branches.name}
-                        </div>
+                        <span className="mis-badge mis-badge-info mt-1.5">{entry.profiles.branches.name}</span>
                       )}
                     </td>
-                    <td className="px-6 py-4">
-                      <span className="bg-indigo-500/10 text-indigo-400 px-3 py-1 rounded-full text-xs font-semibold">
-                        {entry.modules?.name}
-                      </span>
+                    <td>
+                      <span className="mis-badge mis-badge-info">{entry.modules?.name}</span>
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="flex flex-wrap gap-2 max-w-sm">
+                    <td>
+                      <div className="flex flex-wrap gap-1.5 max-w-xs">
                         {Object.entries(entry.data || {}).map(([key, val]) => (
-                          <div key={key} className="bg-slate-950 border border-slate-800 px-2 py-1 rounded-lg text-xs">
-                            <span className="text-slate-500 font-medium">{key}:</span>{' '}
-                            <span className="text-slate-300 font-semibold">{val}</span>
-                          </div>
+                          <span key={key} className="mis-chip">
+                            {key}: <strong>{String(val)}</strong>
+                          </span>
                         ))}
                       </div>
                     </td>
-                    <td className="px-6 py-4">
+                    <td>
                       {entry.status === 'verified' ? (
-                        <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-3 py-1 rounded-full text-xs font-semibold">
-                          Verified
-                        </span>
+                        <span className="mis-badge mis-badge-success">Verified</span>
                       ) : (
-                        <span className="bg-amber-500/10 text-amber-400 border border-amber-500/20 px-3 py-1 rounded-full text-xs font-semibold animate-pulse">
-                          Pending
-                        </span>
+                        <span className="mis-badge mis-badge-warning">Pending</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex gap-2 justify-end">
+                    <td>
+                      <div className="flex flex-wrap gap-2 justify-end">
                         <button
+                          type="button"
                           onClick={() => handleOpenEdit(entry)}
-                          className="px-4 py-1.5 rounded-lg border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800 text-xs font-medium transition-all"
+                          className="mis-btn mis-btn-ghost mis-btn-sm"
                         >
-                          ✏️ Edit & Verify
+                          Edit & Verify
                         </button>
                         {entry.status !== 'verified' && (
                           <button
-                            onClick={() => handleVerify(entry.id)}
-                            className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-md"
+                            type="button"
+                            onClick={() => handleVerify(entry)}
+                            className="mis-btn mis-btn-sm mis-btn-success-soft"
+                            style={{
+                              background: 'rgba(16, 185, 129, 0.15)',
+                              border: '1px solid rgba(16, 185, 129, 0.35)',
+                              color: '#34d399',
+                            }}
                           >
-                            ✓ Approve
+                            Approve
                           </button>
                         )}
                       </div>
@@ -275,70 +312,94 @@ const VerifyEntriesPage: React.FC = () => {
                 ))}
               </tbody>
             </table>
+          )}
+        </div>
+
+        {editingEntry && (
+          <div className="mis-modal-backdrop">
+            <div className="mis-modal max-w-xl">
+              <div className="mis-modal-header">
+                <div>
+                  <h2 className="text-lg font-bold m-0 mb-1" style={{ color: 'var(--text-primary)' }}>Edit & Verify Entry</h2>
+                  <p className="text-xs m-0" style={{ color: 'var(--text-secondary)' }}>
+                    {editingEntry.profiles?.full_name} — {editingEntry.modules?.name}
+                  </p>
+                </div>
+                <button type="button" className="mis-icon-btn" onClick={() => setEditingEntry(null)} aria-label="Close">
+                  ✕
+                </button>
+              </div>
+
+              <div className="mis-modal-body">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {editingEntry.modules?.fields?.map((field, idx) => (
+                    <div key={idx} className="mis-field">
+                      <label className="mis-label" style={{ textTransform: 'none', letterSpacing: 'normal', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                        {field.name}
+                      </label>
+                      {field.type === 'text' && (
+                        <input
+                          type="text"
+                          value={editFormData[field.name] || ''}
+                          onChange={(e) => handleEditInputChange(field.name, e.target.value, field.type)}
+                          className="mis-input"
+                        />
+                      )}
+                      {field.type === 'number' && (
+                        <input
+                          type="number"
+                          value={editFormData[field.name] !== undefined ? editFormData[field.name] : ''}
+                          onChange={(e) => handleEditInputChange(field.name, e.target.value, field.type)}
+                          className="mis-input"
+                        />
+                      )}
+                      {field.type === 'date' && (
+                        <input
+                          type="date"
+                          value={editFormData[field.name] || ''}
+                          onChange={(e) => handleEditInputChange(field.name, e.target.value, field.type)}
+                          className="mis-input"
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mis-modal-footer">
+                <button type="button" onClick={() => setEditingEntry(null)} className="mis-btn mis-btn-ghost flex-1 justify-center">
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveEdit}
+                  disabled={isSavingEdit}
+                  className="mis-btn flex-1 justify-center mis-btn-success-soft"
+                  style={{
+                    background: 'rgba(16, 185, 129, 0.15)',
+                    border: '1px solid rgba(16, 185, 129, 0.35)',
+                    color: '#34d399',
+                  }}
+                >
+                  {isSavingEdit ? 'Saving...' : 'Verify & Save'}
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>
 
-      {/* Edit & Verify Modal */}
-      {editingEntry && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-xl shadow-2xl relative">
-            <h2 className="text-xl font-bold text-white mb-2">Edit & Verify Entry</h2>
-            <p className="text-xs text-slate-400 mb-6">
-              Modifying data entered by <strong>{editingEntry.profiles?.full_name}</strong> for module <strong>{editingEntry.modules?.name}</strong>.
-            </p>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-              {editingEntry.modules?.fields?.map((field, idx) => (
-                <div key={idx} className="flex flex-col gap-1.5">
-                  <label className="text-xs font-semibold text-slate-300">{field.name}</label>
-                  {field.type === 'text' && (
-                    <input
-                      type="text"
-                      value={editFormData[field.name] || ''}
-                      onChange={(e) => handleEditInputChange(field.name, e.target.value, field.type)}
-                      className="bg-slate-950 border border-slate-800 text-white text-sm rounded-xl px-3 py-2.5 focus:outline-none focus:border-indigo-500"
-                    />
-                  )}
-                  {field.type === 'number' && (
-                    <input
-                      type="number"
-                      value={editFormData[field.name] !== undefined ? editFormData[field.name] : ''}
-                      onChange={(e) => handleEditInputChange(field.name, e.target.value, field.type)}
-                      className="bg-slate-950 border border-slate-800 text-white text-sm rounded-xl px-3 py-2.5 focus:outline-none focus:border-indigo-500"
-                    />
-                  )}
-                  {field.type === 'date' && (
-                    <input
-                      type="date"
-                      value={editFormData[field.name] || ''}
-                      onChange={(e) => handleEditInputChange(field.name, e.target.value, field.type)}
-                      className="bg-slate-950 border border-slate-800 text-white text-sm rounded-xl px-3 py-2.5 focus:outline-none focus:border-indigo-500"
-                    />
-                  )}
-                </div>
-              ))}
-            </div>
-
-            <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
-              <button
-                onClick={() => setEditingEntry(null)}
-                className="px-5 py-2 rounded-xl text-slate-300 border border-slate-700 hover:bg-slate-800 text-sm font-semibold transition-all"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSaveEdit}
-                disabled={isSavingEdit}
-                className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2 rounded-xl text-sm font-bold transition-all shadow-md"
-              >
-                {isSavingEdit ? 'Saving...' : '💾 Verify & Save'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        confirmLabel={confirmModal.confirmLabel}
+        cancelLabel={confirmModal.cancelLabel}
+        isDanger={confirmModal.isDanger}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+      />
+    </DashboardLayout>
   );
 };
 

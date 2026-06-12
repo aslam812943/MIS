@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
 import axios from 'axios';
 import { orgService } from '../services/org.service';
-import type { Branch, Department, Module } from '../services/org.service';
-import Sidebar from '../components/layout/Sidebar';
+import type { Branch, Department, Module, User } from '../services/org.service';
+import { INITIAL_CONFIRM_STATE, type ConfirmDialogState } from '../types/confirm.types';
+import DashboardLayout from '../components/layout/DashboardLayout';
+import UserTable from '../components/admin/UserTable';
 import ConfirmModal from '../components/common/ConfirmModal';
 import AuditLogsTab from '../components/admin/AuditLogsTab';
 
@@ -12,6 +14,7 @@ import AuditLogsTab from '../components/admin/AuditLogsTab';
  */
 const AdminPanelPage: React.FC = () => {
   const [mainTab, setMainTab] = useState<'management' | 'audit'>('management');
+  const [listTab, setListTab] = useState<'users' | 'branches' | 'departments' | 'modules'>('users');
   const [branches, setBranches] = useState<Branch[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [modules, setModules] = useState<Module[]>([]);
@@ -44,17 +47,7 @@ const AdminPanelPage: React.FC = () => {
   });
 
   // Confirmation Modal state
-  const [confirmModal, setConfirmModal] = useState<{
-    isOpen: boolean;
-    title: string;
-    message: string;
-    onConfirm: () => void;
-  }>({
-    isOpen: false,
-    title: '',
-    message: '',
-    onConfirm: () => {}
-  });
+  const [confirmModal, setConfirmModal] = useState<ConfirmDialogState>(INITIAL_CONFIRM_STATE);
 
   useEffect(() => {
     fetchData();
@@ -90,9 +83,10 @@ const AdminPanelPage: React.FC = () => {
       return;
     }
     setLoading(true);
+    const toastId = toast.loading('Creating branch...');
     try {
       await orgService.addBranch(newBranchName);
-      toast.success('Branch added successfully!');
+      toast.success(`Branch "${newBranchName.trim()}" created successfully.`, { id: toastId });
       setNewBranchName('');
       fetchData();
     } catch (error: unknown) {
@@ -102,7 +96,7 @@ const AdminPanelPage: React.FC = () => {
       } else if (error instanceof Error) {
         message = error.message;
       }
-      toast.error(message);
+      toast.error(message, { id: toastId });
     } finally {
       setLoading(false);
     }
@@ -114,9 +108,10 @@ const AdminPanelPage: React.FC = () => {
       return;
     }
     setLoading(true);
+    const toastId = toast.loading('Updating branch...');
     try {
       await orgService.updateBranch(id, editingName);
-      toast.success('Branch updated successfully!');
+      toast.success(`Branch updated to "${editingName.trim()}".`, { id: toastId });
       setEditingId(null);
       fetchData();
     } catch (error: unknown) {
@@ -126,23 +121,27 @@ const AdminPanelPage: React.FC = () => {
       } else if (error instanceof Error) {
         message = error.message;
       }
-      toast.error(message);
+      toast.error(message, { id: toastId });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDeleteBranch = (id: string) => {
+  const handleDeleteBranch = (branch: Branch) => {
     setConfirmModal({
       isOpen: true,
       title: 'Delete Branch',
-      message: 'Are you sure you want to delete this branch? This action cannot be undone.',
+      message: `Delete branch "${branch.name}"? This action cannot be undone.`,
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      isDanger: true,
       onConfirm: async () => {
-        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        const toastId = toast.loading('Deleting branch...');
         setLoading(true);
         try {
-          await orgService.deleteBranch(id);
-          toast.success('Branch deleted successfully!');
+          await orgService.deleteBranch(branch.id);
+          toast.success(`Branch "${branch.name}" deleted successfully.`, { id: toastId });
           fetchData();
         } catch (error: unknown) {
           let message = 'Failed to delete branch.';
@@ -151,11 +150,11 @@ const AdminPanelPage: React.FC = () => {
           } else if (error instanceof Error) {
             message = error.message;
           }
-          toast.error(message);
+          toast.error(message, { id: toastId });
         } finally {
           setLoading(false);
         }
-      }
+      },
     });
   };
 
@@ -166,9 +165,10 @@ const AdminPanelPage: React.FC = () => {
       return;
     }
     setLoading(true);
+    const toastId = toast.loading('Creating department...');
     try {
       await orgService.addDepartment(newDeptName);
-      toast.success('Department added successfully!');
+      toast.success(`Department "${newDeptName.trim()}" created successfully.`, { id: toastId });
       setNewDeptName('');
       fetchData();
     } catch (error: unknown) {
@@ -178,7 +178,7 @@ const AdminPanelPage: React.FC = () => {
       } else if (error instanceof Error) {
         message = error.message;
       }
-      toast.error(message);
+      toast.error(message, { id: toastId });
     } finally {
       setLoading(false);
     }
@@ -190,9 +190,10 @@ const AdminPanelPage: React.FC = () => {
       return;
     }
     setLoading(true);
+    const toastId = toast.loading('Updating department...');
     try {
       await orgService.updateDepartment(id, editingName);
-      toast.success('Department updated successfully!');
+      toast.success(`Department updated to "${editingName.trim()}".`, { id: toastId });
       setEditingId(null);
       fetchData();
     } catch (error: unknown) {
@@ -202,24 +203,28 @@ const AdminPanelPage: React.FC = () => {
       } else if (error instanceof Error) {
         message = error.message;
       }
-      toast.error(message);
+      toast.error(message, { id: toastId });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDeleteDept = (id: string) => {
+  const handleDeleteDept = (dept: Department) => {
     setConfirmModal({
       isOpen: true,
       title: 'Delete Department',
-      message: 'Are you sure you want to delete this department? This action cannot be undone.',
+      message: `Delete department "${dept.name}"? This action cannot be undone.`,
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      isDanger: true,
       onConfirm: async () => {
-        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        const toastId = toast.loading('Deleting department...');
         setLoading(true);
         try {
-          await orgService.deleteDepartment(id);
+          await orgService.deleteDepartment(dept.id);
           fetchData();
-          toast.success('Department deleted successfully!');
+          toast.success(`Department "${dept.name}" deleted successfully.`, { id: toastId });
         } catch (error: unknown) {
           let message = 'Failed to delete department.';
           if (axios.isAxiosError(error) && error.response?.data?.message) {
@@ -227,11 +232,11 @@ const AdminPanelPage: React.FC = () => {
           } else if (error instanceof Error) {
             message = error.message;
           }
-          toast.error(message);
+          toast.error(message, { id: toastId });
         } finally {
           setLoading(false);
         }
-      }
+      },
     });
   };
 
@@ -242,9 +247,10 @@ const AdminPanelPage: React.FC = () => {
       return;
     }
     setLoading(true);
+    const toastId = toast.loading('Creating module...');
     try {
       await orgService.addModule(newModuleName, newModuleFields);
-      toast.success('Module added successfully!');
+      toast.success(`Module "${newModuleName.trim()}" created successfully.`, { id: toastId });
       setNewModuleName('');
       setNewModuleFields([]);
       fetchData();
@@ -255,7 +261,7 @@ const AdminPanelPage: React.FC = () => {
       } else if (error instanceof Error) {
         message = error.message;
       }
-      toast.error(message);
+      toast.error(message, { id: toastId });
     } finally {
       setLoading(false);
     }
@@ -267,9 +273,10 @@ const AdminPanelPage: React.FC = () => {
       return;
     }
     setLoading(true);
+    const toastId = toast.loading('Saving module configuration...');
     try {
       await orgService.updateModule(id, editingName, editingFields);
-      toast.success('Module updated successfully!');
+      toast.success(`Module "${editingName.trim()}" updated successfully.`, { id: toastId });
       setEditingId(null);
       setEditingFields([]);
       fetchData();
@@ -280,24 +287,28 @@ const AdminPanelPage: React.FC = () => {
       } else if (error instanceof Error) {
         message = error.message;
       }
-      toast.error(message);
+      toast.error(message, { id: toastId });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDeleteModule = (id: string) => {
+  const handleDeleteModule = (mod: Module) => {
     setConfirmModal({
       isOpen: true,
       title: 'Delete Module',
-      message: 'Are you sure you want to delete this module? All associated configurations will be removed.',
+      message: `Delete module "${mod.name}"? All field configurations will be removed. This cannot be undone.`,
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      isDanger: true,
       onConfirm: async () => {
-        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        const toastId = toast.loading('Deleting module...');
         setLoading(true);
         try {
-          await orgService.deleteModule(id);
+          await orgService.deleteModule(mod.id);
           fetchData();
-          toast.success('Module deleted successfully!');
+          toast.success(`Module "${mod.name}" deleted successfully.`, { id: toastId });
         } catch (error: unknown) {
           let message = 'Failed to delete module.';
           if (axios.isAxiosError(error) && error.response?.data?.message) {
@@ -305,11 +316,11 @@ const AdminPanelPage: React.FC = () => {
           } else if (error instanceof Error) {
             message = error.message;
           }
-          toast.error(message);
+          toast.error(message, { id: toastId });
         } finally {
           setLoading(false);
         }
-      }
+      },
     });
   };
 
@@ -320,9 +331,10 @@ const AdminPanelPage: React.FC = () => {
       return;
     }
     setLoading(true);
+    const toastId = toast.loading('Creating user account...');
     try {
       await orgService.createUser(userData as any);
-      toast.success('User created and email sent successfully!');
+      toast.success(`User "${userData.full_name}" created successfully.`, { id: toastId });
       setIsUserModalOpen(false);
       setUserData({
         full_name: '',
@@ -341,23 +353,28 @@ const AdminPanelPage: React.FC = () => {
       } else if (error instanceof Error) {
         message = error.message;
       }
-      toast.error(message);
+      toast.error(message, { id: toastId });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDeleteUser = (id: string) => {
+  const handleDeleteUser = (user: User) => {
+    const displayName = user.full_name?.trim() || user.email;
     setConfirmModal({
       isOpen: true,
       title: 'Delete User',
-      message: 'Are you sure you want to delete this user? This will remove their access and profile permanently.',
+      message: `Permanently delete "${displayName}"? They will lose all portal access and data tied to this account.`,
+      confirmLabel: 'Delete User',
+      cancelLabel: 'Cancel',
+      isDanger: true,
       onConfirm: async () => {
-        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        const toastId = toast.loading('Deleting user...');
         setLoading(true);
         try {
-          await orgService.deleteUser(id);
-          toast.success('User deleted successfully!');
+          await orgService.deleteUser(user.id);
+          toast.success(`User "${displayName}" deleted successfully.`, { id: toastId });
           fetchData();
         } catch (error: unknown) {
           let message = 'Failed to delete user.';
@@ -366,58 +383,66 @@ const AdminPanelPage: React.FC = () => {
           } else if (error instanceof Error) {
             message = error.message;
           }
-          toast.error(message);
+          toast.error(message, { id: toastId });
         } finally {
           setLoading(false);
         }
-      }
+      },
     });
   };
 
-  const handleUpdateUserStatus = async (id: string, currentStatus: string) => {
-    const newStatus = currentStatus === 'blocked' ? 'active' : 'blocked';
-    setLoading(true);
-    try {
-      await orgService.updateUserStatus(id, newStatus);
-      toast.success(`User ${newStatus === 'blocked' ? 'blocked' : 'unblocked'} successfully!`);
-      fetchData();
-    } catch (error: unknown) {
-      let message = 'Failed to update user status.';
-      if (axios.isAxiosError(error) && error.response?.data?.message) {
-        message = error.response.data.message;
-      }
-      toast.error(message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleOpenEditUser = (u: any) => {
-    setUserData({
-      full_name: u.full_name || '',
-      email: u.email || '',
-      password: '', // Password not editable here
-      role: u.role || 'employee',
-      branch_id: u.branch_id || '',
-      department_id: u.department_id || '',
-      allowed_modules: u.allowed_modules || []
+  const handleToggleBlockUser = (user: User) => {
+    const displayName = user.full_name?.trim() || user.email;
+    const isBlocked = user.status === 'blocked';
+    setConfirmModal({
+      isOpen: true,
+      title: isBlocked ? 'Unblock User' : 'Block User',
+      message: isBlocked
+        ? `Allow "${displayName}" to sign in and use the portal again?`
+        : `Block "${displayName}"? They will not be able to sign in until you unblock them.`,
+      confirmLabel: isBlocked ? 'Unblock' : 'Block User',
+      cancelLabel: 'Cancel',
+      isDanger: !isBlocked,
+      onConfirm: async () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        const newStatus = isBlocked ? 'active' : 'blocked';
+        const toastId = toast.loading(isBlocked ? 'Unblocking user...' : 'Blocking user...');
+        setLoading(true);
+        try {
+          await orgService.updateUserStatus(user.id, newStatus);
+          toast.success(
+            isBlocked
+              ? `"${displayName}" has been unblocked successfully.`
+              : `"${displayName}" has been blocked successfully.`,
+            { id: toastId }
+          );
+          fetchData();
+        } catch (error: unknown) {
+          let message = 'Failed to update user status.';
+          if (axios.isAxiosError(error) && error.response?.data?.message) {
+            message = error.response.data.message;
+          } else if (error instanceof Error) {
+            message = error.message;
+          }
+          toast.error(message, { id: toastId });
+        } finally {
+          setLoading(false);
+        }
+      },
     });
-    setEditingId(u.id);
-    setIsEditingUser(true);
-    setIsUserModalOpen(true);
   };
 
   const handleEditUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingId) return;
     setLoading(true);
+    const toastId = toast.loading('Updating user...');
     try {
-      // Don't send password if empty
       const updatePayload = { ...userData };
       if (!updatePayload.password) delete (updatePayload as any).password;
-      
+
       await orgService.updateUser(editingId, updatePayload as any);
-      toast.success('User updated successfully!');
+      toast.success(`User "${userData.full_name}" updated successfully.`, { id: toastId });
       setIsUserModalOpen(false);
       setIsEditingUser(false);
       setEditingId(null);
@@ -426,64 +451,76 @@ const AdminPanelPage: React.FC = () => {
       let message = 'Failed to update user.';
       if (axios.isAxiosError(error) && error.response?.data?.message) {
         message = error.response.data.message;
+      } else if (error instanceof Error) {
+        message = error.message;
       }
-      toast.error(message);
+      toast.error(message, { id: toastId });
     } finally {
       setLoading(false);
     }
   };
 
+  const handleRemoveModuleField = (idx: number, fieldName: string) => {
+    const label = fieldName.trim() || 'this field';
+    setConfirmModal({
+      isOpen: true,
+      title: 'Remove Field',
+      message: `Remove "${label}" from the module configuration? You must save the module for this change to take effect.`,
+      confirmLabel: 'Remove',
+      cancelLabel: 'Cancel',
+      isDanger: true,
+      onConfirm: () => {
+        setEditingFields((prev) => prev.filter((_, i) => i !== idx));
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        toast.success(`Field "${label}" removed. Save configuration to apply.`);
+      },
+    });
+  };
+
   return (
-    <div className="flex min-h-screen bg-slate-950 text-slate-50">
-      <Sidebar />
-      <main className="flex-1 p-10 overflow-y-auto">
+    <DashboardLayout>
+      <div className="mis-page mis-animate-in mis-admin-page">
         <Toaster position="top-right" />
 
         {/* ── Page Header ───────────────────────────────── */}
-        <header className="mb-8">
-          <div className="flex justify-between items-start mb-6">
-            <div>
-              <h1 className="text-4xl font-extrabold mb-2 bg-gradient-to-r from-indigo-500 to-purple-500 bg-clip-text text-transparent">Admin Panel</h1>
-              <p className="text-slate-400">Manage your organisation and review the full system activity history.</p>
+        <header className="mis-page-header">
+          <div className="mis-page-header-row mb-5">
+            <div className="mis-page-header" style={{ marginBottom: 0 }}>
+              <h1 className="mis-page-title">Admin Panel</h1>
+              <p className="mis-page-desc">Manage organisation structure, users, and review system activity.</p>
             </div>
             {mainTab === 'management' && (
               <button
+                type="button"
                 onClick={() => {
                   setUserData({ full_name: '', email: '', password: '', role: 'employee', branch_id: '', department_id: '', allowed_modules: [] });
                   setEditingId(null);
                   setIsEditingUser(false);
                   setIsUserModalOpen(true);
                 }}
-                className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl px-6 py-3 font-bold flex items-center gap-2 transition-all hover:scale-[1.02] shadow-lg shadow-indigo-600/20"
+                className="mis-btn mis-btn-primary w-full sm:w-auto justify-center"
               >
                 <span>+</span> Add User
               </button>
             )}
           </div>
 
-          {/* ── Main Tab Navigation ─────────────────────── */}
-          <div className="flex gap-1 p-1.5 bg-slate-900/60 border border-slate-800 rounded-2xl w-fit">
+          <div className="mis-tabs flex-wrap">
             <button
               id="tab-management"
+              type="button"
               onClick={() => setMainTab('management')}
-              className={`flex items-center gap-2.5 px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${
-                mainTab === 'management'
-                  ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
-              }`}
+              className={`mis-tab ${mainTab === 'management' ? 'active' : ''}`}
             >
-              <span>🛠️</span> Management Control
+              Management
             </button>
             <button
               id="tab-audit"
+              type="button"
               onClick={() => setMainTab('audit')}
-              className={`flex items-center gap-2.5 px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${
-                mainTab === 'audit'
-                  ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
-              }`}
+              className={`mis-tab ${mainTab === 'audit' ? 'active' : ''}`}
             >
-              <span>📜</span> System History Logs
+              Audit Logs
             </button>
           </div>
         </header>
@@ -492,477 +529,344 @@ const AdminPanelPage: React.FC = () => {
         {mainTab === 'audit' && <AuditLogsTab />}
 
         {/* ── Management Tab ─────────────────────────────── */}
-        {mainTab === 'management' && <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-          {/* Branches Section */}
-          <section className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-3xl p-8">
-            <div className="mb-6">
-              <h2 className="text-xl font-bold">🏢 Branches</h2>
-            </div>
-            <form onSubmit={handleAddBranch} className="flex gap-3 mb-6">
-              <input
-                type="text"
-                placeholder="Enter branch name (e.g. London)"
-                className="flex-1 bg-black/20 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
-                value={newBranchName}
-                onChange={(e) => setNewBranchName(e.target.value)}
-                disabled={loading}
-              />
-              <button 
-                type="submit" 
-                className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl px-6 py-3 font-semibold transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
-                disabled={loading}
-              >
-                Add Branch
-              </button>
-            </form>
-            <ul className="space-y-3">
-              {branches.map(b => (
-                <li key={b.id} className="flex justify-between items-center p-4 bg-white/5 border border-slate-800 rounded-xl font-medium">
-                  {editingId === b.id ? (
-                    <div className="flex gap-2 w-full">
-                      <input 
-                        className="flex-1 bg-black/30 border border-indigo-500 rounded-lg px-3 py-1 text-white focus:outline-none"
-                        value={editingName} 
-                        onChange={(e) => setEditingName(e.target.value)}
-                        autoFocus
-                      />
-                      <button className="p-2 hover:bg-white/10 rounded-lg transition-colors" onClick={() => handleUpdateBranch(b.id)}>✅</button>
-                      <button className="p-2 hover:bg-white/10 rounded-lg transition-colors" onClick={() => setEditingId(null)}>❌</button>
-                    </div>
-                  ) : (
-                    <>
-                      <span>{b.name}</span>
-                      <div className="flex gap-2">
-                        <button className="p-2 hover:bg-white/10 rounded-lg transition-colors text-lg" onClick={() => { setEditingId(b.id); setEditingName(b.name); }}>✏️</button>
-                        <button className="p-2 hover:bg-white/10 rounded-lg transition-colors text-lg" onClick={() => handleDeleteBranch(b.id)}>🗑️</button>
-                      </div>
-                    </>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </section>
+        {mainTab === 'management' && (
+          <div className="flex flex-col gap-8 mb-10">
+            {/* Quick Add Forms Row */}
+            <div className="mis-admin-quick-add">
+              <div className="mis-card p-5 sm:p-6">
+                <h3 className="mis-label mb-4">Add Branch</h3>
+                <form onSubmit={handleAddBranch}>
+                  <input
+                    type="text"
+                    placeholder="Branch name (e.g. London)"
+                    className="mis-input w-full"
+                    value={newBranchName}
+                    onChange={(e) => setNewBranchName(e.target.value)}
+                    disabled={loading}
+                  />
+                  <button type="submit" disabled={loading} className="mis-btn mis-btn-primary w-full justify-center">Create Branch</button>
+                </form>
+              </div>
 
-          {/* Departments Section */}
-          <section className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-3xl p-8">
-            <div className="mb-6">
-              <h2 className="text-xl font-bold">🏢 Departments</h2>
-            </div>
-            <form onSubmit={handleAddDept} className="flex gap-3 mb-6">
-              <input
-                type="text"
-                placeholder="Enter department (e.g. IT)"
-                className="flex-1 bg-black/20 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
-                value={newDeptName}
-                onChange={(e) => setNewDeptName(e.target.value)}
-                disabled={loading}
-              />
-              <button 
-                type="submit" 
-                className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl px-6 py-3 font-semibold transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
-                disabled={loading}
-              >
-                Add Dept
-              </button>
-            </form>
-            <ul className="space-y-3">
-              {departments.map(d => (
-                <li key={d.id} className="flex justify-between items-center p-4 bg-white/5 border border-slate-800 rounded-xl font-medium">
-                  {editingId === d.id ? (
-                    <div className="flex gap-2 w-full">
-                      <input 
-                        className="flex-1 bg-black/30 border border-indigo-500 rounded-lg px-3 py-1 text-white focus:outline-none"
-                        value={editingName} 
-                        onChange={(e) => setEditingName(e.target.value)}
-                        autoFocus
-                      />
-                      <button className="p-2 hover:bg-white/10 rounded-lg transition-colors" onClick={() => handleUpdateDept(d.id)}>✅</button>
-                      <button className="p-2 hover:bg-white/10 rounded-lg transition-colors" onClick={() => setEditingId(null)}>❌</button>
-                    </div>
-                  ) : (
-                    <>
-                      <span>{d.name}</span>
-                      <div className="flex gap-2">
-                        <button className="p-2 hover:bg-white/10 rounded-lg transition-colors text-lg" onClick={() => { setEditingId(d.id); setEditingName(d.name); }}>✏️</button>
-                        <button className="p-2 hover:bg-white/10 rounded-lg transition-colors text-lg" onClick={() => handleDeleteDept(d.id)}>🗑️</button>
-                      </div>
-                    </>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </section>
+              <div className="mis-card p-5 sm:p-6">
+                <h3 className="mis-label mb-4">Add Department</h3>
+                <form onSubmit={handleAddDept}>
+                  <input
+                    type="text"
+                    placeholder="Dept name (e.g. IT)"
+                    className="mis-input w-full"
+                    value={newDeptName}
+                    onChange={(e) => setNewDeptName(e.target.value)}
+                    disabled={loading}
+                  />
+                  <button type="submit" disabled={loading} className="mis-btn mis-btn-primary w-full justify-center">Create Dept</button>
+                </form>
+              </div>
 
-          {/* Modules Section */}
-          <section className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-3xl p-8 xl:col-span-2">
-            <div className="mb-6">
-              <h2 className="text-xl font-bold">📦 Modules</h2>
+              <div className="mis-card p-5 sm:p-6">
+                <h3 className="mis-label mb-4">Add Module</h3>
+                <form onSubmit={handleAddModule}>
+                  <input
+                    type="text"
+                    placeholder="Module name (e.g. Inventory)"
+                    className="mis-input w-full"
+                    value={newModuleName}
+                    onChange={(e) => setNewModuleName(e.target.value)}
+                    disabled={loading}
+                  />
+                  <button type="submit" disabled={loading} className="mis-btn mis-btn-primary w-full justify-center">Create Module</button>
+                </form>
+              </div>
             </div>
-            <form onSubmit={handleAddModule} className="flex flex-col gap-6 mb-10">
-              <div className="flex gap-3">
-                <input
-                  type="text"
-                  placeholder="Enter module name (e.g. Inventory)"
-                  className="flex-1 bg-black/20 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
-                  value={newModuleName}
-                  onChange={(e) => setNewModuleName(e.target.value)}
-                  disabled={loading}
-                />
-                <button 
-                  type="submit" 
-                  className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl px-6 py-3 font-semibold transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
-                  disabled={loading}
-                >
-                  Add Module
-                </button>
+
+            {/* Main Data Section */}
+            <div className="mis-card overflow-hidden">
+              <div className="flex flex-wrap gap-1 p-3 border-b overflow-x-auto mis-panel-inset-soft" style={{ borderColor: 'var(--border)', background: 'rgba(0,0,0,0.25)' }}>
+                {['users', 'branches', 'departments', 'modules'].map(tab => (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => setListTab(tab as any)}
+                    className={`mis-module-tab capitalize ${listTab === tab ? 'active' : ''}`}
+                  >
+                    {tab}
+                  </button>
+                ))}
               </div>
               
-              <div className="bg-black/20 p-6 rounded-3xl border border-slate-800 border-dashed transition-all hover:bg-black/30">
-                <h4 className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-4 flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"></span>
-                  Define Initial Fields
-                </h4>
-                <div className="space-y-3">
-                  {newModuleFields.map((field, idx) => (
-                    <div key={idx} className="flex gap-3 animate-in slide-in-from-left-2 duration-200">
-                      <input 
-                        placeholder="Field Label (e.g. Amount)" 
-                        className="flex-[2] bg-black/30 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 transition-all"
-                        value={field.name}
-                        onChange={(e) => {
-                          const updated = [...newModuleFields];
-                          updated[idx].name = e.target.value;
-                          setNewModuleFields(updated);
-                        }}
-                      />
-                      <select 
-                        className="flex-1 bg-black/30 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 transition-all cursor-pointer"
-                        value={field.type}
-                        onChange={(e) => {
-                          const updated = [...newModuleFields];
-                          updated[idx].type = e.target.value as any;
-                          setNewModuleFields(updated);
-                        }}
-                      >
-                        <option value="text">Text Input</option>
-                        <option value="number">Numeric</option>
-                        <option value="date">Date Picker</option>
-                      </select>
-                      <button 
-                        type="button" 
-                        className="p-2.5 text-red-400 hover:bg-red-400/10 rounded-xl transition-all"
-                        onClick={() => setNewModuleFields(newModuleFields.filter((_, i) => i !== idx))}
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  ))}
-                </div>
-                <button 
-                  type="button" 
-                  className="mt-4 text-sm font-bold text-indigo-400 hover:text-indigo-300 flex items-center gap-1.5 transition-colors group"
-                  onClick={() => setNewModuleFields([...newModuleFields, { name: '', type: 'text' }])}
-                >
-                  <span className="text-lg group-hover:scale-125 transition-transform">+</span> Add Field
-                </button>
-              </div>
-            </form>
+              <div className="p-0">
+                {listTab === 'users' && (
+                  <UserTable 
+                    users={users} branches={branches} departments={departments} modules={modules} 
+                    loading={loading} onEditUser={(u) => {
+                      setUserData({
+                        full_name: u.full_name || '',
+                        email: u.email,
+                        password: '',
+                        role: u.role,
+                        branch_id: u.branch_id || '',
+                        department_id: u.department_id || '',
+                        allowed_modules: u.allowed_modules || []
+                      });
+                      setEditingId(u.id);
+                      setIsEditingUser(true);
+                      setIsUserModalOpen(true);
+                    }} onDeleteUser={handleDeleteUser} onToggleBlock={handleToggleBlockUser} 
+                  />
+                )}
 
-            <ul className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {modules.map(m => (
-                <li key={m.id} className="flex flex-col bg-slate-900/40 border border-slate-800 rounded-2xl overflow-hidden transition-all hover:border-slate-700">
-                  <div className="flex justify-between items-center p-5 bg-white/5">
-                    <div className="flex items-center gap-3">
-                      <span className="text-xl">📦</span>
-                      <span className="font-bold text-lg">{m.name}</span>
-                      <span className="text-[10px] bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-2 py-0.5 rounded-full uppercase tracking-tighter">
-                        {m.fields?.length || 0} fields
-                      </span>
-                    </div>
-                    <div className="flex gap-2">
-                      <button 
-                        className={`px-3 py-1.5 rounded-lg text-sm font-bold transition-all ${editingId === m.id ? 'bg-indigo-600 text-white' : 'bg-indigo-500/10 text-indigo-400 hover:bg-indigo-600 hover:text-white'}`}
-                        onClick={() => { 
-                          if (editingId === m.id) {
-                            setEditingId(null);
-                          } else {
-                            setEditingId(m.id); 
-                            setEditingName(m.name); 
-                            setEditingFields(m.fields || []);
-                          }
-                        }}
-                      >
-                        ⚙️ Manage
-                      </button>
-                      <button 
-                        className="p-1.5 hover:bg-red-400/10 text-slate-400 hover:text-red-400 rounded-lg transition-colors"
-                        onClick={() => handleDeleteModule(m.id)}
-                      >
-                        🗑️
-                      </button>
-                    </div>
-                  </div>
+                {listTab === 'branches' && (
+                  <ul className="list-none p-0 m-0">
+                    {branches.map(b => (
+                      <li key={b.id} className="mis-list-row">
+                        {editingId === b.id ? (
+                          <div className="flex flex-wrap gap-2 w-full max-w-lg">
+                            <input
+                              className="mis-input flex-1 min-w-[10rem]"
+                              value={editingName}
+                              onChange={(e) => setEditingName(e.target.value)}
+                              autoFocus
+                            />
+                            <button type="button" className="mis-btn mis-btn-primary mis-btn-sm" onClick={() => handleUpdateBranch(b.id)}>Save</button>
+                            <button type="button" className="mis-btn mis-btn-ghost mis-btn-sm" onClick={() => setEditingId(null)}>Cancel</button>
+                          </div>
+                        ) : (
+                          <>
+                            <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{b.name}</span>
+                            <div className="flex gap-1">
+                              <button type="button" className="mis-icon-btn" onClick={() => { setEditingId(b.id); setEditingName(b.name); }}>✏️</button>
+                              <button type="button" className="mis-icon-btn danger" onClick={() => handleDeleteBranch(b)}>🗑️</button>
+                            </div>
+                          </>
+                        )}
+                      </li>
+                    ))}
+                    {branches.length === 0 && <li className="mis-empty">No branches found.</li>}
+                  </ul>
+                )}
 
-                  {editingId === m.id && (
-                    <div className="p-6 bg-black/30 border-t border-slate-800 flex flex-col gap-6 animate-in fade-in slide-in-from-top-2 duration-300">
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Module Name</label>
-                        <input 
-                          className="w-full bg-black/40 border border-slate-700 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-indigo-500 transition-colors"
-                          value={editingName} 
-                          onChange={(e) => setEditingName(e.target.value)}
-                          placeholder="Module Name"
-                        />
-                      </div>
+                {listTab === 'departments' && (
+                  <ul className="list-none p-0 m-0">
+                    {departments.map(d => (
+                      <li key={d.id} className="mis-list-row">
+                        {editingId === d.id ? (
+                          <div className="flex flex-wrap gap-2 w-full max-w-lg">
+                            <input
+                              className="mis-input flex-1 min-w-[10rem]"
+                              value={editingName}
+                              onChange={(e) => setEditingName(e.target.value)}
+                              autoFocus
+                            />
+                            <button type="button" className="mis-btn mis-btn-primary mis-btn-sm" onClick={() => handleUpdateDept(d.id)}>Save</button>
+                            <button type="button" className="mis-btn mis-btn-ghost mis-btn-sm" onClick={() => setEditingId(null)}>Cancel</button>
+                          </div>
+                        ) : (
+                          <>
+                            <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{d.name}</span>
+                            <div className="flex gap-1">
+                              <button type="button" className="mis-icon-btn" onClick={() => { setEditingId(d.id); setEditingName(d.name); }}>✏️</button>
+                              <button type="button" className="mis-icon-btn danger" onClick={() => handleDeleteDept(d)}>🗑️</button>
+                            </div>
+                          </>
+                        )}
+                      </li>
+                    ))}
+                    {departments.length === 0 && <li className="mis-empty">No departments found.</li>}
+                  </ul>
+                )}
 
-                      <div className="space-y-4">
-                        <div className="flex justify-between items-center">
-                          <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Input Fields</label>
+                {listTab === 'modules' && (
+                  <ul className="list-none p-0 m-0">
+                    {modules.map(m => (
+                      <li key={m.id} className="mis-list-row flex-col items-stretch">
+                        <div className="flex flex-wrap justify-between items-center gap-3 w-full">
+                          <div>
+                            <span className="font-semibold text-lg block" style={{ color: 'var(--text-primary)' }}>{m.name}</span>
+                            <span className="mis-badge mis-badge-info mt-1">{m.fields?.length || 0} fields</span>
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              className={`mis-btn mis-btn-sm ${editingId === m.id ? 'mis-btn-primary' : 'mis-btn-ghost'}`}
+                              onClick={() => {
+                                if (editingId === m.id) {
+                                  setEditingId(null);
+                                } else {
+                                  setEditingId(m.id);
+                                  setEditingName(m.name);
+                                  setEditingFields(m.fields || []);
+                                }
+                              }}
+                            >
+                              Configure
+                            </button>
+                            <button type="button" className="mis-icon-btn danger" onClick={() => handleDeleteModule(m)}>🗑️</button>
+                          </div>
                         </div>
-                        
-                        <div className="space-y-3">
-                          {editingFields.map((field, idx) => (
-                            <div key={idx} className="grid grid-cols-[2fr_1.5fr_auto] gap-3 items-center bg-white/5 p-4 rounded-xl border border-slate-800">
-                              <div className="space-y-1.5">
-                                <span className="text-[10px] text-slate-500 font-semibold">Label</span>
-                                <input 
-                                  className="w-full bg-black/40 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-indigo-500"
-                                  placeholder="e.g. Amount" 
-                                  value={field.name}
-                                  onChange={(e) => {
-                                    const updated = [...editingFields];
-                                    updated[idx].name = e.target.value;
-                                    setEditingFields(updated);
-                                  }}
-                                />
+
+                        {editingId === m.id && (
+                          <div className="mt-4 p-5 w-full rounded-[var(--radius-lg)] mis-panel-inset" style={{ background: 'rgba(0,0,0,0.35)', border: '1px solid var(--border)' }}>
+                            <div className="mb-5 mis-field">
+                              <label className="mis-label">Module Name</label>
+                              <input 
+                                className="mis-input w-full max-w-md"
+                                value={editingName} 
+                                onChange={(e) => setEditingName(e.target.value)}
+                                placeholder="Module Name"
+                              />
+                            </div>
+
+                            <div className="mb-5">
+                              <label className="mis-label mb-3 block">Input Fields</label>
+                              <div className="space-y-3">
+                                {editingFields.map((field, idx) => (
+                                  <div key={idx} className="flex flex-col sm:flex-row gap-3 items-end p-4 rounded-[var(--radius-md)]" style={{ background: 'var(--bg-hover)', border: '1px solid var(--border)' }}>
+                                    <div className="w-full sm:flex-[2] mis-field">
+                                      <span className="mis-label" style={{ fontSize: '0.65rem' }}>Label</span>
+                                      <input 
+                                        className="mis-input w-full py-2"
+                                        placeholder="e.g. Amount" 
+                                        value={field.name}
+                                        onChange={(e) => {
+                                          const updated = [...editingFields];
+                                          updated[idx].name = e.target.value;
+                                          setEditingFields(updated);
+                                        }}
+                                      />
+                                    </div>
+                                    <div className="w-full sm:flex-1 mis-field">
+                                      <span className="mis-label" style={{ fontSize: '0.65rem' }}>Type</span>
+                                      <select 
+                                        className="mis-input w-full py-2"
+                                        value={field.type}
+                                        onChange={(e) => {
+                                          const updated = [...editingFields];
+                                          updated[idx].type = e.target.value as any;
+                                          setEditingFields(updated);
+                                        }}
+                                      >
+                                        <option value="text">Text</option>
+                                        <option value="number">Number</option>
+                                        <option value="date">Date</option>
+                                      </select>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      className="mis-icon-btn danger shrink-0"
+                                      onClick={() => handleRemoveModuleField(idx, field.name)}
+                                      aria-label={`Remove field ${field.name || idx + 1}`}
+                                    >
+                                      ✕
+                                    </button>
+                                  </div>
+                                ))}
                               </div>
-                              <div className="space-y-1.5">
-                                <span className="text-[10px] text-slate-500 font-semibold">Type</span>
-                                <select 
-                                  className="w-full bg-black/40 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-indigo-500"
-                                  value={field.type}
-                                  onChange={(e) => {
-                                    const updated = [...editingFields];
-                                    updated[idx].type = e.target.value as any;
-                                    setEditingFields(updated);
-                                  }}
-                                >
-                                  <option value="text">Text</option>
-                                  <option value="number">Number</option>
-                                  <option value="date">Date</option>
-                                </select>
-                              </div>
-                              <button 
-                                type="button" 
-                                className="mt-5 p-2 text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
-                                onClick={() => setEditingFields(editingFields.filter((_, i) => i !== idx))}
+                              <button
+                                type="button"
+                                className="mis-btn mis-btn-ghost mis-btn-sm mt-3"
+                                onClick={() => setEditingFields([...editingFields, { name: '', type: 'text' }])}
                               >
-                                ✕
+                                + Add Field
                               </button>
                             </div>
-                          ))}
-                        </div>
 
-                        <div className="flex justify-between items-center pt-2">
-                          <button 
-                            type="button" 
-                            className="text-xs font-bold text-indigo-400 hover:text-indigo-300 flex items-center gap-1 transition-colors"
-                            onClick={() => setEditingFields([...editingFields, { name: '', type: 'text' }])}
-                          >
-                            <span className="text-lg">+</span> Add New Field
-                          </button>
-                          <div className="flex items-center gap-4">
-                            <button className="text-xs font-bold text-slate-500 hover:text-slate-300 transition-colors" onClick={() => setEditingId(null)}>Cancel</button>
-                            <button 
-                              className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold px-5 py-2 rounded-lg shadow-lg shadow-indigo-600/20 transition-all hover:scale-[1.02]"
-                              onClick={() => handleUpdateModule(m.id)}
-                            >
-                              Save Changes
-                            </button>
+                            <div className="flex flex-wrap justify-end gap-2 pt-4 divider" style={{ borderTop: '1px solid var(--border)' }}>
+                              <button type="button" className="mis-btn mis-btn-ghost" onClick={() => setEditingId(null)}>Cancel</button>
+                              <button type="button" className="mis-btn mis-btn-primary" onClick={() => handleUpdateModule(m.id)}>Save Configuration</button>
+                            </div>
                           </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {!editingId && m.fields && m.fields.length > 0 && (
-                    <div className="flex flex-wrap gap-2 p-5 pt-0">
-                      {m.fields.map((f, i) => (
-                        <span key={i} className="text-[10px] bg-slate-800 text-slate-300 px-2.5 py-1 rounded-md font-medium border border-slate-700">
-                          {f.name}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </section>
-
-          {/* Users Section */}
-          <section className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-3xl p-8 xl:col-span-2">
-            <div className="mb-6">
-              <h2 className="text-xl font-bold">👤 System Users</h2>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="border-b border-slate-800 text-slate-500 text-xs uppercase tracking-widest font-bold">
-                    <th className="px-4 py-4">User</th>
-                    <th className="px-4 py-4">Role</th>
-                    <th className="px-4 py-4">Branch</th>
-                    <th className="px-4 py-4">Department</th>
-                    <th className="px-4 py-4">Access</th>
-                    <th className="px-4 py-4 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/50">
-                  {users.map(u => (
-                    <tr key={u.id} className="group hover:bg-white/5 transition-colors">
-                      <td className="px-4 py-4">
-                        <div className="flex flex-col">
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-slate-200">{u.full_name || 'Unnamed User'}</span>
-                            {u.status === 'blocked' && (
-                              <span className="text-[9px] bg-red-500/20 text-red-400 border border-red-500/30 px-1.5 py-0.5 rounded-md font-black uppercase tracking-tighter">
-                                Blocked
-                              </span>
-                            )}
+                        )}
+                        {!editingId && m.fields && m.fields.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 mt-3 w-full">
+                            {m.fields.map((f, i) => (
+                              <span key={i} className="mis-chip">{f.name}</span>
+                            ))}
                           </div>
-                          <span className="text-xs text-slate-500">{u.email}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-4">
-                        <span className={`text-[10px] px-2 py-1 rounded-full border uppercase font-bold tracking-tighter ${
-                          u.role === 'admin' ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' :
-                          u.role === 'ceo' || u.role === 'managing_director' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
-                          u.role === 'director' || u.role === 'executive' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
-                          u.role === 'hod' || u.role === 'regional_manager' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
-                          'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'
-                        }`}>
-                          {u.role.replace('_', ' ')}
-                        </span>
-                      </td>
-                      <td className="px-4 py-4 text-sm text-slate-400">
-                        {branches.find(b => b.id === u.branch_id)?.name || '—'}
-                      </td>
-                      <td className="px-4 py-4 text-sm text-slate-400">
-                        {departments.find(d => d.id === u.department_id)?.name || '—'}
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="flex flex-wrap gap-1">
-                          {u.allowed_modules?.length ? u.allowed_modules.map((mid: string) => (
-                            <span key={mid} className="text-[8px] bg-slate-800 text-slate-500 px-1.5 py-0.5 rounded uppercase font-medium">
-                              {modules.find(m => m.id === mid)?.name || 'Unknown'}
-                            </span>
-                          )) : <span className="text-[10px] text-slate-600 italic">No access</span>}
-                        </div>
-                      </td>
-                      <td className="px-4 py-4 text-right">
-                        <div className="flex justify-end gap-2 transition-opacity">
-                          <button 
-                            onClick={() => handleOpenEditUser(u)}
-                            className="p-2 text-slate-400 hover:text-indigo-400 hover:bg-indigo-400/10 rounded-lg transition-all"
-                            title="Edit User"
-                          >
-                            ✏️
-                          </button>
-                          <button 
-                            onClick={() => handleUpdateUserStatus(u.id, u.status || 'active')}
-                            className={`p-2 rounded-lg transition-all ${u.status === 'blocked' ? 'text-emerald-400 hover:bg-emerald-400/10' : 'text-amber-400 hover:bg-amber-400/10'}`}
-                            title={u.status === 'blocked' ? 'Unblock User' : 'Block User'}
-                          >
-                            {u.status === 'blocked' ? '🔓' : '🚫'}
-                          </button>
-                          <button 
-                            onClick={() => handleDeleteUser(u.id)}
-                            className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all"
-                            title="Delete User"
-                          >
-                            🗑️
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                  {users.length === 0 && (
-                    <tr>
-                      <td colSpan={6} className="px-4 py-10 text-center text-slate-500 italic">No users found. Create one to get started.</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+                        )}
+                      </li>
+                    ))}
+                    {modules.length === 0 && <li className="mis-empty">No modules found.</li>}
+                  </ul>
+                )}
+
+              </div>
             </div>
-          </section>
-        </div>}
-      </main>
+          </div>
+        )}
+      </div>
 
       {/* Add New User Modal */}
       {isUserModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300">
-            <header className="p-6 border-b border-slate-800 flex justify-between items-center">
+        <div className="mis-modal-backdrop">
+          <div className="mis-modal max-w-xl">
+            <div className="mis-modal-header">
               <div>
-                <h2 className="text-xl font-bold">{isEditingUser ? 'Edit User Profile' : 'Add New User'}</h2>
-                <p className="text-xs text-slate-500">{isEditingUser ? 'Update account details and permissions.' : 'Create an account and assign module permissions.'}</p>
+                <h2 className="text-lg font-bold m-0 mb-1" style={{ color: 'var(--text-primary)' }}>
+                  {isEditingUser ? 'Edit User Profile' : 'Add New User'}
+                </h2>
+                <p className="text-xs m-0" style={{ color: 'var(--text-secondary)' }}>
+                  {isEditingUser ? 'Update account details and permissions.' : 'Create an account and assign module permissions.'}
+                </p>
               </div>
-              <button onClick={() => { setIsUserModalOpen(false); setIsEditingUser(false); }} className="text-slate-500 hover:text-white transition-colors">✕</button>
-            </header>
+              <button type="button" className="mis-icon-btn" onClick={() => { setIsUserModalOpen(false); setIsEditingUser(false); }} aria-label="Close">✕</button>
+            </div>
 
-            <div className="flex border-b border-slate-800">
-              <button 
+            <div className="mis-modal-tabs">
+              <button
+                type="button"
                 onClick={() => setUserTab('details')}
-                className={`flex-1 py-4 text-sm font-bold transition-all ${userTab === 'details' ? 'text-indigo-400 border-b-2 border-indigo-500 bg-indigo-500/5' : 'text-slate-500 hover:text-slate-300'}`}
+                className={`mis-modal-tab ${userTab === 'details' ? 'active' : ''}`}
               >
-                👤 User Details
+                User Details
               </button>
-              <button 
+              <button
+                type="button"
                 onClick={() => setUserTab('modules')}
-                className={`flex-1 py-4 text-sm font-bold transition-all ${userTab === 'modules' ? 'text-indigo-400 border-b-2 border-indigo-500 bg-indigo-500/5' : 'text-slate-500 hover:text-slate-300'}`}
+                className={`mis-modal-tab ${userTab === 'modules' ? 'active' : ''}`}
               >
-                🔐 Module Access <span className="ml-1 text-[10px] bg-slate-800 px-1.5 py-0.5 rounded-full">{userData.allowed_modules.length}/{modules.length}</span>
+                Module Access ({userData.allowed_modules.length}/{modules.length})
               </button>
             </div>
 
-            <div className="p-8 max-h-[60vh] overflow-y-auto">
+            <div className="mis-modal-body max-h-[60vh]">
               {userTab === 'details' ? (
-                <div className="space-y-6">
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Full Name *</label>
-                    <input 
+                <div className="space-y-5">
+                  <div className="mis-field">
+                    <label className="mis-label">Full Name *</label>
+                    <input
                       placeholder="e.g. John Doe"
-                      className="w-full bg-black/40 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 transition-colors"
+                      className="mis-input"
                       value={userData.full_name}
                       onChange={(e) => setUserData({ ...userData, full_name: e.target.value })}
                     />
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Email Address *</label>
-                    <input 
+                  <div className="mis-field">
+                    <label className="mis-label">Email Address *</label>
+                    <input
                       type="email"
                       placeholder="user@example.com"
-                      className="w-full bg-black/40 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 transition-colors"
+                      className="mis-input"
                       value={userData.email}
                       onChange={(e) => setUserData({ ...userData, email: e.target.value })}
                     />
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  <div className="mis-field">
+                    <label className="mis-label">
                       {isEditingUser ? 'New Password (Optional)' : 'Initial Password *'}
                     </label>
-                    <input 
+                    <input
                       type="password"
-                      placeholder={isEditingUser ? "Leave blank to keep current" : "Min. 6 characters"}
-                      className="w-full bg-black/40 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 transition-colors"
+                      placeholder={isEditingUser ? 'Leave blank to keep current' : 'Min. 6 characters'}
+                      className="mis-input"
                       value={userData.password}
                       onChange={(e) => setUserData({ ...userData, password: e.target.value })}
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Role</label>
-                      <select 
-                        className="w-full bg-black/40 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 transition-colors"
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="mis-field">
+                      <label className="mis-label">Role</label>
+                      <select
+                        className="mis-select"
                         value={userData.role}
                         onChange={(e) => setUserData({ ...userData, role: e.target.value })}
                       >
@@ -976,10 +880,10 @@ const AdminPanelPage: React.FC = () => {
                         <option value="employee">Branch Employee</option>
                       </select>
                     </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Branch</label>
-                      <select 
-                        className="w-full bg-black/40 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 transition-colors"
+                    <div className="mis-field">
+                      <label className="mis-label">Branch</label>
+                      <select
+                        className="mis-select"
                         value={userData.branch_id}
                         onChange={(e) => setUserData({ ...userData, branch_id: e.target.value })}
                       >
@@ -988,10 +892,10 @@ const AdminPanelPage: React.FC = () => {
                       </select>
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Department</label>
-                    <select 
-                      className="w-full bg-black/40 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 transition-colors"
+                  <div className="mis-field">
+                    <label className="mis-label">Department</label>
+                    <select
+                      className="mis-select"
                       value={userData.department_id}
                       onChange={(e) => setUserData({ ...userData, department_id: e.target.value })}
                     >
@@ -1002,29 +906,31 @@ const AdminPanelPage: React.FC = () => {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  <p className="text-xs text-slate-500 mb-4 bg-indigo-500/10 border border-indigo-500/20 p-3 rounded-xl">
-                    Select which modules this user is allowed to access and enter data for.
+                  <p className="mis-alert mis-alert-info m-0">
+                    Select which modules this user may access for data entry.
                   </p>
                   <div className="grid grid-cols-1 gap-2">
                     {modules.map(m => (
-                      <label 
-                        key={m.id} 
-                        className={`flex items-center justify-between p-4 rounded-2xl border transition-all cursor-pointer ${
-                          userData.allowed_modules.includes(m.id) 
-                            ? 'bg-indigo-500/10 border-indigo-500/50 text-indigo-200' 
-                            : 'bg-black/20 border-slate-800 text-slate-400 hover:border-slate-700'
+                      <label
+                        key={m.id}
+                        className={`flex items-center justify-between p-4 rounded-[var(--radius-md)] border cursor-pointer transition-all ${
+                          userData.allowed_modules.includes(m.id)
+                            ? 'mis-badge-info'
+                            : ''
                         }`}
+                        style={
+                          userData.allowed_modules.includes(m.id)
+                            ? { background: 'var(--accent-bg)', borderColor: 'var(--border-accent)' }
+                            : { background: 'var(--bg-hover)', borderColor: 'var(--border)' }
+                        }
                       >
-                        <div className="flex items-center gap-3">
-                          <span className="text-lg">📦</span>
-                          <span className="font-bold">{m.name}</span>
-                        </div>
-                        <input 
+                        <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{m.name}</span>
+                        <input
                           type="checkbox"
-                          className="w-5 h-5 rounded-lg border-slate-700 bg-slate-800 text-indigo-500 focus:ring-indigo-500 transition-all cursor-pointer"
+                          className="w-4 h-4 cursor-pointer accent-[#06b6d4]"
                           checked={userData.allowed_modules.includes(m.id)}
                           onChange={(e) => {
-                            const updated = e.target.checked 
+                            const updated = e.target.checked
                               ? [...userData.allowed_modules, m.id]
                               : userData.allowed_modules.filter(id => id !== m.id);
                             setUserData({ ...userData, allowed_modules: updated });
@@ -1032,39 +938,40 @@ const AdminPanelPage: React.FC = () => {
                         />
                       </label>
                     ))}
-                    {modules.length === 0 && <p className="text-center py-10 text-slate-500 italic">No modules available. Create modules first.</p>}
+                    {modules.length === 0 && <p className="mis-empty py-8">No modules available. Create modules first.</p>}
                   </div>
                 </div>
               )}
             </div>
 
-            <footer className="p-6 border-t border-slate-800 bg-black/20 flex gap-3">
-              <button 
-                onClick={() => setIsUserModalOpen(false)}
-                className="flex-1 py-3 text-sm font-bold text-slate-500 hover:text-slate-300 transition-colors"
-              >
+            <div className="mis-modal-footer">
+              <button type="button" onClick={() => setIsUserModalOpen(false)} className="mis-btn mis-btn-ghost flex-1 justify-center">
                 Cancel
               </button>
-              <button 
+              <button
+                type="button"
                 onClick={isEditingUser ? handleEditUser : handleAddUser}
                 disabled={loading}
-                className="flex-[2] bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white py-3 rounded-xl font-bold shadow-lg shadow-indigo-600/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                className="mis-btn mis-btn-primary flex-[2] justify-center"
               >
                 {loading ? (isEditingUser ? 'Updating...' : 'Creating...') : (isEditingUser ? 'Save Changes' : 'Create User Account')}
               </button>
-            </footer>
+            </div>
           </div>
         </div>
       )}
 
-      <ConfirmModal 
+      <ConfirmModal
         isOpen={confirmModal.isOpen}
         title={confirmModal.title}
         message={confirmModal.message}
+        confirmLabel={confirmModal.confirmLabel}
+        cancelLabel={confirmModal.cancelLabel}
+        isDanger={confirmModal.isDanger}
         onConfirm={confirmModal.onConfirm}
-        onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onCancel={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
       />
-    </div>
+    </DashboardLayout>
   );
 };
 

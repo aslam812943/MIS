@@ -25,10 +25,9 @@ const ForgotPasswordForm: React.FC<ForgotPasswordFormProps> = ({ selectedRole, o
     try {
       await authService.requestOTP(email, selectedRole);
       setSuccess('OTP has been sent to your email.');
-      // Small delay before moving to step 2 so user can see the success message
       setTimeout(() => {
         setStep(2);
-        setSuccess(''); // Clear success message for Step 2
+        setSuccess('');
       }, 1500);
     } catch (err: any) {
       setError(err.message || 'Failed to request OTP');
@@ -40,7 +39,7 @@ const ForgotPasswordForm: React.FC<ForgotPasswordFormProps> = ({ selectedRole, o
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    
+
     if (newPassword !== confirmPassword) {
       setError('Passwords do not match');
       return;
@@ -71,25 +70,25 @@ const ForgotPasswordForm: React.FC<ForgotPasswordFormProps> = ({ selectedRole, o
   };
 
   return (
-    <div className="glass p-8 rounded-3xl w-full max-w-md animate-in fade-in zoom-in duration-500 shadow-2xl">
-      <div className="text-center mb-8">
-        <div className="inline-block px-3 py-1 rounded-full bg-brand-primary/10 text-brand-primary text-xs font-bold uppercase tracking-wider mb-4 border border-brand-primary/20">
+    <div className="glass rounded-[var(--radius-2xl)] p-6 sm:p-8 w-full shadow-2xl mis-animate-in">
+      <div className="text-center mb-7">
+        <div className="inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-4 mis-badge mis-badge-info">
           {getRoleLabel()} Security
         </div>
-        <h1 className="text-2xl font-bold text-white mb-2">
+        <h2 className="text-xl font-bold mb-1.5" style={{ color: 'var(--text-primary)' }}>
           {step === 1 ? 'Forgot Password' : 'Reset Password'}
-        </h1>
-        <p className="text-slate-400 text-sm">
-          {step === 1 
-            ? 'Enter your email to receive a 6-digit verification code' 
+        </h2>
+        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+          {step === 1
+            ? 'Enter your email to receive a 6-digit verification code'
             : 'Enter the code sent to your email and your new password'}
         </p>
       </div>
 
       {step === 1 ? (
-        <form onSubmit={handleRequestOTP} className="space-y-6">
-          <div className="space-y-2">
-            <label htmlFor="reset-email" className="text-sm font-medium text-slate-300 ml-1">
+        <form onSubmit={handleRequestOTP} className="space-y-5">
+          <div className="mis-field">
+            <label htmlFor="reset-email" className="mis-label" style={{ textTransform: 'none', letterSpacing: 'normal', fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
               Email Address
             </label>
             <input
@@ -98,36 +97,25 @@ const ForgotPasswordForm: React.FC<ForgotPasswordFormProps> = ({ selectedRole, o
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="name@company.com"
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-primary/50 focus:border-brand-primary transition-all"
+              className="mis-input"
               required
             />
           </div>
 
-          {error && (
-            <div className="bg-red-500/10 border border-red-500/20 text-red-500 text-sm py-3 px-4 rounded-xl flex items-center gap-2">
-              <span>⚠️</span> {error}
-            </div>
-          )}
+          {error && <div className="mis-alert mis-alert-error"><span>{error}</span></div>}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-brand-primary hover:bg-brand-primary/90 text-white font-semibold py-3.5 rounded-xl transition-all duration-300 shadow-lg shadow-brand-primary/25 disabled:opacity-50 disabled:cursor-not-allowed group flex items-center justify-center gap-2"
-          >
+          <button type="submit" disabled={loading} className="mis-btn mis-btn-primary w-full justify-center py-3">
             {loading ? (
-              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              <span className="mis-spinner" style={{ width: '1.25rem', height: '1.25rem', borderWidth: '2px' }} />
             ) : (
-              <>
-                Send Reset Code
-                <span className="group-hover:translate-x-1 transition-transform">→</span>
-              </>
+              'Send Reset Code'
             )}
           </button>
         </form>
       ) : (
-        <form onSubmit={handleResetPassword} className="space-y-5">
-          <div className="space-y-2">
-            <label htmlFor="otp" className="text-sm font-medium text-slate-300 ml-1">
+        <form onSubmit={handleResetPassword} className="space-y-4">
+          <div className="mis-field">
+            <label htmlFor="otp" className="mis-label" style={{ textTransform: 'none', letterSpacing: 'normal', fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
               6-Digit Code
             </label>
             <input
@@ -137,13 +125,13 @@ const ForgotPasswordForm: React.FC<ForgotPasswordFormProps> = ({ selectedRole, o
               value={otp}
               onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
               placeholder="000000"
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-center text-2xl tracking-[0.5em] font-bold placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-primary/50 focus:border-brand-primary transition-all"
+              className="mis-input text-center text-2xl tracking-[0.5em] font-bold"
               required
             />
           </div>
 
-          <div className="space-y-2">
-            <label htmlFor="new-password" title="New Password" className="text-sm font-medium text-slate-300 ml-1">
+          <div className="mis-field">
+            <label htmlFor="new-password" title="New Password" className="mis-label" style={{ textTransform: 'none', letterSpacing: 'normal', fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
               New Password
             </label>
             <input
@@ -152,13 +140,13 @@ const ForgotPasswordForm: React.FC<ForgotPasswordFormProps> = ({ selectedRole, o
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               placeholder="••••••••"
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-primary/50 focus:border-brand-primary transition-all"
+              className="mis-input"
               required
             />
           </div>
 
-          <div className="space-y-2">
-            <label htmlFor="confirm-password" title="Confirm Password" className="text-sm font-medium text-slate-300 ml-1">
+          <div className="mis-field">
+            <label htmlFor="confirm-password" title="Confirm Password" className="mis-label" style={{ textTransform: 'none', letterSpacing: 'normal', fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
               Confirm New Password
             </label>
             <input
@@ -167,30 +155,17 @@ const ForgotPasswordForm: React.FC<ForgotPasswordFormProps> = ({ selectedRole, o
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               placeholder="••••••••"
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-primary/50 focus:border-brand-primary transition-all"
+              className="mis-input"
               required
             />
           </div>
 
-          {error && (
-            <div className="bg-red-500/10 border border-red-500/20 text-red-500 text-sm py-3 px-4 rounded-xl flex items-center gap-2">
-              <span>⚠️</span> {error}
-            </div>
-          )}
+          {error && <div className="mis-alert mis-alert-error"><span>{error}</span></div>}
+          {success && <div className="mis-alert mis-alert-success"><span>{success}</span></div>}
 
-          {success && (
-            <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-sm py-3 px-4 rounded-xl flex items-center gap-2">
-              <span>✅</span> {success}
-            </div>
-          )}
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-brand-primary hover:bg-brand-primary/90 text-white font-semibold py-3.5 rounded-xl transition-all duration-300 shadow-lg shadow-brand-primary/25 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-          >
+          <button type="submit" disabled={loading} className="mis-btn mis-btn-primary w-full justify-center py-3">
             {loading ? (
-              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              <span className="mis-spinner" style={{ width: '1.25rem', height: '1.25rem', borderWidth: '2px' }} />
             ) : (
               'Reset Password'
             )}
@@ -199,8 +174,10 @@ const ForgotPasswordForm: React.FC<ForgotPasswordFormProps> = ({ selectedRole, o
       )}
 
       <button
+        type="button"
         onClick={onBackToLogin}
-        className="w-full mt-6 text-slate-400 hover:text-white text-sm font-medium transition-colors"
+        className="w-full mt-5 text-sm font-medium transition-colors"
+        style={{ color: 'var(--text-secondary)' }}
       >
         ← Back to Sign In
       </button>

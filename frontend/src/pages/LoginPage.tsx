@@ -3,51 +3,55 @@ import LoginForm from '../components/auth/LoginForm';
 import ForgotPasswordForm from '../components/auth/ForgotPasswordForm';
 import RoleSelector from '../components/auth/RoleSelector';
 import { UserRole } from '../types/user.types';
+import { useTheme } from '../context/ThemeContext';
 
 const LoginPage: React.FC = () => {
   const [selectedRole, setSelectedRole] = useState<UserRole>(UserRole.ADMIN);
   const [showForgotPassword, setShowForgotPassword] = useState<boolean>(false);
+  const { theme, toggleTheme } = useTheme();
 
   return (
-    <div className="min-h-screen bg-brand-dark flex flex-col items-center justify-center p-6 relative overflow-hidden">
-      {/* Background Orbs */}
-      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-brand-primary/10 rounded-full blur-[120px] animate-pulse" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-brand-secondary/10 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '2s' }} />
-      
-      <div className="w-full max-w-6xl z-10 flex flex-col items-center gap-12">
-        <div className="text-center">
-          <h1 className="text-5xl font-black mb-4 tracking-tight">
-            <span className="text-white">MIS</span>
-            <span className="text-gradient"> Portal</span>
+    <div className="mis-login-shell">
+      <button
+        type="button"
+        className="mis-theme-toggle mis-login-theme-toggle"
+        onClick={toggleTheme}
+        aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+      >
+        {theme === 'dark' ? '☀ Light mode' : '☾ Dark mode'}
+      </button>
+      <div className="w-full max-w-6xl z-10 flex flex-col items-center gap-8 sm:gap-12 mis-animate-in px-0 sm:px-2">
+        <div className="mis-login-brand">
+          <h1>
+            <span style={{ color: 'var(--text-primary)' }}>MIS</span>{' '}
+            <span className="mis-page-title-accent">Portal</span>
           </h1>
-          <p className="text-slate-400 max-w-md mx-auto">
-            Management Information System - Secure access for organizational efficiency and data-driven decisions.
+          <p className="mis-page-desc mx-auto text-center">
+            Management Information System — secure access for organizational efficiency and data-driven decisions.
           </p>
         </div>
 
-        <div className="flex flex-col lg:flex-row gap-12 items-start justify-center w-full">
-          {/* Left Side: Role Selection */}
-          <div className="flex-1 w-full lg:max-w-2xl">
+        <div className="mis-login-grid w-full">
+          <div className="flex-1 w-full min-w-0">
             <RoleSelector selectedRole={selectedRole} onSelect={setSelectedRole} />
           </div>
 
-          {/* Right Side: Auth Form */}
-          <div className="w-full max-w-md flex flex-col items-center">
+          <div className="w-full max-w-md flex flex-col items-center shrink-0 mx-auto lg:mx-0">
             {showForgotPassword ? (
-              <ForgotPasswordForm 
-                selectedRole={selectedRole} 
-                onBackToLogin={() => setShowForgotPassword(false)} 
+              <ForgotPasswordForm
+                selectedRole={selectedRole}
+                onBackToLogin={() => setShowForgotPassword(false)}
               />
             ) : (
-              <LoginForm 
-                selectedRole={selectedRole} 
-                onForgotPassword={() => setShowForgotPassword(true)} 
+              <LoginForm
+                selectedRole={selectedRole}
+                onForgotPassword={() => setShowForgotPassword(true)}
               />
             )}
           </div>
         </div>
-        
-        <footer className="mt-12 text-slate-500 text-sm">
+
+        <footer className="text-center text-sm relative z-10" style={{ color: 'var(--text-muted)' }}>
           &copy; {new Date().getFullYear()} Management Information System. All rights reserved.
         </footer>
       </div>

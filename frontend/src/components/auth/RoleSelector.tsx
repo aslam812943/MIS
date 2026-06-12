@@ -66,40 +66,42 @@ interface RoleSelectorProps {
 
 const RoleSelector: React.FC<RoleSelectorProps> = ({ selectedRole, onSelect }) => {
   return (
-    <div className="w-full max-w-4xl animate-in fade-in slide-in-from-bottom-4 duration-700">
-      <div className="text-center mb-8">
-        <h2 className="text-3xl font-bold text-white mb-2">Select Your Role</h2>
-        <p className="text-slate-400">Choose your access level to continue to the portal</p>
+    <div className="w-full mis-animate-in">
+      <div className="text-center mb-6 sm:mb-8">
+        <h2 className="text-xl sm:text-2xl font-bold mb-1.5" style={{ color: 'var(--text-primary)' }}>
+          Select Your Role
+        </h2>
+        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+          Choose your access level to continue to the portal
+        </p>
       </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
         {ROLE_OPTIONS.map((option) => (
           <button
             key={option.role}
+            type="button"
             onClick={() => onSelect(option.role)}
-            className={`
-              glass group relative p-6 rounded-2xl text-left transition-all duration-300 hover:scale-[1.02]
-              ${selectedRole === option.role 
-                ? 'ring-2 ring-brand-primary border-brand-primary/50 bg-brand-primary/5' 
-                : 'hover:border-white/20'}
-            `}
+            className={`mis-role-card ${selectedRole === option.role ? 'selected' : ''}`}
           >
-            <div className="flex flex-col h-full">
-              <div className="text-3xl mb-4 group-hover:scale-110 transition-transform duration-300">
-                {option.icon}
-              </div>
-              <h3 className={`font-semibold text-lg mb-1 transition-colors ${selectedRole === option.role ? 'text-brand-primary' : 'text-white'}`}>
-                {option.label}
-              </h3>
-              <p className="text-sm text-slate-400 line-clamp-2">
-                {option.description}
-              </p>
+            <div className="mis-role-card-icon" aria-hidden="true">
+              {option.icon}
             </div>
-            
+            <h3
+              className="font-semibold text-base mb-1"
+              style={{ color: selectedRole === option.role ? 'var(--accent)' : 'var(--text-primary)' }}
+            >
+              {option.label}
+            </h3>
+            <p className="text-sm line-clamp-2 m-0" style={{ color: 'var(--text-secondary)' }}>
+              {option.description}
+            </p>
             {selectedRole === option.role && (
-              <div className="absolute top-4 right-4">
-                <div className="w-2 h-2 rounded-full bg-brand-primary shadow-[0_0_8px_rgba(99,102,241,0.6)]" />
-              </div>
+              <span
+                className="absolute top-3 right-3 w-2 h-2 rounded-full"
+                style={{ background: 'var(--accent)', boxShadow: '0 0 8px var(--accent-glow)' }}
+                aria-hidden="true"
+              />
             )}
           </button>
         ))}
