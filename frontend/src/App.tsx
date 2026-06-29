@@ -5,6 +5,8 @@ import AdminPanelPage from './pages/AdminPanelPage';
 import ProfilePage from './pages/ProfilePage';
 import DataEntryPage from './pages/DataEntry/DataEntryPage';
 import VerifyEntriesPage from './pages/DataEntry/VerifyEntriesPage';
+import IEPFDataEntryPage from './pages/IEPF/IEPFDataEntryPage';
+import IEPFDashboardPage from './pages/IEPF/IEPFDashboardPage';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 
 import { ROUTES } from './constants/routes';
@@ -63,6 +65,24 @@ function App() {
           element={
             <ProtectedRoute>
               <VerifyEntriesPage />
+            </ProtectedRoute>
+          } 
+        />
+
+        <Route 
+          path={ROUTES.IEPF_DATA_ENTRY} 
+          element={
+            <ProtectedRoute>
+              <IEPFDataEntryPage />
+            </ProtectedRoute>
+          } 
+        />
+
+        <Route 
+          path={ROUTES.IEPF_DASHBOARD} 
+          element={
+            <ProtectedRoute>
+              <IEPFDashboardPage />
             </ProtectedRoute>
           } 
         />

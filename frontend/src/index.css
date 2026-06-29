@@ -2170,7 +2170,7 @@ body {
 /* Dark mode — inputs & selects */
 [data-theme="dark"] .mis-input,
 [data-theme="dark"] .mis-select {
-  background: var(--bg-card);
+  background-color: var(--bg-card);
   color: var(--text-primary);
   border-color: var(--border);
 }

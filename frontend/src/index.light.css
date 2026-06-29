@@ -509,7 +509,7 @@
 /* Inputs — explicit light background */
 [data-theme="light"] .mis-input,
 [data-theme="light"] .mis-select {
-  background: #ffffff;
+  background-color: #ffffff;
   color: var(--text-primary);
 }
 

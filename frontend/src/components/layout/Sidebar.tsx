@@ -70,6 +70,24 @@ const IconClose = () => (
   </svg>
 );
 
+const IconIEPFEntry = () => (
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+    <polyline points="14 2 14 8 20 8"/>
+    <line x1="16" y1="13" x2="8" y2="13"/>
+    <line x1="16" y1="17" x2="8" y2="17"/>
+    <polyline points="10 9 9 9 8 9"/>
+  </svg>
+);
+
+const IconIEPFDashboard = () => (
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="18" y1="20" x2="18" y2="10"/>
+    <line x1="12" y1="20" x2="12" y2="4"/>
+    <line x1="6" y1="20" x2="6" y2="14"/>
+  </svg>
+);
+
 /* ── Nav Item ─────────────────────────────────────────────── */
 interface NavItemProps {
   to: string;
@@ -100,6 +118,9 @@ const Sidebar: React.FC = () => {
   const isAdmin = user?.role === 'admin';
   const isHOD = user?.role === 'hod';
   const isEmployee = user?.role === 'employee';
+  
+  const isIEPFUser = user?.department_name?.toUpperCase() === 'IEPF';
+  const showIEPFDashboard = isAdmin || ['ceo', 'managing_director', 'director', 'executive'].includes(user?.role || '') || (isIEPFUser && isHOD);
 
 
   const closeOnMobile = () => setSidebarOpen(false);
@@ -155,6 +176,31 @@ const Sidebar: React.FC = () => {
             label="Verify Entries"
             onClick={closeOnMobile}
           />
+        )}
+
+        {/* IEPF Department Navigation */}
+        {isIEPFUser && (
+          <>
+            <span className="mis-sidebar-section-label">IEPF Department</span>
+            <NavItem
+              to={ROUTES.IEPF_DATA_ENTRY}
+              icon={<IconIEPFEntry />}
+              label="IEPF Data Entry"
+              onClick={closeOnMobile}
+            />
+          </>
+        )}
+
+        {showIEPFDashboard && (
+          <>
+            {!isIEPFUser && <span className="mis-sidebar-section-label">IEPF Department</span>}
+            <NavItem
+              to={ROUTES.IEPF_DASHBOARD}
+              icon={<IconIEPFDashboard />}
+              label="IEPF Dashboard"
+              onClick={closeOnMobile}
+            />
+          </>
         )}
 
         {isAdmin && (
