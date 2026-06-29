@@ -19,7 +19,7 @@ function getStoredTheme(): Theme {
   } catch {
     /* ignore */
   }
-  return 'dark';
+  return 'light';
 }
 
 export function applyTheme(theme: Theme) {

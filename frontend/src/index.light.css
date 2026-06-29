@@ -88,6 +88,17 @@
   background: var(--overlay-bg);
 }
 
+/* Sidebar — light mode variables */
+[data-theme="light"] .mis-sidebar {
+  --bg-surface:     #ffffff;
+  --border:         #e5e7eb;
+  --text-primary:   #111827;
+  --text-secondary: #4b5563;
+  --text-muted:     #9ca3af;
+  --bg-hover:       rgba(15, 23, 42, 0.04);
+  --bg-hover-2:     rgba(15, 23, 42, 0.08);
+}
+
 /* Sidebar active — solid indigo pill */
 [data-theme="light"] .mis-nav-item.active {
   background: var(--accent-dark);
@@ -448,4 +459,67 @@
 [data-theme="light"] .mis-login-card,
 [data-theme="light"] .mis-auth-card {
   box-shadow: var(--card-shadow);
+}
+
+/* Panel header insets — override dark rgba(0,0,0,X) backgrounds */
+[data-theme="light"] .mis-profile-section-head {
+  background: var(--bg-card-2);
+}
+
+[data-theme="light"] .mis-data-entry-panel-head {
+  background: var(--bg-card-2);
+}
+
+[data-theme="light"] .mis-modal-footer {
+  background: var(--bg-card-2);
+  border-top-color: var(--border);
+}
+
+[data-theme="light"] .mis-data-entry-footer {
+  background: var(--bg-card-2);
+  border-top-color: var(--border);
+}
+
+/* Module tabs & inset backgrounds */
+[data-theme="light"] .mis-module-tabs {
+  background: var(--panel-inset-soft) !important;
+}
+
+/* Readonly boxes */
+[data-theme="light"] .mis-readonly-box {
+  background: var(--bg-card-2);
+  border-color: var(--border);
+}
+
+/* Table row borders */
+[data-theme="light"] .mis-table thead th {
+  background: var(--table-header-bg);
+}
+
+[data-theme="light"] .mis-table tbody tr {
+  border-bottom-color: var(--list-row-border);
+}
+
+/* Diff pane generic head */
+[data-theme="light"] .mis-diff-pane-head {
+  background: var(--bg-card-2);
+  border-bottom-color: var(--border);
+}
+
+/* Inputs — explicit light background */
+[data-theme="light"] .mis-input,
+[data-theme="light"] .mis-select {
+  background: #ffffff;
+  color: var(--text-primary);
+}
+
+/* Logo icon */
+[data-theme="light"] .mis-logo-icon {
+  background: linear-gradient(135deg, #4f46e5, #3730a3);
+}
+
+/* Topbar bg */
+[data-theme="light"] .mis-topbar {
+  background: var(--bg-surface);
+  border-bottom-color: var(--border);
 }
