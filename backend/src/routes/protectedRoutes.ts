@@ -17,6 +17,8 @@ import { SupabaseDataEntryRepository } from '../repositories/SupabaseDataEntryRe
 import { DataEntryService } from '../services/DataEntryService.js';
 import { DataEntryController } from '../controllers/DataEntryController.js';
 import { AuditController } from '../controllers/AuditController.js';
+import { IEPFService } from '../services/IEPFService.js';
+import { IEPFController } from '../controllers/IEPFController.js';
 
 const router = Router();
 
@@ -38,6 +40,9 @@ const dataEntryService = new DataEntryService(dataEntryRepository, userRepositor
 const dataEntryController = new DataEntryController(dataEntryService);
 
 const auditController = new AuditController();
+
+const iepfService = new IEPFService();
+const iepfController = new IEPFController(iepfService);
 
 /**
 
@@ -93,6 +98,15 @@ router.get('/data-entries', requireAuth, dataEntryController.getEntry);
 router.post('/data-entries', requireAuth, dataEntryController.saveEntry);
 router.get('/department-entries', requireAuth, dataEntryController.getDepartmentEntries);
 router.post('/data-entries/:id/verify', requireAuth, dataEntryController.verifyEntry);
+
+/**
+ * IEPF Department endpoints
+ */
+router.get('/iepf/claims', requireAuth, iepfController.getClaims);
+router.post('/iepf/claims', requireAuth, iepfController.createClaim);
+router.patch('/iepf/claims/:id', requireAuth, iepfController.updateClaim);
+router.get('/iepf/dashboard', requireAuth, iepfController.getDashboardData);
+router.get('/iepf/staff', requireAuth, iepfController.getIEPFStaff);
 
 /**
  * Audit Log endpoints

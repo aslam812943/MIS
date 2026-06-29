@@ -9,6 +9,8 @@ export const ROUTES = {
   PROFILE: '/profile',
   DATA_ENTRY: '/data-entry',
   VERIFY_ENTRIES: '/verify-entries',
+  IEPF_DATA_ENTRY: '/iepf-entry',
+  IEPF_DASHBOARD: '/iepf-dashboard',
   ROOT: '/',
 } as const;
 
