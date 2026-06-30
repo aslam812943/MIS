@@ -7,6 +7,7 @@ export enum UserRole {
   HOD = 'hod',
   REGIONAL_MANAGER = 'regional_manager',
   EMPLOYEE = 'employee',
+  HR = 'hr',
 }
 
 export interface User {
@@ -21,7 +22,12 @@ export interface User {
   department_id?: string | undefined;
   department_name?: string | undefined;
   allowed_modules?: string[] | undefined;
-  status?: 'active' | 'blocked' | undefined;
+  status?: 'active' | 'blocked' | 'resigned' | undefined;
+  employee_id?: string | undefined;
+  joining_date?: string | undefined;
+  resignation_date?: string | undefined;
+  resignation_reason?: string | undefined;
+  last_working_date?: string | undefined;
   created_at?: string | undefined;
   updated_at?: string | undefined;
 }

@@ -7,6 +7,7 @@ export const UserRole = {
   HOD: 'hod',
   REGIONAL_MANAGER: 'regional_manager',
   EMPLOYEE: 'employee',
+  HR: 'hr',
 } as const;
 
 export type UserRole = (typeof UserRole)[keyof typeof UserRole];
@@ -23,7 +24,12 @@ export interface User {
   department_id?: string;
   department_name?: string;
   allowed_modules?: string[];
-  status?: 'active' | 'blocked';
+  status?: 'active' | 'blocked' | 'resigned';
+  employee_id?: string;
+  joining_date?: string;
+  resignation_date?: string;
+  resignation_reason?: string;
+  last_working_date?: string;
   created_at?: string;
   updated_at?: string;
 }

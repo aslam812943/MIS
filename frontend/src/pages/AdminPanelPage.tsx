@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import toast, { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 import axios from 'axios';
 import { orgService } from '../services/org.service';
 import type { Branch, Department, Module, User } from '../services/org.service';
@@ -36,6 +36,19 @@ const AdminPanelPage: React.FC = () => {
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [isEditingUser, setIsEditingUser] = useState(false);
   const [userTab, setUserTab] = useState<'details' | 'modules'>('details');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterBranchId, setFilterBranchId] = useState('');
+  const [filterDeptId, setFilterDeptId] = useState('');
+
+  // Resignation state
+  const [isResignModalOpen, setIsResignModalOpen] = useState(false);
+  const [resigningUser, setResigningUser] = useState<User | null>(null);
+  const [resignationData, setResignationData] = useState({
+    resignation_date: '',
+    resignation_reason: '',
+    last_working_date: ''
+  });
+
   const [userData, setUserData] = useState({
     full_name: '',
     email: '',
@@ -43,7 +56,11 @@ const AdminPanelPage: React.FC = () => {
     role: 'employee',
     branch_id: '',
     department_id: '',
-    allowed_modules: [] as string[]
+    allowed_modules: [] as string[],
+    employee_id: '',
+    joining_date: '',
+    phone_number: '',
+    status: 'active' as 'active' | 'blocked' | 'resigned'
   });
 
   // Confirmation Modal state
@@ -326,8 +343,8 @@ const AdminPanelPage: React.FC = () => {
 
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!userData.full_name || !userData.email || !userData.password) {
-      toast.error('Name, Email, and Password are required.');
+    if (!userData.full_name || !userData.email || !userData.password || !userData.phone_number || !userData.branch_id || !userData.department_id || !userData.joining_date) {
+      toast.error('All fields (Name, Email, Password, Phone, Branch, Department, Joining Date) are required.');
       return;
     }
     setLoading(true);
@@ -343,7 +360,11 @@ const AdminPanelPage: React.FC = () => {
         role: 'employee',
         branch_id: '',
         department_id: '',
-        allowed_modules: []
+        allowed_modules: [],
+        employee_id: '',
+        joining_date: '',
+        phone_number: '',
+        status: 'active'
       });
       fetchData();
     } catch (error: unknown) {
@@ -435,6 +456,10 @@ const AdminPanelPage: React.FC = () => {
   const handleEditUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingId) return;
+    if (!userData.full_name || !userData.email || !userData.phone_number || !userData.branch_id || !userData.department_id || !userData.joining_date) {
+      toast.error('All fields except password are required.');
+      return;
+    }
     setLoading(true);
     const toastId = toast.loading('Updating user...');
     try {
@@ -449,6 +474,46 @@ const AdminPanelPage: React.FC = () => {
       fetchData();
     } catch (error: unknown) {
       let message = 'Failed to update user.';
+      if (axios.isAxiosError(error) && error.response?.data?.message) {
+        message = error.response.data.message;
+      } else if (error instanceof Error) {
+        message = error.message;
+      }
+      toast.error(message, { id: toastId });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveResignation = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resigningUser) return;
+    if (!resignationData.resignation_date || !resignationData.resignation_reason || !resignationData.last_working_date) {
+      toast.error('All resignation fields are required.');
+      return;
+    }
+
+    setLoading(true);
+    const toastId = toast.loading('Marking employee as resigned...');
+    try {
+      await orgService.updateUser(resigningUser.id, {
+        status: 'resigned',
+        resignation_date: resignationData.resignation_date,
+        resignation_reason: resignationData.resignation_reason,
+        last_working_date: resignationData.last_working_date
+      });
+      
+      toast.success(`Employee "${resigningUser.full_name}" marked as resigned.`, { id: toastId });
+      setIsResignModalOpen(false);
+      setResigningUser(null);
+      setResignationData({
+        resignation_date: '',
+        resignation_reason: '',
+        last_working_date: ''
+      });
+      fetchData();
+    } catch (error: unknown) {
+      let message = 'Failed to record resignation.';
       if (axios.isAxiosError(error) && error.response?.data?.message) {
         message = error.response.data.message;
       } else if (error instanceof Error) {
@@ -477,10 +542,23 @@ const AdminPanelPage: React.FC = () => {
     });
   };
 
+  const filteredUsers = users.filter(u => {
+    const query = searchQuery.toLowerCase().trim();
+    const matchesSearch = !query || 
+      (u.full_name || '').toLowerCase().includes(query) ||
+      (u.email || '').toLowerCase().includes(query) ||
+      (u.employee_id || '').toLowerCase().includes(query);
+      
+    const matchesBranch = !filterBranchId || u.branch_id === filterBranchId;
+    const matchesDept = !filterDeptId || u.department_id === filterDeptId;
+    
+    return matchesSearch && matchesBranch && matchesDept;
+  });
+
   return (
     <DashboardLayout>
       <div className="mis-page mis-animate-in mis-admin-page">
-        <Toaster position="top-right" />
+
 
         {/* ── Page Header ───────────────────────────────── */}
         <header className="mis-page-header">
@@ -493,7 +571,7 @@ const AdminPanelPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => {
-                  setUserData({ full_name: '', email: '', password: '', role: 'employee', branch_id: '', department_id: '', allowed_modules: [] });
+                  setUserData({ full_name: '', email: '', password: '', role: 'employee', branch_id: '', department_id: '', allowed_modules: [], employee_id: '', joining_date: '', phone_number: '', status: 'active' });
                   setEditingId(null);
                   setIsEditingUser(false);
                   setIsUserModalOpen(true);
@@ -596,23 +674,74 @@ const AdminPanelPage: React.FC = () => {
               
               <div className="p-0">
                 {listTab === 'users' && (
-                  <UserTable 
-                    users={users} branches={branches} departments={departments} modules={modules} 
-                    loading={loading} onEditUser={(u) => {
-                      setUserData({
-                        full_name: u.full_name || '',
-                        email: u.email,
-                        password: '',
-                        role: u.role,
-                        branch_id: u.branch_id || '',
-                        department_id: u.department_id || '',
-                        allowed_modules: u.allowed_modules || []
-                      });
-                      setEditingId(u.id);
-                      setIsEditingUser(true);
-                      setIsUserModalOpen(true);
-                    }} onDeleteUser={handleDeleteUser} onToggleBlock={handleToggleBlockUser} 
-                  />
+                  <div className="flex flex-col gap-4">
+                    <div className="px-4 pt-4 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+                      <div className="flex-1 max-w-md relative">
+                        <input
+                          type="text"
+                          placeholder="Search employee by name, email, or ID..."
+                          className="mis-input w-full pl-9 pr-4 py-2"
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                        />
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm opacity-50">🔍</span>
+                      </div>
+                      
+                      <div className="flex flex-wrap items-center gap-3">
+                        <select
+                          className="mis-select text-xs py-1.5 px-3"
+                          value={filterBranchId}
+                          onChange={(e) => setFilterBranchId(e.target.value)}
+                          style={{ minWidth: '150px' }}
+                        >
+                          <option value="">All Branches</option>
+                          {branches.map(b => (
+                            <option key={b.id} value={b.id}>{b.name}</option>
+                          ))}
+                        </select>
+
+                        <select
+                          className="mis-select text-xs py-1.5 px-3"
+                          value={filterDeptId}
+                          onChange={(e) => setFilterDeptId(e.target.value)}
+                          style={{ minWidth: '150px' }}
+                        >
+                          <option value="">All Departments</option>
+                          {departments.map(d => (
+                            <option key={d.id} value={d.id}>{d.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    <UserTable 
+                      users={filteredUsers} branches={branches} departments={departments} modules={modules} 
+                      loading={loading}
+                      onEditUser={(u) => {
+                        setUserData({
+                          full_name: u.full_name || '',
+                          email: u.email,
+                          password: '',
+                          role: u.role,
+                          branch_id: u.branch_id || '',
+                          department_id: u.department_id || '',
+                          allowed_modules: u.allowed_modules || [],
+                          employee_id: u.employee_id || '',
+                          joining_date: u.joining_date || '',
+                          phone_number: u.phone_number || '',
+                          status: u.status || 'active'
+                        });
+                        setEditingId(u.id);
+                        setIsEditingUser(true);
+                        setIsUserModalOpen(true);
+                      }}
+                      onDeleteUser={handleDeleteUser}
+                      onToggleBlock={handleToggleBlockUser}
+                      onMarkResigned={(u) => {
+                        setResigningUser(u);
+                        setIsResignModalOpen(true);
+                      }}
+                    />
+                  </div>
                 )}
 
                 {listTab === 'branches' && (
@@ -831,37 +960,74 @@ const AdminPanelPage: React.FC = () => {
             <div className="mis-modal-body max-h-[60vh]">
               {userTab === 'details' ? (
                 <div className="space-y-5">
-                  <div className="mis-field">
-                    <label className="mis-label">Full Name *</label>
-                    <input
-                      placeholder="e.g. John Doe"
-                      className="mis-input"
-                      value={userData.full_name}
-                      onChange={(e) => setUserData({ ...userData, full_name: e.target.value })}
-                    />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="mis-field">
+                      <label className="mis-label">Employee ID (Auto-generated)</label>
+                      <input
+                        placeholder="(Auto-generated)"
+                        className="mis-input"
+                        value={isEditingUser ? userData.employee_id : '(Auto-generated)'}
+                        disabled
+                      />
+                    </div>
+                    <div className="mis-field">
+                      <label className="mis-label">Full Name *</label>
+                      <input
+                        placeholder="e.g. John Doe"
+                        className="mis-input"
+                        value={userData.full_name}
+                        onChange={(e) => setUserData({ ...userData, full_name: e.target.value })}
+                      />
+                    </div>
                   </div>
-                  <div className="mis-field">
-                    <label className="mis-label">Email Address *</label>
-                    <input
-                      type="email"
-                      placeholder="user@example.com"
-                      className="mis-input"
-                      value={userData.email}
-                      onChange={(e) => setUserData({ ...userData, email: e.target.value })}
-                    />
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="mis-field">
+                      <label className="mis-label">Email Address *</label>
+                      <input
+                        type="email"
+                        placeholder="user@example.com"
+                        className="mis-input"
+                        value={userData.email}
+                        onChange={(e) => setUserData({ ...userData, email: e.target.value })}
+                      />
+                    </div>
+                    <div className="mis-field">
+                      <label className="mis-label">Phone Number *</label>
+                      <input
+                        type="tel"
+                        placeholder="e.g. +91 98765 43210"
+                        className="mis-input"
+                        value={userData.phone_number}
+                        onChange={(e) => setUserData({ ...userData, phone_number: e.target.value })}
+                      />
+                    </div>
                   </div>
-                  <div className="mis-field">
-                    <label className="mis-label">
-                      {isEditingUser ? 'New Password (Optional)' : 'Initial Password *'}
-                    </label>
-                    <input
-                      type="password"
-                      placeholder={isEditingUser ? 'Leave blank to keep current' : 'Min. 6 characters'}
-                      className="mis-input"
-                      value={userData.password}
-                      onChange={(e) => setUserData({ ...userData, password: e.target.value })}
-                    />
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="mis-field">
+                      <label className="mis-label">
+                        {isEditingUser ? 'New Password (Optional)' : 'Initial Password *'}
+                      </label>
+                      <input
+                        type="password"
+                        placeholder={isEditingUser ? 'Leave blank to keep current' : 'Min. 6 characters'}
+                        className="mis-input"
+                        value={userData.password}
+                        onChange={(e) => setUserData({ ...userData, password: e.target.value })}
+                      />
+                    </div>
+                    <div className="mis-field">
+                      <label className="mis-label">Joining Date *</label>
+                      <input
+                        type="date"
+                        className="mis-input"
+                        value={userData.joining_date}
+                        onChange={(e) => setUserData({ ...userData, joining_date: e.target.value })}
+                      />
+                    </div>
                   </div>
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="mis-field">
                       <label className="mis-label">Role</label>
@@ -871,6 +1037,7 @@ const AdminPanelPage: React.FC = () => {
                         onChange={(e) => setUserData({ ...userData, role: e.target.value })}
                       >
                         <option value="admin">Administrator</option>
+                        <option value="hr">HR Manager</option>
                         <option value="ceo">CEO</option>
                         <option value="managing_director">Managing Director</option>
                         <option value="director">Director</option>
@@ -971,6 +1138,76 @@ const AdminPanelPage: React.FC = () => {
         onConfirm={confirmModal.onConfirm}
         onCancel={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
       />
+
+      {/* Resignation Modal */}
+      {isResignModalOpen && resigningUser && (
+        <div className="mis-modal-backdrop" style={{ zIndex: 9999 }}>
+          <div className="mis-modal max-w-md">
+            <div className="mis-modal-header">
+              <div>
+                <h2 className="text-lg font-bold m-0 mb-1" style={{ color: 'var(--text-primary)' }}>
+                  Mark as Resigned
+                </h2>
+                <p className="text-xs m-0" style={{ color: 'var(--text-secondary)' }}>
+                  Enter resignation details for {resigningUser.full_name || resigningUser.email}.
+                </p>
+              </div>
+              <button type="button" className="mis-icon-btn" onClick={() => { setIsResignModalOpen(false); setResigningUser(null); }}>✕</button>
+            </div>
+            
+            <form onSubmit={handleSaveResignation}>
+              <div className="mis-modal-body space-y-4">
+                <div className="mis-field">
+                  <label className="mis-label">Resignation Date *</label>
+                  <input
+                    type="date"
+                    className="mis-input"
+                    required
+                    value={resignationData.resignation_date}
+                    onChange={(e) => setResignationData({ ...resignationData, resignation_date: e.target.value })}
+                  />
+                </div>
+
+                <div className="mis-field">
+                  <label className="mis-label">Last Working Date *</label>
+                  <input
+                    type="date"
+                    className="mis-input"
+                    required
+                    value={resignationData.last_working_date}
+                    onChange={(e) => setResignationData({ ...resignationData, last_working_date: e.target.value })}
+                  />
+                </div>
+
+                <div className="mis-field">
+                  <label className="mis-label">Reason for Resignation *</label>
+                  <textarea
+                    className="mis-input w-full min-h-[80px] py-2"
+                    placeholder="Provide details about resignation..."
+                    required
+                    value={resignationData.resignation_reason}
+                    onChange={(e) => setResignationData({ ...resignationData, resignation_reason: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="mis-modal-footer">
+                <button type="button" onClick={() => { setIsResignModalOpen(false); setResigningUser(null); }} className="mis-btn mis-btn-ghost flex-1 justify-center">
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="mis-btn mis-btn-primary flex-[2] justify-center"
+                  style={{ background: 'var(--danger)', borderColor: 'var(--danger-border)' }}
+                >
+                  {loading ? 'Saving...' : 'Confirm Resignation'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </DashboardLayout>
   );
 };

@@ -29,14 +29,19 @@ CREATE TABLE IF NOT EXISTS modules (
 CREATE TABLE IF NOT EXISTS profiles (
     id UUID REFERENCES auth.users ON DELETE CASCADE PRIMARY KEY,
     email TEXT NOT NULL,
-    role TEXT DEFAULT 'employee' CHECK (role IN ('admin', 'ceo', 'managing_director', 'director', 'executive', 'hod', 'regional_manager', 'employee')),
+    role TEXT DEFAULT 'employee' CHECK (role IN ('admin', 'ceo', 'managing_director', 'director', 'executive', 'hod', 'regional_manager', 'employee', 'hr')),
     full_name TEXT,
     phone_number TEXT,
     avatar_url TEXT,
     branch_id UUID REFERENCES branches(id) ON DELETE SET NULL,
     department_id UUID REFERENCES departments(id) ON DELETE SET NULL,
     allowed_modules TEXT[] DEFAULT '{}', -- Array of module IDs user can access
-    status TEXT DEFAULT 'active' CHECK (status IN ('active', 'blocked')),
+    status TEXT DEFAULT 'active' CHECK (status IN ('active', 'blocked', 'resigned')),
+    employee_id TEXT UNIQUE,
+    joining_date DATE,
+    resignation_date DATE,
+    resignation_reason TEXT,
+    last_working_date DATE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
