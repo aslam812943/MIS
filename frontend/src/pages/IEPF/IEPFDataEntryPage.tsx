@@ -86,17 +86,52 @@ const IEPFDataEntryPage: React.FC = () => {
   };
 
   const handleCheckboxChange = (reason: string, checked: boolean) => {
-    const currentReasons = [...formData.pending_reasons];
-    if (checked) {
-      if (!currentReasons.includes(reason)) {
-        currentReasons.push(reason);
+    let currentReasons = [...formData.pending_reasons];
+    if (reason === 'Other') {
+      if (checked) {
+        if (!currentReasons.some(r => r === 'Other' || r.startsWith('Other:'))) {
+          currentReasons.push('Other');
+        }
+      } else {
+        currentReasons = currentReasons.filter(r => r !== 'Other' && !r.startsWith('Other:'));
       }
     } else {
-      const idx = currentReasons.indexOf(reason);
-      if (idx > -1) {
-        currentReasons.splice(idx, 1);
+      if (checked) {
+        if (!currentReasons.includes(reason)) {
+          currentReasons.push(reason);
+        }
+      } else {
+        const idx = currentReasons.indexOf(reason);
+        if (idx > -1) {
+          currentReasons.splice(idx, 1);
+        }
       }
     }
+    setFormData((prev) => ({
+      ...prev,
+      pending_reasons: currentReasons,
+    }));
+  };
+
+  const getOtherReasonText = () => {
+    const otherVal = formData.pending_reasons.find(r => r === 'Other' || r.startsWith('Other:')) || '';
+    if (otherVal.startsWith('Other: ')) {
+      return otherVal.substring(7); // strip "Other: "
+    }
+    return '';
+  };
+
+  const handleOtherReasonChange = (value: string) => {
+    const currentReasons = [...formData.pending_reasons];
+    const otherIdx = currentReasons.findIndex(r => r === 'Other' || r.startsWith('Other:'));
+    const formattedReason = value.trim() ? `Other: ${value.trim()}` : 'Other';
+    
+    if (otherIdx > -1) {
+      currentReasons[otherIdx] = formattedReason;
+    } else {
+      currentReasons.push(formattedReason);
+    }
+    
     setFormData((prev) => ({
       ...prev,
       pending_reasons: currentReasons,
@@ -133,8 +168,14 @@ const IEPFDataEntryPage: React.FC = () => {
       }
     }
 
-    if (formData.status === 'Documents Pending' && formData.pending_reasons.length === 0) {
-      return 'Please specify at least one pending reason.';
+    if (formData.status === 'Documents Pending') {
+      if (formData.pending_reasons.length === 0) {
+        return 'Please specify at least one pending reason.';
+      }
+      const hasOther = formData.pending_reasons.some(r => r === 'Other' || r.startsWith('Other:'));
+      if (hasOther && !getOtherReasonText().trim()) {
+        return 'Please specify the custom "Other" pending reason.';
+      }
     }
 
     if (formData.status === 'Closed') {
@@ -440,31 +481,45 @@ const IEPFDataEntryPage: React.FC = () => {
                     'Bank Details Missing',
                     'Legal Documents Missing',
                     'Other',
-                  ].map((reason) => (
-                    <label
-                      key={reason}
-                      className="flex items-center gap-3 p-3 rounded-[var(--radius-md)] border cursor-pointer hover:bg-[var(--bg-hover)] transition-all"
-                      style={{
-                        borderColor: formData.pending_reasons.includes(reason)
-                          ? 'var(--border-accent)'
-                          : 'var(--border)',
-                        background: formData.pending_reasons.includes(reason)
-                          ? 'rgba(245, 158, 11, 0.05)'
-                          : 'transparent',
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        className="w-4 h-4 accent-amber-500"
-                        checked={formData.pending_reasons.includes(reason)}
-                        onChange={(e) => handleCheckboxChange(reason, e.target.checked)}
-                      />
-                      <span className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>
-                        {reason}
-                      </span>
-                    </label>
-                  ))}
+                  ].map((reason) => {
+                    const isChecked = reason === 'Other'
+                      ? formData.pending_reasons.some(r => r === 'Other' || r.startsWith('Other:'))
+                      : formData.pending_reasons.includes(reason);
+                    return (
+                      <label
+                        key={reason}
+                        className="flex items-center gap-3 p-3 rounded-[var(--radius-md)] border cursor-pointer hover:bg-[var(--bg-hover)] transition-all"
+                        style={{
+                          borderColor: isChecked ? 'var(--border-accent)' : 'var(--border)',
+                          background: isChecked ? 'rgba(245, 158, 11, 0.05)' : 'transparent',
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          className="w-4 h-4 accent-amber-500"
+                          checked={isChecked}
+                          onChange={(e) => handleCheckboxChange(reason, e.target.checked)}
+                        />
+                        <span className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>
+                          {reason}
+                        </span>
+                      </label>
+                    );
+                  })}
                 </div>
+
+                {formData.pending_reasons.some(r => r === 'Other' || r.startsWith('Other:')) && (
+                  <div className="mis-field mt-5 mis-animate-in">
+                    <label className="mis-label">Specify Other Pending Reason *</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Nominee documentation or stamp missing"
+                      className="mis-input"
+                      value={getOtherReasonText()}
+                      onChange={(e) => handleOtherReasonChange(e.target.value)}
+                    />
+                  </div>
+                )}
               </div>
             )}
 
