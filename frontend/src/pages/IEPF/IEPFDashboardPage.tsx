@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Chart, registerables } from 'chart.js';
-import toast, { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 import { iepfService } from '../../services/iepf.service';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 
@@ -245,7 +245,6 @@ const IEPFDashboardPage: React.FC = () => {
   return (
     <DashboardLayout>
       <div className="mis-page mis-animate-in max-w-7xl mx-auto space-y-8">
-        <Toaster position="top-right" />
 
         {/* ── Page Header ───────────────────────────────────── */}
         <header className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">

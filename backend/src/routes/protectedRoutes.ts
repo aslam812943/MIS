@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { requireAuth } from '../middlewares/requireAuth.js';
 import { requireAdmin } from '../middlewares/requireAdmin.js';
+import { requireAdminOrHR } from '../middlewares/requireAdminOrHR.js';
 import { HttpStatus } from '../utils/httpStatus.js';
 import { OrgController } from '../controllers/OrgController.js';
 import { OrgService } from '../services/OrgService.js';
@@ -85,10 +86,11 @@ router.delete('/modules/:id', requireAuth, requireAdmin, orgController.deleteMod
 /**
  * User management endpoints
  */
-router.get('/users', requireAuth, requireAdmin, userController.getUsers);
-router.post('/users', requireAuth, requireAdmin, userController.createUser);
-router.patch('/users/:id', requireAuth, requireAdmin, userController.updateUser);
-router.patch('/users/:id/status', requireAuth, requireAdmin, userController.updateStatus);
+router.get('/users/hr-dashboard', requireAuth, requireAdminOrHR, userController.getHRDashboardData);
+router.get('/users', requireAuth, requireAdminOrHR, userController.getUsers);
+router.post('/users', requireAuth, requireAdminOrHR, userController.createUser);
+router.patch('/users/:id', requireAuth, requireAdminOrHR, userController.updateUser);
+router.patch('/users/:id/status', requireAuth, requireAdminOrHR, userController.updateStatus);
 router.delete('/users/:id', requireAuth, requireAdmin, userController.deleteUser);
 
 /**

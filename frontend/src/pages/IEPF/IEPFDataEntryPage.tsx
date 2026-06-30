@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import toast, { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import { iepfService } from '../../services/iepf.service';
@@ -275,7 +275,6 @@ const IEPFDataEntryPage: React.FC = () => {
   return (
     <DashboardLayout>
       <div className="mis-page mis-animate-in max-w-5xl mx-auto">
-        <Toaster position="top-right" />
 
         {/* ── Header ────────────────────────────────────────── */}
         <header className="mis-page-header-row mb-6">

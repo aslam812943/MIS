@@ -28,6 +28,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ selectedRole, onForgotPassword })
       [UserRole.HOD]: 'hod@mis.com',
       [UserRole.REGIONAL_MANAGER]: 'regional@mis.com',
       [UserRole.EMPLOYEE]: 'employee@mis.com',
+      [UserRole.HR]: 'hr@mis.com',
     };
     setEmail(roleEmails[selectedRole] || 'user@mis.com');
   }, [selectedRole]);

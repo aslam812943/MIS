@@ -44,12 +44,18 @@ export interface Module {
 export interface User {
   id: string;
   email: string;
-  role: 'admin' | 'ceo' | 'managing_director' | 'director' | 'executive' | 'hod' | 'regional_manager' | 'employee';
+  role: 'admin' | 'ceo' | 'managing_director' | 'director' | 'executive' | 'hod' | 'regional_manager' | 'employee' | 'hr';
   full_name?: string;
+  phone_number?: string;
   branch_id?: string;
   department_id?: string;
   allowed_modules?: string[];
-  status?: 'active' | 'blocked';
+  status?: 'active' | 'blocked' | 'resigned';
+  employee_id?: string;
+  joining_date?: string;
+  resignation_date?: string;
+  resignation_reason?: string;
+  last_working_date?: string;
   created_at?: string;
 }
 
@@ -178,8 +184,13 @@ export const orgService = {
     return response.data;
   },
 
-  async updateUserStatus(id: string, status: 'active' | 'blocked'): Promise<User> {
+  async updateUserStatus(id: string, status: 'active' | 'blocked' | 'resigned'): Promise<User> {
     const response = await api.patch(`/admin/users/${id}/status`, { status });
+    return response.data;
+  },
+
+  async getHRDashboardData(params?: { range?: string; startDate?: string; endDate?: string }): Promise<any> {
+    const response = await api.get('/admin/users/hr-dashboard', { params });
     return response.data;
   }
 };

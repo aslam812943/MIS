@@ -17,7 +17,12 @@ interface ProfileRow {
   branches?: { name: string };
   departments?: { name: string };
   allowed_modules?: string[];
-  status?: 'active' | 'blocked';
+  status?: 'active' | 'blocked' | 'resigned';
+  employee_id?: string;
+  joining_date?: string;
+  resignation_date?: string;
+  resignation_reason?: string;
+  last_working_date?: string;
   created_at: string;
   updated_at: string;
 }
@@ -67,7 +72,7 @@ export class SupabaseUserRepository implements IUserRepository {
   async findAll(): Promise<User[]> {
     const { data, error } = await supabase
       .from('profiles')
-      .select('*')
+      .select('*, branches(name), departments(name)')
       .order('created_at', { ascending: false });
 
     if (error) throw new Error(error.message);
@@ -146,6 +151,11 @@ export class SupabaseUserRepository implements IUserRepository {
       department_name: data.departments?.name,
       allowed_modules: data.allowed_modules,
       status: data.status,
+      employee_id: data.employee_id,
+      joining_date: data.joining_date,
+      resignation_date: data.resignation_date,
+      resignation_reason: data.resignation_reason,
+      last_working_date: data.last_working_date,
       created_at: data.created_at,
       updated_at: data.updated_at,
     };
