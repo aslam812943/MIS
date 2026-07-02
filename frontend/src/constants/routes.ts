@@ -11,6 +11,8 @@ export const ROUTES = {
   VERIFY_ENTRIES: '/verify-entries',
   IEPF_DATA_ENTRY: '/iepf-entry',
   IEPF_DASHBOARD: '/iepf-dashboard',
+  SETTLEMENTS_DATA_ENTRY: '/settlements-entry',
+  SETTLEMENTS_DASHBOARD: '/settlements-dashboard',
   ROOT: '/',
 } as const;
 

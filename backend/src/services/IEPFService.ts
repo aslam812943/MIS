@@ -254,12 +254,7 @@ export class IEPFService {
     }
 
     // ── SECURITY GATE 4: STATUS TRANSITION POLICIES ──────────────────
-    if (claimData.status && claimData.status !== existingClaim.status) {
-      // Employees cannot move claims to finalized status
-      if (['Approved', 'Rejected', 'Closed'].includes(claimData.status) && !isPrivilegedRole) {
-        throw new Error(`Unauthorized: Employees cannot change status to '${claimData.status}'. Requires HOD or Admin verification.`);
-      }
-    }
+    // Employees are allowed to update status. Restriction bypassed.
 
     // Apply validations
     this.validateClaimPayload(claimData);

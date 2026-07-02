@@ -203,6 +203,31 @@ const Sidebar: React.FC = () => {
           </>
         )}
 
+        {/* Settlements Department Navigation */}
+        {user?.department_name?.toUpperCase() === 'SETTLEMENTS' && (
+          <>
+            <span className="mis-sidebar-section-label">Settlements Department</span>
+            <NavItem
+              to={ROUTES.SETTLEMENTS_DATA_ENTRY}
+              icon={<IconIEPFEntry />}
+              label="Settlements Entry"
+              onClick={closeOnMobile}
+            />
+          </>
+        )}
+
+        {(isAdmin || ['ceo', 'managing_director', 'director', 'executive'].includes(user?.role || '') || (user?.department_name?.toUpperCase() === 'SETTLEMENTS' && isHOD)) && (
+          <>
+            {user?.department_name?.toUpperCase() !== 'SETTLEMENTS' && <span className="mis-sidebar-section-label">Settlements Department</span>}
+            <NavItem
+              to={ROUTES.SETTLEMENTS_DASHBOARD}
+              icon={<IconIEPFDashboard />}
+              label="Settlements Dashboard"
+              onClick={closeOnMobile}
+            />
+          </>
+        )}
+
         {isAdmin && (
           <>
             <span className="mis-sidebar-section-label">Administration</span>
