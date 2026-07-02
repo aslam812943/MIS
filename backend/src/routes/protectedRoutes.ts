@@ -20,6 +20,8 @@ import { DataEntryController } from '../controllers/DataEntryController.js';
 import { AuditController } from '../controllers/AuditController.js';
 import { IEPFService } from '../services/IEPFService.js';
 import { IEPFController } from '../controllers/IEPFController.js';
+import { SettlementService } from '../services/SettlementService.js';
+import { SettlementController } from '../controllers/SettlementController.js';
 
 const router = Router();
 
@@ -44,6 +46,9 @@ const auditController = new AuditController();
 
 const iepfService = new IEPFService();
 const iepfController = new IEPFController(iepfService);
+
+const settlementService = new SettlementService();
+const settlementController = new SettlementController(settlementService);
 
 /**
 
@@ -109,6 +114,23 @@ router.post('/iepf/claims', requireAuth, iepfController.createClaim);
 router.patch('/iepf/claims/:id', requireAuth, iepfController.updateClaim);
 router.get('/iepf/dashboard', requireAuth, iepfController.getDashboardData);
 router.get('/iepf/staff', requireAuth, iepfController.getIEPFStaff);
+
+/**
+ * Settlements Department endpoints
+ */
+router.get('/settlements/payin-payout', requireAuth, settlementController.getPayInPayOutRecords);
+router.post('/settlements/payin-payout', requireAuth, settlementController.createPayInPayOutRecord);
+router.patch('/settlements/payin-payout/:id', requireAuth, settlementController.updatePayInPayOutRecord);
+router.get('/settlements/client-requests', requireAuth, settlementController.getClientRequestRecords);
+router.post('/settlements/client-requests', requireAuth, settlementController.createClientRequestRecord);
+router.patch('/settlements/client-requests/:id', requireAuth, settlementController.updateClientRequestRecord);
+router.get('/settlements/ipo-allocation', requireAuth, settlementController.getIpoAllocationRecords);
+router.post('/settlements/ipo-allocation', requireAuth, settlementController.createIpoAllocationRecord);
+router.patch('/settlements/ipo-allocation/:id', requireAuth, settlementController.updateIpoAllocationRecord);
+router.get('/settlements/corporate-actions', requireAuth, settlementController.getCorporateActionRecords);
+router.post('/settlements/corporate-actions', requireAuth, settlementController.createCorporateActionRecord);
+router.patch('/settlements/corporate-actions/:id', requireAuth, settlementController.updateCorporateActionRecord);
+router.get('/settlements/dashboard', requireAuth, settlementController.getDashboardStats);
 
 /**
  * Audit Log endpoints

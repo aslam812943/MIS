@@ -7,6 +7,8 @@ import DataEntryPage from './pages/DataEntry/DataEntryPage';
 import VerifyEntriesPage from './pages/DataEntry/VerifyEntriesPage';
 import IEPFDataEntryPage from './pages/IEPF/IEPFDataEntryPage';
 import IEPFDashboardPage from './pages/IEPF/IEPFDashboardPage';
+import SettlementsDataEntryPage from './pages/Settlements/SettlementsDataEntryPage';
+import SettlementsDashboardPage from './pages/Settlements/SettlementsDashboardPage';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 
 import { ROUTES } from './constants/routes';
@@ -83,6 +85,24 @@ function App() {
           element={
             <ProtectedRoute>
               <IEPFDashboardPage />
+            </ProtectedRoute>
+          } 
+        />
+
+        <Route 
+          path={ROUTES.SETTLEMENTS_DATA_ENTRY} 
+          element={
+            <ProtectedRoute>
+              <SettlementsDataEntryPage />
+            </ProtectedRoute>
+          } 
+        />
+
+        <Route 
+          path={ROUTES.SETTLEMENTS_DASHBOARD} 
+          element={
+            <ProtectedRoute>
+              <SettlementsDashboardPage />
             </ProtectedRoute>
           } 
         />
