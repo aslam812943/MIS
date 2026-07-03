@@ -9,6 +9,8 @@ import IEPFDataEntryPage from './pages/IEPF/IEPFDataEntryPage';
 import IEPFDashboardPage from './pages/IEPF/IEPFDashboardPage';
 import SettlementsDataEntryPage from './pages/Settlements/SettlementsDataEntryPage';
 import SettlementsDashboardPage from './pages/Settlements/SettlementsDashboardPage';
+import KYCDataEntryPage from './pages/KYC/KYCDataEntryPage';
+import KYCDashboardPage from './pages/KYC/KYCDashboardPage';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 
 import { ROUTES } from './constants/routes';
@@ -103,6 +105,24 @@ function App() {
           element={
             <ProtectedRoute>
               <SettlementsDashboardPage />
+            </ProtectedRoute>
+          } 
+        />
+
+        <Route 
+          path={ROUTES.KYC_DATA_ENTRY} 
+          element={
+            <ProtectedRoute>
+              <KYCDataEntryPage />
+            </ProtectedRoute>
+          } 
+        />
+
+        <Route 
+          path={ROUTES.KYC_DASHBOARD} 
+          element={
+            <ProtectedRoute>
+              <KYCDashboardPage />
             </ProtectedRoute>
           } 
         />

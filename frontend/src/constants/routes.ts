@@ -13,6 +13,8 @@ export const ROUTES = {
   IEPF_DASHBOARD: '/iepf-dashboard',
   SETTLEMENTS_DATA_ENTRY: '/settlements-entry',
   SETTLEMENTS_DASHBOARD: '/settlements-dashboard',
+  KYC_DATA_ENTRY: '/kyc-entry',
+  KYC_DASHBOARD: '/kyc-dashboard',
   ROOT: '/',
 } as const;
 

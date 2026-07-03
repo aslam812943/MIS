@@ -122,6 +122,9 @@ const Sidebar: React.FC = () => {
   const isIEPFUser = user?.department_name?.toUpperCase() === 'IEPF';
   const showIEPFDashboard = isAdmin || ['ceo', 'managing_director', 'director', 'executive'].includes(user?.role || '') || (isIEPFUser && isHOD);
 
+  const isKYCUser = user?.department_name?.toUpperCase() === 'KYC';
+  const showKYCDashboard = isAdmin || ['ceo', 'managing_director', 'director', 'executive'].includes(user?.role || '') || (isKYCUser && isHOD);
+
 
   const closeOnMobile = () => setSidebarOpen(false);
 
@@ -223,6 +226,31 @@ const Sidebar: React.FC = () => {
               to={ROUTES.SETTLEMENTS_DASHBOARD}
               icon={<IconIEPFDashboard />}
               label="Settlements Dashboard"
+              onClick={closeOnMobile}
+            />
+          </>
+        )}
+
+        {/* KYC Department Navigation */}
+        {(isKYCUser || isAdmin) && (
+          <>
+            <span className="mis-sidebar-section-label">KYC Department</span>
+            <NavItem
+              to={ROUTES.KYC_DATA_ENTRY}
+              icon={<IconIEPFEntry />}
+              label="KYC Entry"
+              onClick={closeOnMobile}
+            />
+          </>
+        )}
+
+        {showKYCDashboard && (
+          <>
+            {(!isKYCUser && !isAdmin) && <span className="mis-sidebar-section-label">KYC Department</span>}
+            <NavItem
+              to={ROUTES.KYC_DASHBOARD}
+              icon={<IconIEPFDashboard />}
+              label="KYC Dashboard"
               onClick={closeOnMobile}
             />
           </>

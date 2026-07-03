@@ -22,6 +22,9 @@ import { IEPFService } from '../services/IEPFService.js';
 import { IEPFController } from '../controllers/IEPFController.js';
 import { SettlementService } from '../services/SettlementService.js';
 import { SettlementController } from '../controllers/SettlementController.js';
+import { KYCService } from '../services/KYCService.js';
+import { KYCController } from '../controllers/KYCController.js';
+import multer from 'multer';
 
 const router = Router();
 
@@ -49,6 +52,10 @@ const iepfController = new IEPFController(iepfService);
 
 const settlementService = new SettlementService();
 const settlementController = new SettlementController(settlementService);
+
+const kycService = new KYCService();
+const kycController = new KYCController(kycService);
+const kycUpload = multer({ storage: multer.memoryStorage() });
 
 /**
 
@@ -131,6 +138,56 @@ router.get('/settlements/corporate-actions', requireAuth, settlementController.g
 router.post('/settlements/corporate-actions', requireAuth, settlementController.createCorporateActionRecord);
 router.patch('/settlements/corporate-actions/:id', requireAuth, settlementController.updateCorporateActionRecord);
 router.get('/settlements/dashboard', requireAuth, settlementController.getDashboardStats);
+
+/**
+ * KYC Department endpoints
+ */
+router.post('/kyc/upload', requireAuth, kycUpload.single('file'), kycController.uploadDocument);
+router.get('/kyc/dashboard', requireAuth, kycController.getDashboardStats);
+
+router.get('/kyc/new-accounts', requireAuth, kycController.getNewAccounts);
+router.post('/kyc/new-accounts', requireAuth, kycController.createNewAccount);
+router.patch('/kyc/new-accounts/:id', requireAuth, kycController.updateNewAccount);
+
+router.get('/kyc/ucc-allotments', requireAuth, kycController.getUCCAllotments);
+router.post('/kyc/ucc-allotments', requireAuth, kycController.createUCCAllotment);
+router.patch('/kyc/ucc-allotments/:id', requireAuth, kycController.updateUCCAllotment);
+
+router.get('/kyc/registry-updates', requireAuth, kycController.getRegistryUpdates);
+router.post('/kyc/registry-updates', requireAuth, kycController.createRegistryUpdate);
+router.patch('/kyc/registry-updates/:id', requireAuth, kycController.updateRegistryUpdate);
+
+router.get('/kyc/ap-sharings', requireAuth, kycController.getAPSharings);
+router.post('/kyc/ap-sharings', requireAuth, kycController.createAPSharing);
+router.patch('/kyc/ap-sharings/:id', requireAuth, kycController.updateAPSharing);
+
+router.get('/kyc/demise-reports', requireAuth, kycController.getDemiseReports);
+router.post('/kyc/demise-reports', requireAuth, kycController.createDemiseReport);
+router.patch('/kyc/demise-reports/:id', requireAuth, kycController.updateDemiseReport);
+
+router.get('/kyc/ap-codes', requireAuth, kycController.getAPCodes);
+router.post('/kyc/ap-codes', requireAuth, kycController.createAPCode);
+router.patch('/kyc/ap-codes/:id', requireAuth, kycController.updateAPCode);
+
+router.get('/kyc/communications', requireAuth, kycController.getCommunications);
+router.post('/kyc/communications', requireAuth, kycController.createCommunication);
+router.patch('/kyc/communications/:id', requireAuth, kycController.updateCommunication);
+
+router.get('/kyc/modifications', requireAuth, kycController.getModifications);
+router.post('/kyc/modifications', requireAuth, kycController.createModification);
+router.patch('/kyc/modifications/:id', requireAuth, kycController.updateModification);
+
+router.get('/kyc/reactivations', requireAuth, kycController.getReactivations);
+router.post('/kyc/reactivations', requireAuth, kycController.createReactivation);
+router.patch('/kyc/reactivations/:id', requireAuth, kycController.updateReactivation);
+
+router.get('/kyc/closures', requireAuth, kycController.getClosures);
+router.post('/kyc/closures', requireAuth, kycController.createClosure);
+router.patch('/kyc/closures/:id', requireAuth, kycController.updateClosure);
+
+router.get('/kyc/compliance', requireAuth, kycController.getCompliances);
+router.post('/kyc/compliance', requireAuth, kycController.createCompliance);
+router.patch('/kyc/compliance/:id', requireAuth, kycController.updateCompliance);
 
 /**
  * Audit Log endpoints
