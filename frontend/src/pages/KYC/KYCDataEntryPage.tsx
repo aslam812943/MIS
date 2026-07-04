@@ -141,6 +141,146 @@ const INITIAL_COMPLIANCE = {
   branch_id: '',
 };
 
+interface FieldConfig {
+  key: string;
+  label: string;
+  required: boolean;
+}
+
+const SHEET_FIELDS: Record<SheetType, FieldConfig[]> = {
+  new_account: [
+    { key: 'applicant_name', label: 'Applicant Name', required: true },
+    { key: 'pan', label: 'PAN Card Number', required: true },
+    { key: 'aadhaar_number', label: 'Aadhaar Number', required: true },
+    { key: 'mobile_number', label: 'Mobile Number', required: true },
+    { key: 'email', label: 'Email', required: true },
+    { key: 'address', label: 'Address', required: true },
+    { key: 'date_of_birth', label: 'Date of Birth (YYYY-MM-DD)', required: true },
+    { key: 'verified_by', label: 'Verified By', required: false },
+    { key: 'verification_date', label: 'Verification Date (YYYY-MM-DD)', required: false },
+    { key: 'status', label: 'Status (Pending/Verified/Rejected)', required: false },
+    { key: 'remarks', label: 'Remarks', required: false },
+  ],
+  ucc_allotment: [
+    { key: 'client_name', label: 'Client Name', required: true },
+    { key: 'pan', label: 'PAN Card Number', required: true },
+    { key: 'exchange', label: 'Exchange (NSE/BSE)', required: true },
+    { key: 'segment', label: 'Segment (Cash/F&O/Currency/Commodity)', required: true },
+    { key: 'ucc_code', label: 'UCC Code', required: false },
+    { key: 'upload_date', label: 'Upload Date (YYYY-MM-DD)', required: false },
+    { key: 'confirmation_date', label: 'Confirmation Date (YYYY-MM-DD)', required: false },
+    { key: 'status', label: 'Status (Pending/Uploaded/Confirmed/Rejected)', required: false },
+  ],
+  registry_updation: [
+    { key: 'client_name', label: 'Client Name', required: true },
+    { key: 'pan', label: 'PAN Card Number', required: true },
+    { key: 'registry', label: 'Registry (CKYC/KRA)', required: true },
+    { key: 'upload_date', label: 'Upload Date (YYYY-MM-DD)', required: false },
+    { key: 'status', label: 'Status (Pending/Verified/Rejected)', required: false },
+    { key: 'rejection_reason', label: 'Rejection Reason', required: false },
+  ],
+  ap_sharing: [
+    { key: 'ap_name', label: 'AP Name', required: true },
+    { key: 'ap_code', label: 'AP Code', required: true },
+    { key: 'client_name', label: 'Client Name', required: true },
+    { key: 'sharing_percentage', label: 'Sharing Percentage (%)', required: true },
+    { key: 'effective_date', label: 'Effective Date (YYYY-MM-DD)', required: true },
+    { key: 'status', label: 'Status (Active/Revised/Terminated)', required: false },
+  ],
+  demise_reporting: [
+    { key: 'client_name', label: 'Client Name', required: true },
+    { key: 'pan', label: 'PAN Card Number', required: true },
+    { key: 'date_of_demise', label: 'Date of Demise (YYYY-MM-DD)', required: true },
+    { key: 'reported_date', label: 'Reported Date (YYYY-MM-DD)', required: true },
+    { key: 'status', label: 'Status (Reported/Forwarded to DP/Closed)', required: false },
+    { key: 'remarks', label: 'Remarks', required: false },
+  ],
+  ap_code_exchange: [
+    { key: 'ap_name', label: 'AP Name', required: true },
+    { key: 'ap_code', label: 'AP Code', required: true },
+    { key: 'exchange', label: 'Exchange (NSE/BSE)', required: true },
+    { key: 'upload_date', label: 'Upload Date (YYYY-MM-DD)', required: true },
+    { key: 'status', label: 'Status (Pending/Confirmed)', required: false },
+  ],
+  onboarding_communication: [
+    { key: 'client_name', label: 'Client Name', required: true },
+    { key: 'mode', label: 'Mode (Letter/SMS/Call/Email)', required: true },
+    { key: 'sent_date', label: 'Sent Date (YYYY-MM-DD)', required: true },
+    { key: 'status', label: 'Status (Sent/Failed/Not Reachable)', required: false },
+    { key: 'remarks', label: 'Remarks', required: false },
+  ],
+  modification_requests: [
+    { key: 'client_name', label: 'Client Name', required: true },
+    { key: 'pan', label: 'PAN Card Number', required: true },
+    { key: 'modification_type', label: 'Modification Type', required: true },
+    { key: 'old_value', label: 'Old Value', required: false },
+    { key: 'new_value', label: 'New Value', required: false },
+    { key: 'request_date', label: 'Request Date (YYYY-MM-DD)', required: true },
+    { key: 'processed_date', label: 'Processed Date (YYYY-MM-DD)', required: false },
+    { key: 'status', label: 'Status (Pending/Processed/Rejected)', required: false },
+  ],
+  reactivation: [
+    { key: 'client_name', label: 'Client Name', required: true },
+    { key: 'pan', label: 'PAN Card Number', required: true },
+    { key: 'reason', label: 'Reason', required: true },
+    { key: 'request_date', label: 'Request Date (YYYY-MM-DD)', required: true },
+    { key: 'processed_date', label: 'Processed Date (YYYY-MM-DD)', required: false },
+    { key: 'status', label: 'Status (Pending/Processed/Rejected)', required: false },
+  ],
+  account_closure: [
+    { key: 'client_name', label: 'Client Name', required: true },
+    { key: 'pan', label: 'PAN Card Number', required: true },
+    { key: 'reason', label: 'Reason', required: true },
+    { key: 'request_date', label: 'Request Date (YYYY-MM-DD)', required: true },
+    { key: 'closure_date', label: 'Closure Date (YYYY-MM-DD)', required: false },
+    { key: 'status', label: 'Status (Pending/Processed/Rejected)', required: false },
+  ],
+  exchange_compliance: [
+    { key: 'client_name', label: 'Client Name', required: true },
+    { key: 'pan', label: 'PAN Card Number', required: true },
+    { key: 'compliance_item', label: 'Compliance Item', required: true },
+    { key: 'due_date', label: 'Due Date (YYYY-MM-DD)', required: false },
+    { key: 'status', label: 'Status (Compliant/Non-Compliant/Due)', required: false },
+  ],
+};
+
+const getBackendSheetName = (tab: SheetType): string => {
+  const map: Record<SheetType, string> = {
+    new_account: 'new-accounts',
+    ucc_allotment: 'ucc-allotments',
+    registry_updation: 'registry-updates',
+    ap_sharing: 'ap-sharings',
+    demise_reporting: 'demise-reports',
+    ap_code_exchange: 'ap-codes',
+    onboarding_communication: 'communications',
+    modification_requests: 'modifications',
+    reactivation: 'reactivations',
+    account_closure: 'closures',
+    exchange_compliance: 'compliance',
+  };
+  return map[tab];
+};
+
+const parseCsvLine = (line: string): string[] => {
+  const result: string[] = [];
+  let current = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    if (char === '"') {
+      inQuotes = !inQuotes;
+    } else if (char === ',' && !inQuotes) {
+      result.push(current.trim().replace(/^"|"$/g, ''));
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+  result.push(current.trim().replace(/^"|"$/g, ''));
+  return result;
+};
+
 const KYCDataEntryPage: React.FC = () => {
   const currentUser = authService.getCurrentUser();
   const isAdmin = currentUser?.role === 'admin';
@@ -160,6 +300,25 @@ const KYCDataEntryPage: React.FC = () => {
   const [onboardedClients, setOnboardedClients] = useState<any[]>([]);
   const [manualClientInput, setManualClientInput] = useState<boolean>(false);
 
+  // CSV Import States
+  const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
+  const [csvRows, setCsvRows] = useState<string[][]>([]);
+  const [csvMapping, setCsvMapping] = useState<Record<string, string>>({});
+  const [showMappingModal, setShowMappingModal] = useState(false);
+  const [importBranchId, setImportBranchId] = useState('');
+  const [importing, setImporting] = useState(false);
+
+  // Bulk Operations Selection States
+  const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
+  const [selectedBatchStatus, setSelectedBatchStatus] = useState<string>('');
+  const [batchChecklist, setBatchChecklist] = useState({
+    pan_copy: false,
+    aadhaar_copy: false,
+    bank_proof: false,
+    photograph: false,
+    signature: false,
+  });
+
   // Filters
   const [statusFilter, setStatusFilter] = useState('');
   const [branchFilter, setBranchFilter] = useState('');
@@ -178,6 +337,15 @@ const KYCDataEntryPage: React.FC = () => {
     setSearchTerm('');
     setRecords([]);
     setManualClientInput(false);
+    setSelectedRowIds([]);
+    setSelectedBatchStatus('');
+    setBatchChecklist({
+      pan_copy: false,
+      aadhaar_copy: false,
+      bank_proof: false,
+      photograph: false,
+      signature: false,
+    });
 
     const stateMap: { [key in SheetType]: any } = {
       new_account: INITIAL_NEW_ACCOUNT,
@@ -225,6 +393,8 @@ const KYCDataEntryPage: React.FC = () => {
 
   const fetchRecords = async () => {
     setFetching(true);
+    setSelectedRowIds([]);
+    setSelectedBatchStatus('');
     try {
       const branchIdParam = hasMultiBranchAccess ? (branchFilter || undefined) : userBranchId;
       const filters = {
@@ -309,6 +479,201 @@ const KYCDataEntryPage: React.FC = () => {
       console.error(err);
       toast.error('Document upload failed.', { id: loadToast });
     }
+  };
+
+  const handleCsvFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.name.endsWith('.csv')) {
+      toast.error('Please upload a valid CSV file.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      if (!text) {
+        toast.error('The uploaded file is empty.');
+        return;
+      }
+
+      const lines = text.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+      if (lines.length === 0) {
+        toast.error('The CSV file contains no records.');
+        return;
+      }
+
+      const headers = parseCsvLine(lines[0]);
+      const rows = lines.slice(1).map(line => parseCsvLine(line));
+
+      if (rows.length === 0) {
+        toast.error('The CSV file contains only header values.');
+        return;
+      }
+
+      if (rows.length > 500) {
+        toast.error('Upload exceeds maximum limit of 500 records.');
+        return;
+      }
+
+      const initialMapping: Record<string, string> = {};
+      const fields = SHEET_FIELDS[sheetTab];
+
+      fields.forEach((field) => {
+        const match = headers.find(h => 
+          h.toLowerCase() === field.key.toLowerCase() ||
+          h.toLowerCase().replace(/_/g, ' ') === field.label.toLowerCase() ||
+          field.label.toLowerCase().includes(h.toLowerCase()) ||
+          h.toLowerCase().includes(field.key.toLowerCase())
+        );
+        if (match) {
+          initialMapping[field.key] = match;
+        } else {
+          initialMapping[field.key] = '';
+        }
+      });
+
+      setCsvHeaders(headers);
+      setCsvRows(rows);
+      setCsvMapping(initialMapping);
+      setImportBranchId('');
+      setShowMappingModal(true);
+    };
+
+    reader.onerror = () => {
+      toast.error('Failed to read CSV file.');
+    };
+
+    reader.readAsText(file);
+  };
+
+  const handleBulkImportSubmit = async () => {
+    const fields = SHEET_FIELDS[sheetTab];
+    const missing = fields.filter(f => f.required && !csvMapping[f.key]);
+    if (missing.length > 0) {
+      toast.error(`Please map all required fields: ${missing.map(f => f.label).join(', ')}`);
+      return;
+    }
+
+    const selectedBranch = hasMultiBranchAccess ? importBranchId : userBranchId;
+    if (hasMultiBranchAccess && !selectedBranch) {
+      toast.error('Please select a default Branch Office for the imported records.');
+      return;
+    }
+
+    setImporting(true);
+    const loadToast = toast.loading('Importing bulk records...');
+
+    try {
+      const recordsToImport = csvRows.map((row) => {
+        const item: Record<string, any> = {};
+        
+        fields.forEach((field) => {
+          const csvColName = csvMapping[field.key];
+          if (csvColName) {
+            const colIndex = csvHeaders.indexOf(csvColName);
+            if (colIndex !== -1) {
+              let value = row[colIndex] || '';
+              
+              if (['pan_copy', 'aadhaar_copy', 'bank_proof', 'photograph', 'signature'].includes(field.key)) {
+                value = ['true', 'yes', '1', 'checked'].includes(value.toLowerCase());
+              }
+              
+              item[field.key] = value;
+            }
+          }
+        });
+
+        if (!item.branch_id) {
+          item.branch_id = selectedBranch;
+        }
+
+        return item;
+      });
+
+      const backendSheet = getBackendSheetName(sheetTab);
+      await kycService.bulkImport(backendSheet, recordsToImport);
+
+      toast.success(`Successfully imported ${recordsToImport.length} records.`, { id: loadToast });
+      setShowMappingModal(false);
+      fetchRecords();
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.response?.data?.message || err.message || 'Bulk import failed.', { id: loadToast });
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const GET_SHEET_STATUS_OPTIONS = (tab: SheetType): string[] => {
+    switch (tab) {
+      case 'new_account':
+      case 'registry_updation':
+      case 'modification_requests':
+      case 'reactivation':
+      case 'account_closure':
+        return ['Pending', 'Verified', 'Processed', 'Rejected'];
+      case 'ucc_allotment':
+        return ['Pending', 'Uploaded', 'Confirmed', 'Rejected'];
+      case 'ap_sharing':
+        return ['Active', 'Revised', 'Terminated'];
+      case 'demise_reporting':
+        return ['Reported', 'Forwarded to DP', 'Closed'];
+      case 'ap_code_exchange':
+        return ['Pending', 'Confirmed'];
+      case 'onboarding_communication':
+        return ['Sent', 'Failed', 'Not Reachable'];
+      case 'exchange_compliance':
+        return ['Compliant', 'Non-Compliant', 'Due'];
+      default:
+        return [];
+    }
+  };
+
+  const handleBulkUpdate = async (updates: any) => {
+    if (selectedRowIds.length === 0) return;
+    setLoading(true);
+    const loadToast = toast.loading(`Updating ${selectedRowIds.length} records...`);
+    try {
+      const backendSheet = getBackendSheetName(sheetTab);
+      await kycService.bulkUpdate(backendSheet, selectedRowIds, updates);
+      toast.success('Selected records updated successfully.', { id: loadToast });
+      setSelectedRowIds([]);
+      setBatchChecklist({
+        pan_copy: false,
+        aadhaar_copy: false,
+        bank_proof: false,
+        photograph: false,
+        signature: false,
+      });
+      setSelectedBatchStatus('');
+      fetchRecords();
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.response?.data?.message || err.message || 'Bulk update failed.', { id: loadToast });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const renderRowCheckbox = (record: any) => {
+    return (
+      <td className="w-10 text-center select-none" style={{ borderColor: 'var(--border)' }}>
+        <input
+          type="checkbox"
+          checked={selectedRowIds.includes(record.id)}
+          onChange={(e) => {
+            if (e.target.checked) {
+              setSelectedRowIds(prev => [...prev, record.id]);
+            } else {
+              setSelectedRowIds(prev => prev.filter(id => id !== record.id));
+            }
+          }}
+          className="rounded text-teal-600 focus:ring-teal-500 w-4 h-4 cursor-pointer"
+        />
+      </td>
+    );
   };
 
   const validateForm = () => {
@@ -1418,7 +1783,7 @@ const KYCDataEntryPage: React.FC = () => {
       case 'new_account':
         const checklistCount = [record.pan_copy, record.aadhaar_copy, record.bank_proof, record.photograph, record.signature].filter(Boolean).length;
         return (
-          <tr key={record.id}>
+          <tr key={record.id}>{renderRowCheckbox(record)}
             <td className="whitespace-nowrap text-xs font-semibold">{record.applicant_name}</td>
             <td className="whitespace-nowrap text-xs">{record.pan}</td>
             <td className="whitespace-nowrap text-xs">{record.aadhaar_number}</td>
@@ -1440,7 +1805,7 @@ const KYCDataEntryPage: React.FC = () => {
 
       case 'ucc_allotment':
         return (
-          <tr key={record.id}>
+          <tr key={record.id}>{renderRowCheckbox(record)}
             <td className="whitespace-nowrap text-xs font-semibold">{record.client_name}</td>
             <td className="whitespace-nowrap text-xs">{record.pan}</td>
             <td className="whitespace-nowrap text-xs">{record.exchange}</td>
@@ -1457,7 +1822,7 @@ const KYCDataEntryPage: React.FC = () => {
 
       case 'registry_updation':
         return (
-          <tr key={record.id}>
+          <tr key={record.id}>{renderRowCheckbox(record)}
             <td className="whitespace-nowrap text-xs font-semibold">{record.client_name}</td>
             <td className="whitespace-nowrap text-xs">{record.pan}</td>
             <td className="whitespace-nowrap text-xs">{record.registry}</td>
@@ -1473,7 +1838,7 @@ const KYCDataEntryPage: React.FC = () => {
 
       case 'ap_sharing':
         return (
-          <tr key={record.id}>
+          <tr key={record.id}>{renderRowCheckbox(record)}
             <td className="whitespace-nowrap text-xs font-semibold">{record.ap_name}</td>
             <td className="whitespace-nowrap text-xs font-semibold">{record.ap_code}</td>
             <td className="whitespace-nowrap text-xs font-semibold">{record.client_name}</td>
@@ -1489,7 +1854,7 @@ const KYCDataEntryPage: React.FC = () => {
 
       case 'demise_reporting':
         return (
-          <tr key={record.id}>
+          <tr key={record.id}>{renderRowCheckbox(record)}
             <td className="whitespace-nowrap text-xs font-semibold">{record.client_name}</td>
             <td className="whitespace-nowrap text-xs">{record.pan}</td>
             <td className="whitespace-nowrap text-xs">{record.date_of_demise}</td>
@@ -1513,7 +1878,7 @@ const KYCDataEntryPage: React.FC = () => {
 
       case 'ap_code_exchange':
         return (
-          <tr key={record.id}>
+          <tr key={record.id}>{renderRowCheckbox(record)}
             <td className="whitespace-nowrap text-xs font-semibold">{record.ap_name}</td>
             <td className="whitespace-nowrap text-xs font-semibold">{record.ap_code}</td>
             <td className="whitespace-nowrap text-xs">{record.exchange}</td>
@@ -1528,7 +1893,7 @@ const KYCDataEntryPage: React.FC = () => {
 
       case 'onboarding_communication':
         return (
-          <tr key={record.id}>
+          <tr key={record.id}>{renderRowCheckbox(record)}
             <td className="whitespace-nowrap text-xs font-semibold">{record.client_name}</td>
             <td className="whitespace-nowrap text-xs">{record.mode}</td>
             <td className="whitespace-nowrap text-xs">{record.sent_date}</td>
@@ -1543,7 +1908,7 @@ const KYCDataEntryPage: React.FC = () => {
 
       case 'modification_requests':
         return (
-          <tr key={record.id}>
+          <tr key={record.id}>{renderRowCheckbox(record)}
             <td className="whitespace-nowrap text-xs font-semibold">{record.client_name}</td>
             <td className="whitespace-nowrap text-xs">{record.pan}</td>
             <td className="whitespace-nowrap text-xs">{record.modification_type}</td>
@@ -1573,7 +1938,7 @@ const KYCDataEntryPage: React.FC = () => {
 
       case 'reactivation':
         return (
-          <tr key={record.id}>
+          <tr key={record.id}>{renderRowCheckbox(record)}
             <td className="whitespace-nowrap text-xs font-semibold">{record.client_name}</td>
             <td className="whitespace-nowrap text-xs">{record.pan}</td>
             <td className="whitespace-nowrap text-xs">
@@ -1591,7 +1956,7 @@ const KYCDataEntryPage: React.FC = () => {
 
       case 'account_closure':
         return (
-          <tr key={record.id}>
+          <tr key={record.id}>{renderRowCheckbox(record)}
             <td className="whitespace-nowrap text-xs font-semibold">{record.client_name}</td>
             <td className="whitespace-nowrap text-xs">{record.pan}</td>
             <td className="whitespace-nowrap text-xs">
@@ -1609,7 +1974,7 @@ const KYCDataEntryPage: React.FC = () => {
 
       case 'exchange_compliance':
         return (
-          <tr key={record.id}>
+          <tr key={record.id}>{renderRowCheckbox(record)}
             <td className="whitespace-nowrap text-xs font-semibold">{record.client_name}</td>
             <td className="whitespace-nowrap text-xs">{record.pan}</td>
             <td className="whitespace-nowrap text-xs">{record.compliance_item}</td>
@@ -1689,18 +2054,145 @@ const KYCDataEntryPage: React.FC = () => {
           </div>
 
           {activeTab === 'list' && (
-            <button
-              onClick={() => setActiveTab('register')}
-              className="mis-btn mis-btn-primary text-xs flex items-center gap-1 py-1.5"
-            >
-              ➕ Add Record Row
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  const input = document.getElementById('bulk-csv-input') as HTMLInputElement;
+                  if (input) {
+                    input.value = '';
+                    input.click();
+                  }
+                }}
+                className="px-3 py-1.5 border rounded-lg text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center gap-1"
+                style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}
+              >
+                📤 Bulk Import CSV
+              </button>
+              <input
+                id="bulk-csv-input"
+                type="file"
+                accept=".csv"
+                onChange={handleCsvFileChange}
+                className="hidden"
+              />
+              <button
+                onClick={() => setActiveTab('register')}
+                className="mis-btn mis-btn-primary text-xs flex items-center gap-1 py-1.5"
+              >
+                ➕ Add Record Row
+              </button>
+            </div>
           )}
         </div>
 
         {/* List Tab Grid */}
         {activeTab === 'list' ? (
           <div className="space-y-4">
+            
+            {/* Batch Operations Bar */}
+            {selectedRowIds.length > 0 && (
+              <div 
+                className="p-4 rounded-xl border flex flex-col md:flex-row justify-between items-start md:items-center gap-4 animate-fade-in text-left"
+                style={{ background: 'var(--panel-inset-soft)', borderColor: 'var(--border)' }}
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>
+                    🛠️ Batch Edit ({selectedRowIds.length} rows selected)
+                  </span>
+                  <button
+                    onClick={() => setSelectedRowIds([])}
+                    className="text-[10px] font-bold hover:underline"
+                    style={{ color: 'var(--accent)' }}
+                  >
+                    Deselect All
+                  </button>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-4 w-full md:w-auto">
+                  {/* Status batch edit */}
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={selectedBatchStatus}
+                      onChange={(e) => setSelectedBatchStatus(e.target.value)}
+                      className="mis-select text-xs py-1.5 w-40"
+                    >
+                      <option value="">-- Change Status --</option>
+                      {GET_SHEET_STATUS_OPTIONS(sheetTab).map((opt) => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={() => handleBulkUpdate({ status: selectedBatchStatus })}
+                      disabled={!selectedBatchStatus || loading}
+                      className="px-3 py-1.5 bg-teal-600 hover:bg-teal-700 disabled:bg-teal-400 text-white text-xs font-bold rounded-lg transition-colors"
+                    >
+                      Apply Status
+                    </button>
+                  </div>
+
+                  {/* Checklist batch edit (Only for new_account) */}
+                  {sheetTab === 'new_account' && (
+                    <div className="flex flex-wrap items-center gap-3 border-l pl-4" style={{ borderColor: 'var(--border)' }}>
+                      <span className="text-[10px] font-bold" style={{ color: 'var(--text-secondary)' }}>Checklist:</span>
+                      <div className="flex gap-2.5">
+                        <label className="flex items-center gap-1.5 text-[10px] font-bold cursor-pointer select-none" style={{ color: 'var(--text-secondary)' }}>
+                          <input
+                            type="checkbox"
+                            checked={batchChecklist.pan_copy}
+                            onChange={(e) => setBatchChecklist(prev => ({ ...prev, pan_copy: e.target.checked }))}
+                            className="rounded text-teal-600 focus:ring-teal-500 w-3.5 h-3.5"
+                          />
+                          PAN
+                        </label>
+                        <label className="flex items-center gap-1.5 text-[10px] font-bold cursor-pointer select-none" style={{ color: 'var(--text-secondary)' }}>
+                          <input
+                            type="checkbox"
+                            checked={batchChecklist.aadhaar_copy}
+                            onChange={(e) => setBatchChecklist(prev => ({ ...prev, aadhaar_copy: e.target.checked }))}
+                            className="rounded text-teal-600 focus:ring-teal-500 w-3.5 h-3.5"
+                          />
+                          Aadhaar
+                        </label>
+                        <label className="flex items-center gap-1.5 text-[10px] font-bold cursor-pointer select-none" style={{ color: 'var(--text-secondary)' }}>
+                          <input
+                            type="checkbox"
+                            checked={batchChecklist.bank_proof}
+                            onChange={(e) => setBatchChecklist(prev => ({ ...prev, bank_proof: e.target.checked }))}
+                            className="rounded text-teal-600 focus:ring-teal-500 w-3.5 h-3.5"
+                          />
+                          Bank Proof
+                        </label>
+                        <label className="flex items-center gap-1.5 text-[10px] font-bold cursor-pointer select-none" style={{ color: 'var(--text-secondary)' }}>
+                          <input
+                            type="checkbox"
+                            checked={batchChecklist.photograph}
+                            onChange={(e) => setBatchChecklist(prev => ({ ...prev, photograph: e.target.checked }))}
+                            className="rounded text-teal-600 focus:ring-teal-500 w-3.5 h-3.5"
+                          />
+                          Photo
+                        </label>
+                        <label className="flex items-center gap-1.5 text-[10px] font-bold cursor-pointer select-none" style={{ color: 'var(--text-secondary)' }}>
+                          <input
+                            type="checkbox"
+                            checked={batchChecklist.signature}
+                            onChange={(e) => setBatchChecklist(prev => ({ ...prev, signature: e.target.checked }))}
+                            className="rounded text-teal-600 focus:ring-teal-500 w-3.5 h-3.5"
+                          />
+                          Sign
+                        </label>
+                      </div>
+                      <button
+                        onClick={() => handleBulkUpdate(batchChecklist)}
+                        disabled={loading}
+                        className="px-3 py-1.5 bg-teal-600 hover:bg-teal-700 disabled:bg-teal-400 text-white text-xs font-bold rounded-lg transition-colors"
+                      >
+                        Apply Checklist
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
             
             {/* Filters block */}
             <div className="flex flex-wrap gap-4 items-center p-4 rounded-xl border" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
@@ -1813,6 +2305,20 @@ const KYCDataEntryPage: React.FC = () => {
                 <table className="mis-table">
                   <thead>
                     <tr>
+                      <th className="w-10 text-center select-none">
+                        <input
+                          type="checkbox"
+                          checked={records.length > 0 && selectedRowIds.length === records.length}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedRowIds(records.map(r => r.id));
+                            } else {
+                              setSelectedRowIds([]);
+                            }
+                          }}
+                          className="rounded text-teal-600 focus:ring-teal-500 w-4 h-4 cursor-pointer"
+                        />
+                      </th>
                       {renderTableHeader()}
                     </tr>
                   </thead>
@@ -1876,6 +2382,155 @@ const KYCDataEntryPage: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        )}
+
+        {showMappingModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in text-left">
+            <div 
+              className="border rounded-2xl w-full max-w-3xl overflow-hidden flex flex-col shadow-xl max-h-[85vh] animate-scale-in"
+              style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
+            >
+              {/* Modal Header */}
+              <div className="p-6 border-b flex justify-between items-center" style={{ borderColor: 'var(--border)' }}>
+                <div>
+                  <h3 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>
+                    📤 Map CSV Headers & Bulk Import
+                  </h3>
+                  <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
+                    Pair your uploaded CSV columns to our database field definitions. {csvRows.length} records detected.
+                  </p>
+                </div>
+                <button 
+                  onClick={() => setShowMappingModal(false)}
+                  className="text-slate-400 hover:text-slate-200 text-lg focus:outline-none"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Modal Content */}
+              <div className="p-6 overflow-y-auto space-y-6 flex-1">
+                
+                {/* Default Branch Selection for Multi-Branch Users */}
+                {hasMultiBranchAccess && (
+                  <div className="p-4 border rounded-xl" style={{ background: 'var(--panel-inset-soft)', borderColor: 'var(--border)' }}>
+                    <label className="text-xs font-bold block mb-1.5" style={{ color: 'var(--text-primary)' }}>
+                      Select Default Branch Office for Imported Records <span className="text-rose-500">*</span>
+                    </label>
+                    <select
+                      value={importBranchId}
+                      onChange={(e) => setImportBranchId(e.target.value)}
+                      className="mis-select text-xs w-full font-semibold cursor-pointer"
+                      required
+                    >
+                      <option value="">-- Choose Branch --</option>
+                      {branches.map((b) => (
+                        <option key={b.id} value={b.id}>{b.name}</option>
+                      ))}
+                    </select>
+                    <p className="text-[10px] mt-1" style={{ color: 'var(--text-secondary)' }}>
+                      Since you have management access, please choose which branch office will own these imported records.
+                    </p>
+                  </div>
+                )}
+
+                {/* Mapping Form Grid */}
+                <div>
+                  <h4 className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--text-primary)' }}>
+                    Column Mapping
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {SHEET_FIELDS[sheetTab].map((field) => (
+                      <div key={field.key} className="p-3 border rounded-lg flex flex-col justify-between" style={{ background: 'var(--panel-inset-soft)', borderColor: 'var(--border)' }}>
+                        <label className="text-xs font-semibold block mb-1.5">
+                          <span style={{ color: 'var(--text-primary)' }}>{field.label}</span>
+                          {field.required && <span className="text-rose-500 ml-0.5">*</span>}
+                        </label>
+                        
+                        <select
+                          value={csvMapping[field.key] || ''}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setCsvMapping(prev => ({ ...prev, [field.key]: val }));
+                          }}
+                          className="mis-select text-xs w-full font-medium"
+                          required={field.required}
+                        >
+                          <option value="">-- Do Not Import --</option>
+                          {csvHeaders.map((header) => (
+                            <option key={header} value={header}>{header}</option>
+                          ))}
+                        </select>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Data Preview */}
+                <div>
+                  <h4 className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--text-primary)' }}>
+                    Preview (First 3 Rows)
+                  </h4>
+                  <div className="border rounded-lg overflow-x-auto" style={{ borderColor: 'var(--border)' }}>
+                    <table className="w-full text-left border-collapse" style={{ background: 'var(--bg-base)' }}>
+                      <thead>
+                        <tr className="border-b" style={{ borderColor: 'var(--border)' }}>
+                          {SHEET_FIELDS[sheetTab]
+                            .filter(f => csvMapping[f.key])
+                            .map(f => (
+                              <th key={f.key} className="p-2 text-[10px] font-bold uppercase whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>
+                                {f.label}
+                              </th>
+                            ))
+                          }
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {csvRows.slice(0, 3).map((row, idx) => (
+                          <tr key={idx} className="border-b last:border-b-0" style={{ borderColor: 'var(--border)' }}>
+                            {SHEET_FIELDS[sheetTab]
+                              .filter(f => csvMapping[f.key])
+                              .map(f => {
+                                const colName = csvMapping[f.key];
+                                const colIndex = csvHeaders.indexOf(colName);
+                                const value = colIndex !== -1 ? row[colIndex] : '';
+                                return (
+                                  <td key={f.key} className="p-2 text-xs truncate max-w-[120px]" style={{ color: 'var(--text-primary)' }}>
+                                    {value || <span className="opacity-40 italic">empty</span>}
+                                  </td>
+                                );
+                              })
+                            }
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Modal Footer */}
+              <div className="p-6 border-t flex justify-end gap-3" style={{ borderColor: 'var(--border)' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowMappingModal(false)}
+                  className="px-4 py-2 border rounded-lg text-xs font-bold hover:bg-slate-100 dark:hover:bg-slate-800"
+                  style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleBulkImportSubmit}
+                  disabled={importing}
+                  className="px-5 py-2 bg-teal-600 hover:bg-teal-700 disabled:bg-teal-400 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5"
+                >
+                  {importing ? 'Importing...' : '🚀 Start Import'}
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>

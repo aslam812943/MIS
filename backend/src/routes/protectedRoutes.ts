@@ -144,6 +144,8 @@ router.get('/settlements/dashboard', requireAuth, settlementController.getDashbo
  */
 router.post('/kyc/upload', requireAuth, kycUpload.single('file'), kycController.uploadDocument);
 router.get('/kyc/dashboard', requireAuth, kycController.getDashboardStats);
+router.post('/kyc/bulk/:sheet', requireAuth, kycController.bulkImport);
+router.patch('/kyc/bulk/:sheet', requireAuth, kycController.bulkUpdate);
 
 router.get('/kyc/new-accounts', requireAuth, kycController.getNewAccounts);
 router.post('/kyc/new-accounts', requireAuth, kycController.createNewAccount);

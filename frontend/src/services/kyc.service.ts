@@ -4,9 +4,9 @@ export const kycService = {
   /**
    * Fetches KYC dashboard aggregated metrics.
    */
-  getDashboardData: async (branchId?: string) => {
+  getDashboardData: async (branchId?: string, startDate?: string, endDate?: string) => {
     const response = await api.get('/admin/kyc/dashboard', {
-      params: { branchId }
+      params: { branchId, startDate, endDate }
     });
     return response.data;
   },
@@ -176,6 +176,16 @@ export const kycService = {
   },
   updateCompliance: async (id: string, recordData: any) => {
     const response = await api.patch(`/admin/kyc/compliance/${id}`, recordData);
+    return response.data;
+  },
+
+  bulkImport: async (sheet: string, records: any[]) => {
+    const response = await api.post(`/admin/kyc/bulk/${sheet}`, { records });
+    return response.data;
+  },
+
+  bulkUpdate: async (sheet: string, ids: string[], updates: any) => {
+    const response = await api.patch(`/admin/kyc/bulk/${sheet}`, { ids, updates });
     return response.data;
   }
 };

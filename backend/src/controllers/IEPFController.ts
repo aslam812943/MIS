@@ -98,7 +98,13 @@ export class IEPFController {
   getDashboardData = async (req: Request, res: Response): Promise<void> => {
     try {
       const requesterId = (req as any).user.id;
-      const dashboardData = await this.iepfService.getDashboardData(requesterId);
+      const { branchId, startDate, endDate } = req.query;
+      const dashboardData = await this.iepfService.getDashboardData(
+        requesterId,
+        branchId as string,
+        startDate as string,
+        endDate as string
+      );
       res.status(HttpStatus.OK).json(dashboardData);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to retrieve dashboard metrics';

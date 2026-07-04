@@ -39,9 +39,14 @@ export class SettlementController {
   getDashboardStats = async (req: Request, res: Response): Promise<void> => {
     try {
       const requesterId = (req as any).user.id;
-      const { branchId } = req.query;
+      const { branchId, startDate, endDate } = req.query;
 
-      const stats = await this.settlementService.getDashboardStats(requesterId, branchId as string);
+      const stats = await this.settlementService.getDashboardStats(
+        requesterId,
+        branchId as string,
+        startDate as string,
+        endDate as string
+      );
 
       res.status(HttpStatus.OK).json(stats);
     } catch (error) {

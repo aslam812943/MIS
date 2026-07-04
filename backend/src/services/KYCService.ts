@@ -1218,7 +1218,7 @@ export class KYCService {
   // DASHBOARD AGGREGATIONS
   // ═══════════════════════════════════════════════
 
-  async getDashboardStats(requesterId: string, branchIdFilter?: string): Promise<any> {
+  async getDashboardStats(requesterId: string, branchIdFilter?: string, startDate?: string, endDate?: string): Promise<any> {
     const client = supabaseAdmin;
     if (!client) throw new Error('Supabase client not configured.');
 
@@ -1226,57 +1226,54 @@ export class KYCService {
     if (!access.authorized) throw new Error('Unauthorized: Dashboard access denied.');
 
     let targetBranchId: string | undefined = branchIdFilter;
-    if (access.role === 'employee' || access.role === 'hod') {
+    if (access.role === 'employee') {
       targetBranchId = access.branchId || undefined;
     }
 
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (startDate && !dateRegex.test(startDate)) throw new Error('Invalid start date format (YYYY-MM-DD).');
+    if (endDate && !dateRegex.test(endDate)) throw new Error('Invalid end date format (YYYY-MM-DD).');
+
+    // Helper to apply filters to any query
+    const applyFilters = <T extends any>(baseQuery: T): T => {
+      let q: any = baseQuery;
+      if (targetBranchId) q = q.eq('branch_id', targetBranchId);
+      if (startDate) q = q.gte('created_at', startDate);
+      if (endDate) q = q.lte('created_at', `${endDate}T23:59:59.999Z`);
+      return q;
+    };
+
     // 1. Fetch data from each sheet to aggregate dashboard stats
     // A. New accounts status breakdown
-    let naQuery = client.from('kyc_new_account').select('status, created_at');
-    if (targetBranchId) naQuery = naQuery.eq('branch_id', targetBranchId);
-    const { data: naData, error: naError } = await naQuery;
+    const { data: naData, error: naError } = await applyFilters(client.from('kyc_new_account').select('status, created_at'));
     if (naError) throw new Error(naError.message);
 
     // B. UCC Allotment
-    let uccQuery = client.from('kyc_ucc_allotment').select('status');
-    if (targetBranchId) uccQuery = uccQuery.eq('branch_id', targetBranchId);
-    const { data: uccData, error: uccError } = await uccQuery;
+    const { data: uccData, error: uccError } = await applyFilters(client.from('kyc_ucc_allotment').select('status'));
     if (uccError) throw new Error(uccError.message);
 
     // C. Registry update
-    let regQuery = client.from('kyc_registry_updation').select('status');
-    if (targetBranchId) regQuery = regQuery.eq('branch_id', targetBranchId);
-    const { data: regData, error: regError } = await regQuery;
+    const { data: regData, error: regError } = await applyFilters(client.from('kyc_registry_updation').select('status'));
     if (regError) throw new Error(regError.message);
 
     // D. Demise reports
-    let demiseQuery = client.from('kyc_demise_reporting').select('status');
-    if (targetBranchId) demiseQuery = demiseQuery.eq('branch_id', targetBranchId);
-    const { data: demiseData, error: demiseError } = await demiseQuery;
+    const { data: demiseData, error: demiseError } = await applyFilters(client.from('kyc_demise_reporting').select('status'));
     if (demiseError) throw new Error(demiseError.message);
 
     // E. Modifications
-    let modQuery = client.from('kyc_modification_requests').select('status, modification_type');
-    if (targetBranchId) modQuery = modQuery.eq('branch_id', targetBranchId);
-    const { data: modData, error: modError } = await modQuery;
+    const { data: modData, error: modError } = await applyFilters(client.from('kyc_modification_requests').select('status, modification_type'));
     if (modError) throw new Error(modError.message);
 
     // F. Reactivations
-    let reactQuery = client.from('kyc_reactivation_requests').select('status');
-    if (targetBranchId) reactQuery = reactQuery.eq('branch_id', targetBranchId);
-    const { data: reactData, error: reactError } = await reactQuery;
+    const { data: reactData, error: reactError } = await applyFilters(client.from('kyc_reactivation_requests').select('status'));
     if (reactError) throw new Error(reactError.message);
 
     // G. Closures
-    let closureQuery = client.from('kyc_account_closure').select('status');
-    if (targetBranchId) closureQuery = closureQuery.eq('branch_id', targetBranchId);
-    const { data: closureData, error: closureError } = await closureQuery;
+    const { data: closureData, error: closureError } = await applyFilters(client.from('kyc_account_closure').select('status'));
     if (closureError) throw new Error(closureError.message);
 
     // H. Exchange Compliance
-    let compQuery = client.from('kyc_exchange_compliance').select('status');
-    if (targetBranchId) compQuery = compQuery.eq('branch_id', targetBranchId);
-    const { data: compData, error: compError } = await compQuery;
+    const { data: compData, error: compError } = await applyFilters(client.from('kyc_exchange_compliance').select('status'));
     if (compError) throw new Error(compError.message);
 
     // Calculations
@@ -1385,5 +1382,289 @@ export class KYCService {
         requestTypes
       }
     };
+  }
+
+  async bulkImport(requesterId: string, sheet: string, records: any[]): Promise<any> {
+    const client = supabaseAdmin;
+    if (!client) throw new Error('Supabase admin client not configured.');
+
+    if (!Array.isArray(records) || records.length === 0) {
+      throw new Error('No records provided for import.');
+    }
+
+    if (records.length > 500) {
+      throw new Error('Bulk import limit exceeded. Maximum 500 rows allowed per upload.');
+    }
+
+    const access = await this.verifyAccess(requesterId);
+    if (!access.authorized) throw new Error('Unauthorized: Access denied.');
+
+    const validatedRecords: any[] = [];
+
+    for (let i = 0; i < records.length; i++) {
+      const row = records[i];
+      try {
+        const branch_id = row.branch_id || access.branchId;
+        if (!branch_id) throw new Error('Branch assignment is required.');
+        if ((access.role === 'employee' || access.role === 'hod') && access.branchId && branch_id !== access.branchId) {
+          throw new Error('Unauthorized branch access.');
+        }
+
+        let mappedRow: any = {};
+        
+        switch (sheet) {
+          case 'new-accounts':
+            mappedRow = {
+              applicant_name: this.validateRequiredString(row.applicant_name, 'Applicant Name'),
+              pan: this.validatePAN(row.pan),
+              aadhaar_number: this.validateAadhaar(row.aadhaar_number),
+              mobile_number: this.validateMobile(row.mobile_number),
+              email: this.validateEmail(row.email),
+              address: this.validateRequiredString(row.address, 'Address', 1000),
+              date_of_birth: this.validateDate(row.date_of_birth, 'Date of Birth'),
+              pan_copy: !!row.pan_copy,
+              aadhaar_copy: !!row.aadhaar_copy,
+              bank_proof: !!row.bank_proof,
+              photograph: !!row.photograph,
+              signature: !!row.signature,
+              verified_by: row.verified_by ? String(row.verified_by).trim() : null,
+              verification_date: row.verification_date ? this.validateDate(row.verification_date, 'Verification Date') : null,
+              status: row.status || 'Pending',
+              remarks: row.remarks ? String(row.remarks).trim() : null,
+              branch_id,
+              created_by: requesterId
+            };
+            break;
+          case 'ucc-allotments':
+            mappedRow = {
+              client_name: this.validateRequiredString(row.client_name, 'Client Name'),
+              pan: this.validatePAN(row.pan),
+              exchange: this.validateRequiredString(row.exchange, 'Exchange'),
+              segment: this.validateRequiredString(row.segment, 'Segment'),
+              ucc_code: row.ucc_code ? String(row.ucc_code).trim() : null,
+              upload_date: row.upload_date ? this.validateDate(row.upload_date, 'Upload Date') : null,
+              confirmation_date: row.confirmation_date ? this.validateDate(row.confirmation_date, 'Confirmation Date') : null,
+              status: row.status || 'Pending',
+              branch_id,
+              created_by: requesterId
+            };
+            break;
+          case 'registry-updates':
+            mappedRow = {
+              client_name: this.validateRequiredString(row.client_name, 'Client Name'),
+              pan: this.validatePAN(row.pan),
+              registry: this.validateRequiredString(row.registry, 'Registry'),
+              upload_date: row.upload_date ? this.validateDate(row.upload_date, 'Upload Date') : null,
+              status: row.status || 'Pending',
+              rejection_reason: row.rejection_reason ? String(row.rejection_reason).trim() : null,
+              branch_id,
+              created_by: requesterId
+            };
+            break;
+          case 'ap-sharings':
+            mappedRow = {
+              ap_name: this.validateRequiredString(row.ap_name, 'AP Name'),
+              ap_code: this.validateRequiredString(row.ap_code, 'AP Code'),
+              client_name: this.validateRequiredString(row.client_name, 'Client Name'),
+              sharing_percentage: this.validatePercentage(row.sharing_percentage),
+              effective_date: this.validateDate(row.effective_date, 'Effective Date'),
+              status: row.status || 'Active',
+              branch_id,
+              created_by: requesterId
+            };
+            break;
+          case 'demise-reports':
+            mappedRow = {
+              client_name: this.validateRequiredString(row.client_name, 'Client Name'),
+              pan: this.validatePAN(row.pan),
+              date_of_demise: this.validateDate(row.date_of_demise, 'Date of Demise'),
+              reported_date: this.validateDate(row.reported_date, 'Reported Date'),
+              death_certificate_url: row.death_certificate_url ? String(row.death_certificate_url).trim() : null,
+              status: row.status || 'Reported',
+              remarks: row.remarks ? String(row.remarks).trim() : null,
+              branch_id,
+              created_by: requesterId
+            };
+            break;
+          case 'ap-codes':
+            mappedRow = {
+              ap_name: this.validateRequiredString(row.ap_name, 'AP Name'),
+              ap_code: this.validateRequiredString(row.ap_code, 'AP Code'),
+              exchange: this.validateRequiredString(row.exchange, 'Exchange'),
+              upload_date: this.validateDate(row.upload_date, 'Upload Date'),
+              status: row.status || 'Pending',
+              branch_id,
+              created_by: requesterId
+            };
+            break;
+          case 'communications':
+            mappedRow = {
+              client_name: this.validateRequiredString(row.client_name, 'Client Name'),
+              mode: this.validateRequiredString(row.mode, 'Communication Mode'),
+              sent_date: this.validateDate(row.sent_date, 'Sent Date'),
+              status: row.status || 'Sent',
+              remarks: row.remarks ? String(row.remarks).trim() : null,
+              branch_id,
+              created_by: requesterId
+            };
+            break;
+          case 'modifications':
+            mappedRow = {
+              client_name: this.validateRequiredString(row.client_name, 'Client Name'),
+              pan: this.validatePAN(row.pan),
+              modification_type: this.validateRequiredString(row.modification_type, 'Modification Type'),
+              old_value: row.old_value ? String(row.old_value).trim() : null,
+              new_value: row.new_value ? String(row.new_value).trim() : null,
+              supporting_document_url: row.supporting_document_url ? String(row.supporting_document_url).trim() : null,
+              request_date: this.validateDate(row.request_date, 'Request Date'),
+              processed_date: row.processed_date ? this.validateDate(row.processed_date, 'Processed Date') : null,
+              status: row.status || 'Pending',
+              branch_id,
+              created_by: requesterId
+            };
+            break;
+          case 'reactivations':
+            mappedRow = {
+              client_name: this.validateRequiredString(row.client_name, 'Client Name'),
+              pan: this.validatePAN(row.pan),
+              reason: this.validateRequiredString(row.reason, 'Reason'),
+              request_date: this.validateDate(row.request_date, 'Request Date'),
+              processed_date: row.processed_date ? this.validateDate(row.processed_date, 'Processed Date') : null,
+              status: row.status || 'Pending',
+              branch_id,
+              created_by: requesterId
+            };
+            break;
+          case 'closures':
+            mappedRow = {
+              client_name: this.validateRequiredString(row.client_name, 'Client Name'),
+              pan: this.validatePAN(row.pan),
+              reason: this.validateRequiredString(row.reason, 'Reason'),
+              request_date: this.validateDate(row.request_date, 'Request Date'),
+              closure_date: row.closure_date ? this.validateDate(row.closure_date, 'Closure Date') : null,
+              status: row.status || 'Pending',
+              branch_id,
+              created_by: requesterId
+            };
+            break;
+          case 'compliance':
+            mappedRow = {
+              client_name: this.validateRequiredString(row.client_name, 'Client Name'),
+              pan: this.validatePAN(row.pan),
+              compliance_item: this.validateRequiredString(row.compliance_item, 'Compliance Item'),
+              due_date: row.due_date ? this.validateDate(row.due_date, 'Due Date') : null,
+              status: row.status || 'Due',
+              branch_id,
+              created_by: requesterId
+            };
+            break;
+          default:
+            throw new Error(`Invalid sheet identifier: ${sheet}`);
+        }
+
+        validatedRecords.push(mappedRow);
+      } catch (err: any) {
+        throw new Error(`Row ${i + 1}: ${err.message}`);
+      }
+    }
+
+    const tableNameMap: { [key: string]: string } = {
+      'new-accounts': 'kyc_new_account',
+      'ucc-allotments': 'kyc_ucc_allotment',
+      'registry-updates': 'kyc_registry_updation',
+      'ap-sharings': 'kyc_ap_sharing',
+      'demise-reports': 'kyc_demise_reporting',
+      'ap-codes': 'kyc_ap_code_exchange',
+      'communications': 'kyc_onboarding_communication',
+      'modifications': 'kyc_modification_requests',
+      'reactivations': 'kyc_reactivation_requests',
+      'closures': 'kyc_account_closure',
+      'compliance': 'kyc_exchange_compliance',
+    };
+
+    const targetTable = tableNameMap[sheet];
+    if (!targetTable) throw new Error(`Invalid sheet identifier: ${sheet}`);
+
+    const { data, error } = await client
+      .from(targetTable)
+      .insert(validatedRecords)
+      .select();
+
+    if (error) throw new Error(`Database error during bulk insert: ${error.message}`);
+    return data;
+  }
+
+  async bulkUpdate(requesterId: string, sheet: string, ids: string[], updates: any): Promise<any> {
+    const client = supabaseAdmin;
+    if (!client) throw new Error('Supabase admin client not configured.');
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+      throw new Error('No record IDs provided for update.');
+    }
+
+    const access = await this.verifyAccess(requesterId);
+    if (!access.authorized) throw new Error('Unauthorized: Access denied.');
+
+    const tableNameMap: { [key: string]: string } = {
+      'new-accounts': 'kyc_new_account',
+      'ucc-allotments': 'kyc_ucc_allotment',
+      'registry-updates': 'kyc_registry_updation',
+      'ap-sharings': 'kyc_ap_sharing',
+      'demise-reports': 'kyc_demise_reporting',
+      'ap-codes': 'kyc_ap_code_exchange',
+      'communications': 'kyc_onboarding_communication',
+      'modifications': 'kyc_modification_requests',
+      'reactivations': 'kyc_reactivation_requests',
+      'closures': 'kyc_account_closure',
+      'compliance': 'kyc_exchange_compliance',
+    };
+
+    const targetTable = tableNameMap[sheet];
+    if (!targetTable) throw new Error(`Invalid sheet identifier: ${sheet}`);
+
+    if ((access.role === 'employee' || access.role === 'hod') && access.branchId) {
+      const { data: mismatchRows, error: checkError } = await client
+        .from(targetTable)
+        .select('id')
+        .in('id', ids)
+        .neq('branch_id', access.branchId);
+
+      if (checkError) throw new Error(checkError.message);
+      if (mismatchRows && mismatchRows.length > 0) {
+        throw new Error('Unauthorized: One or more selected records belong to another branch.');
+      }
+    }
+
+    const safeUpdates: any = {};
+
+    if (updates.status !== undefined) {
+      safeUpdates.status = String(updates.status).trim();
+      
+      if (sheet === 'new-accounts' && safeUpdates.status === 'Verified') {
+        safeUpdates.verified_by = access.role === 'hod' ? 'KYC HOD' : 'KYC Employee';
+        safeUpdates.verification_date = new Date().toISOString().split('T')[0];
+      }
+    }
+
+    if (sheet === 'new-accounts') {
+      if (updates.pan_copy !== undefined) safeUpdates.pan_copy = !!updates.pan_copy;
+      if (updates.aadhaar_copy !== undefined) safeUpdates.aadhaar_copy = !!updates.aadhaar_copy;
+      if (updates.bank_proof !== undefined) safeUpdates.bank_proof = !!updates.bank_proof;
+      if (updates.photograph !== undefined) safeUpdates.photograph = !!updates.photograph;
+      if (updates.signature !== undefined) safeUpdates.signature = !!updates.signature;
+    }
+
+    if (Object.keys(safeUpdates).length === 0) {
+      throw new Error('No valid update properties provided.');
+    }
+
+    const { data, error } = await client
+      .from(targetTable)
+      .update(safeUpdates)
+      .in('id', ids)
+      .select();
+
+    if (error) throw new Error(`Database error during bulk update: ${error.message}`);
+    return data;
   }
 }

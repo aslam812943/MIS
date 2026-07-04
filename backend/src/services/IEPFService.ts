@@ -379,10 +379,7 @@ export class IEPFService {
     return result;
   }
 
-  /**
-   * Fetches dashboard statistics and graphs aggregations for HODs and Executives.
-   */
-  async getDashboardData(requesterId: string): Promise<any> {
+  async getDashboardData(requesterId: string, branchIdFilter?: string, startDate?: string, endDate?: string): Promise<any> {
     const client = supabaseAdmin;
     if (!client) {
       throw new Error('Supabase admin client is not configured.');
@@ -393,12 +390,26 @@ export class IEPFService {
       throw new Error('Unauthorized.');
     }
 
-    // Load all claims to calculate metrics in memory
+    // Load claims based on filters
     let query = client.from('iepf_claims').select('*');
-    if (access.role === 'employee' || access.role === 'hod') {
-      if (access.branchId) {
-        query = query.eq('branch_id', access.branchId);
-      }
+    
+    let targetBranchId: string | undefined = branchIdFilter;
+    if (access.role === 'employee') {
+      targetBranchId = access.branchId || undefined;
+    }
+
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (startDate && !dateRegex.test(startDate)) throw new Error('Invalid start date format (YYYY-MM-DD).');
+    if (endDate && !dateRegex.test(endDate)) throw new Error('Invalid end date format (YYYY-MM-DD).');
+
+    if (targetBranchId) {
+      query = query.eq('branch_id', targetBranchId);
+    }
+    if (startDate) {
+      query = query.gte('created_at', startDate);
+    }
+    if (endDate) {
+      query = query.lte('created_at', `${endDate}T23:59:59.999Z`);
     }
 
     const { data: claims, error } = await query;

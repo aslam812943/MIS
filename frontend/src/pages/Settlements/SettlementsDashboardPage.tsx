@@ -41,12 +41,14 @@ const IconCorporate = () => (
 const SettlementsDashboardPage: React.FC = () => {
   const currentUser = authService.getCurrentUser();
   const isAdmin = currentUser?.role === 'admin';
-  const hasMultiBranchAccess = isAdmin || ['ceo', 'managing_director', 'director', 'executive'].includes(currentUser?.role || '');
+  const hasMultiBranchAccess = isAdmin || ['ceo', 'managing_director', 'director', 'executive', 'hod'].includes(currentUser?.role || '');
   const userBranchId = currentUser?.branch_id || '';
 
   const [stats, setStats] = useState<any>(null);
   const [branches, setBranches] = useState<any[]>([]);
   const [branchFilter, setBranchFilter] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -66,7 +68,7 @@ const SettlementsDashboardPage: React.FC = () => {
 
   useEffect(() => {
     fetchDashboardData(true);
-  }, [branchFilter]);
+  }, [branchFilter, startDate, endDate]);
 
   const fetchBranches = async () => {
     if (!hasMultiBranchAccess) return;
@@ -84,7 +86,7 @@ const SettlementsDashboardPage: React.FC = () => {
 
     try {
       const branchIdParam = hasMultiBranchAccess ? (branchFilter || undefined) : userBranchId;
-      const data = await settlementService.getDashboardData(branchIdParam);
+      const data = await settlementService.getDashboardData(branchIdParam, startDate || undefined, endDate || undefined);
       setStats(data);
       if (!initial) {
         toast.success('Dashboard metrics updated.');
@@ -271,18 +273,46 @@ const SettlementsDashboardPage: React.FC = () => {
       <div className="mis-page mis-animate-in max-w-7xl mx-auto space-y-8">
 
         {/* ── Page Header ───────────────────────────────────── */}
-        <header className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+        <header 
+          className="flex flex-col lg:flex-row justify-between lg:items-center gap-6 p-6 border rounded-xl shadow-xs text-left" 
+          style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
+        >
           <div>
-            <h1 className="mis-page-title mis-page-title-accent">Clearing & Settlements Analytics</h1>
-            <p className="mis-page-desc">Overview of daily transaction volumes, client service metrics, and entitlement allocations.</p>
+            <h1 className="text-2.5xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
+              📊 Clearing & Settlements Analytics
+            </h1>
+            <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
+              Overview of daily transaction volumes, client service metrics, and entitlement allocations.
+            </p>
           </div>
           
-          <div className="flex items-center gap-3 self-end sm:self-auto">
+          <div className="flex flex-wrap items-center gap-3.5 sm:self-auto">
+            <div className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>
+              <span>From:</span>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="mis-input py-1 px-2 text-xs"
+                style={{ width: '130px', minWidth: '130px' }}
+              />
+            </div>
+            <div className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>
+              <span>To:</span>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="mis-input py-1 px-2 text-xs"
+                style={{ width: '130px', minWidth: '130px' }}
+              />
+            </div>
             {hasMultiBranchAccess && (
               <select
                 value={branchFilter}
                 onChange={(e) => setBranchFilter(e.target.value)}
-                className="mis-select text-xs py-1.5 w-44"
+                className="mis-select text-xs cursor-pointer"
+                style={{ width: '150px', minWidth: '150px', padding: '6px 12px' }}
               >
                 <option value="">All Branches</option>
                 {branches.map(b => (
@@ -294,7 +324,8 @@ const SettlementsDashboardPage: React.FC = () => {
               type="button"
               onClick={() => fetchDashboardData(false)}
               disabled={refreshing}
-              className="mis-btn mis-btn-ghost w-fit"
+              className="px-3.5 py-1.5 border rounded-lg text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center justify-center gap-1 h-[34px]"
+              style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)', minWidth: '135px' }}
             >
               {refreshing ? 'Refreshing...' : '🔄 Refresh Metrics'}
             </button>

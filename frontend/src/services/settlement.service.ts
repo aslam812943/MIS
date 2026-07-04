@@ -8,9 +8,9 @@ export const settlementService = {
   /**
    * Fetches dashboard metrics.
    */
-  getDashboardData: async (branchId?: string) => {
+  getDashboardData: async (branchId?: string, startDate?: string, endDate?: string) => {
     const response = await api.get('/admin/settlements/dashboard', {
-      params: { branchId }
+      params: { branchId, startDate, endDate }
     });
     return response.data;
   },

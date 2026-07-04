@@ -113,7 +113,7 @@ export class SettlementService {
   /**
    * Aggregates stats across all Settlement sheets
    */
-  async getDashboardStats(requesterId: string, branchIdFilter?: string): Promise<any> {
+  async getDashboardStats(requesterId: string, branchIdFilter?: string, startDate?: string, endDate?: string): Promise<any> {
     const client = supabaseAdmin;
     if (!client) throw new Error('Supabase admin client not configured.');
 
@@ -122,34 +122,47 @@ export class SettlementService {
       throw new Error('Unauthorized: Access denied.');
     }
 
-    // Branch locking logic
+    // Branch locking logic (Only lock standard employees, allow HODs to view other branch stats)
     let targetBranchId: string | undefined = branchIdFilter;
-    if (access.role === 'employee' || access.role === 'hod') {
+    if (access.role === 'employee') {
       targetBranchId = access.branchId || undefined;
     }
 
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (startDate && !dateRegex.test(startDate)) throw new Error('Invalid start date format (YYYY-MM-DD).');
+    if (endDate && !dateRegex.test(endDate)) throw new Error('Invalid end date format (YYYY-MM-DD).');
+
+    // Helper to apply filters to any query
+    const applyFilters = <T extends any>(baseQuery: T): T => {
+      let q: any = baseQuery;
+      if (targetBranchId) q = q.eq('branch_id', targetBranchId);
+      if (startDate) q = q.gte('created_at', startDate);
+      if (endDate) q = q.lte('created_at', `${endDate}T23:59:59.999Z`);
+      return q;
+    };
+
     // 1. Pay-in/Pay-out Stats
-    let ppQuery = client.from('settlement_payin_payout').select('buy_sell, quantity, shortage_qty, status');
-    if (targetBranchId) ppQuery = ppQuery.eq('branch_id', targetBranchId);
-    const { data: ppData, error: ppError } = await ppQuery;
+    const { data: ppData, error: ppError } = await applyFilters(
+      client.from('settlement_payin_payout').select('buy_sell, quantity, shortage_qty, status')
+    );
     if (ppError) throw new Error(`Error fetching Pay-in stats: ${ppError.message}`);
 
     // 2. Client Requests Stats
-    let crQuery = client.from('settlement_client_requests').select('status, date_received, request_type');
-    if (targetBranchId) crQuery = crQuery.eq('branch_id', targetBranchId);
-    const { data: crData, error: crError } = await crQuery;
+    const { data: crData, error: crError } = await applyFilters(
+      client.from('settlement_client_requests').select('status, date_received, request_type')
+    );
     if (crError) throw new Error(`Error fetching Client Request stats: ${crError.message}`);
 
     // 3. IPO Allocation Stats
-    let ipoQuery = client.from('settlement_ipo_allocation').select('status, applied_qty, allotted_qty');
-    if (targetBranchId) ipoQuery = ipoQuery.eq('branch_id', targetBranchId);
-    const { data: ipoData, error: ipoError } = await ipoQuery;
+    const { data: ipoData, error: ipoError } = await applyFilters(
+      client.from('settlement_ipo_allocation').select('status, applied_qty, allotted_qty')
+    );
     if (ipoError) throw new Error(`Error fetching IPO stats: ${ipoError.message}`);
 
     // 4. Corporate Action Stats
-    let caQuery = client.from('settlement_corporate_actions').select('corporate_action, eligible, entitlement_amt_qty');
-    if (targetBranchId) caQuery = caQuery.eq('branch_id', targetBranchId);
-    const { data: caData, error: caError } = await caQuery;
+    const { data: caData, error: caError } = await applyFilters(
+      client.from('settlement_corporate_actions').select('corporate_action, eligible, entitlement_amt_qty')
+    );
     if (caError) throw new Error(`Error fetching Corporate Action stats: ${caError.message}`);
 
     // PP Aggregates
