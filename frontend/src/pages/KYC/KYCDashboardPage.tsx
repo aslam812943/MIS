@@ -43,12 +43,14 @@ const KYCDashboardPage: React.FC = () => {
   const currentUser = authService.getCurrentUser();
   const { theme } = useTheme();
   const isAdmin = currentUser?.role === 'admin';
-  const hasMultiBranchAccess = isAdmin || ['ceo', 'managing_director', 'director', 'executive'].includes(currentUser?.role || '');
+  const hasMultiBranchAccess = isAdmin || ['ceo', 'managing_director', 'director', 'executive', 'hod'].includes(currentUser?.role || '');
   const userBranchId = currentUser?.branch_id || '';
 
   const [stats, setStats] = useState<any>(null);
   const [branches, setBranches] = useState<any[]>([]);
   const [branchFilter, setBranchFilter] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -68,7 +70,7 @@ const KYCDashboardPage: React.FC = () => {
 
   useEffect(() => {
     fetchDashboardData(true);
-  }, [branchFilter]);
+  }, [branchFilter, startDate, endDate]);
 
   const fetchBranches = async () => {
     if (!hasMultiBranchAccess) return;
@@ -86,7 +88,7 @@ const KYCDashboardPage: React.FC = () => {
 
     try {
       const branchIdParam = hasMultiBranchAccess ? (branchFilter || undefined) : userBranchId;
-      const data = await kycService.getDashboardData(branchIdParam);
+      const data = await kycService.getDashboardData(branchIdParam, startDate || undefined, endDate || undefined);
       setStats(data);
       if (!initial) {
         toast.success('Metrics refreshed successfully.');
@@ -282,12 +284,32 @@ const KYCDashboardPage: React.FC = () => {
             </p>
           </div>
 
-          <div className="flex items-center gap-3 self-end sm:self-auto">
+          <div className="flex flex-wrap items-center gap-3 self-end sm:self-auto">
+            <div className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>
+              <span>From:</span>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="mis-input py-1 px-2 text-xs"
+                style={{ width: '130px' }}
+              />
+            </div>
+            <div className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>
+              <span>To:</span>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="mis-input py-1 px-2 text-xs"
+                style={{ width: '130px' }}
+              />
+            </div>
             {hasMultiBranchAccess && (
               <select
                 value={branchFilter}
                 onChange={(e) => setBranchFilter(e.target.value)}
-                className="mis-select w-44 text-xs"
+                className="mis-select w-44 text-xs cursor-pointer"
               >
                 <option value="">All Branches</option>
                 {branches.map(b => (

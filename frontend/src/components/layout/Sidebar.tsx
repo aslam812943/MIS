@@ -182,7 +182,7 @@ const Sidebar: React.FC = () => {
         )}
 
         {/* IEPF Department Navigation */}
-        {isIEPFUser && (
+        {(isIEPFUser || isAdmin) && (
           <>
             <span className="mis-sidebar-section-label">IEPF Department</span>
             <NavItem
@@ -196,7 +196,7 @@ const Sidebar: React.FC = () => {
 
         {showIEPFDashboard && (
           <>
-            {!isIEPFUser && <span className="mis-sidebar-section-label">IEPF Department</span>}
+            {(!isIEPFUser && !isAdmin) && <span className="mis-sidebar-section-label">IEPF Department</span>}
             <NavItem
               to={ROUTES.IEPF_DASHBOARD}
               icon={<IconIEPFDashboard />}
@@ -207,7 +207,7 @@ const Sidebar: React.FC = () => {
         )}
 
         {/* Settlements Department Navigation */}
-        {user?.department_name?.toUpperCase() === 'SETTLEMENTS' && (
+        {(user?.department_name?.toUpperCase() === 'SETTLEMENTS' || isAdmin) && (
           <>
             <span className="mis-sidebar-section-label">Settlements Department</span>
             <NavItem
@@ -221,7 +221,7 @@ const Sidebar: React.FC = () => {
 
         {(isAdmin || ['ceo', 'managing_director', 'director', 'executive'].includes(user?.role || '') || (user?.department_name?.toUpperCase() === 'SETTLEMENTS' && isHOD)) && (
           <>
-            {user?.department_name?.toUpperCase() !== 'SETTLEMENTS' && <span className="mis-sidebar-section-label">Settlements Department</span>}
+            {(user?.department_name?.toUpperCase() !== 'SETTLEMENTS' && !isAdmin) && <span className="mis-sidebar-section-label">Settlements Department</span>}
             <NavItem
               to={ROUTES.SETTLEMENTS_DASHBOARD}
               icon={<IconIEPFDashboard />}

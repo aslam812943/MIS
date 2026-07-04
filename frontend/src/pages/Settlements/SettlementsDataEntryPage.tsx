@@ -376,9 +376,10 @@ const SettlementsDataEntryPage: React.FC = () => {
             onClick={() => setSheetTab('payin_payout')}
             className={`flex-1 min-w-[120px] py-2 text-sm font-semibold rounded-md transition-all ${
               sheetTab === 'payin_payout'
-                ? 'bg-white dark:bg-slate-800 text-teal-600 dark:text-teal-400 shadow-sm'
+                ? 'text-teal-600 dark:text-teal-400 shadow-sm'
                 : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
             }`}
+            style={sheetTab === 'payin_payout' ? { background: 'var(--bg-card)', color: 'var(--accent)' } : undefined}
           >
             📊 Pay-in / Pay-out Sheet
           </button>
@@ -386,9 +387,10 @@ const SettlementsDataEntryPage: React.FC = () => {
             onClick={() => setSheetTab('client_requests')}
             className={`flex-1 min-w-[120px] py-2 text-sm font-semibold rounded-md transition-all ${
               sheetTab === 'client_requests'
-                ? 'bg-white dark:bg-slate-800 text-teal-600 dark:text-teal-400 shadow-sm'
+                ? 'text-teal-600 dark:text-teal-400 shadow-sm'
                 : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
             }`}
+            style={sheetTab === 'client_requests' ? { background: 'var(--bg-card)', color: 'var(--accent)' } : undefined}
           >
             🎫 Client Requests Sheet
           </button>
@@ -396,9 +398,10 @@ const SettlementsDataEntryPage: React.FC = () => {
             onClick={() => setSheetTab('ipo_allocation')}
             className={`flex-1 min-w-[120px] py-2 text-sm font-semibold rounded-md transition-all ${
               sheetTab === 'ipo_allocation'
-                ? 'bg-white dark:bg-slate-800 text-teal-600 dark:text-teal-400 shadow-sm'
+                ? 'text-teal-600 dark:text-teal-400 shadow-sm'
                 : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
             }`}
+            style={sheetTab === 'ipo_allocation' ? { background: 'var(--bg-card)', color: 'var(--accent)' } : undefined}
           >
             📈 IPO Allocation Sheet
           </button>
@@ -406,9 +409,10 @@ const SettlementsDataEntryPage: React.FC = () => {
             onClick={() => setSheetTab('corporate_actions')}
             className={`flex-1 min-w-[120px] py-2 text-sm font-semibold rounded-md transition-all ${
               sheetTab === 'corporate_actions'
-                ? 'bg-white dark:bg-slate-800 text-teal-600 dark:text-teal-400 shadow-sm'
+                ? 'text-teal-600 dark:text-teal-400 shadow-sm'
                 : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
             }`}
+            style={sheetTab === 'corporate_actions' ? { background: 'var(--bg-card)', color: 'var(--accent)' } : undefined}
           >
             📢 Corporate Actions Sheet
           </button>
@@ -435,9 +439,10 @@ const SettlementsDataEntryPage: React.FC = () => {
               }}
               className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${
                 activeTab === 'list'
-                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-xs'
+                  ? 'shadow-xs'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
               }`}
+              style={activeTab === 'list' ? { background: 'var(--bg-card)', color: 'var(--text-primary)' } : undefined}
             >
               📝 View Sheet Grid
             </button>
@@ -445,9 +450,10 @@ const SettlementsDataEntryPage: React.FC = () => {
               onClick={() => setActiveTab('register')}
               className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${
                 activeTab === 'register'
-                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-xs'
+                  ? 'shadow-xs'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
               }`}
+              style={activeTab === 'register' ? { background: 'var(--bg-card)', color: 'var(--text-primary)' } : undefined}
             >
               ➕ {editingId ? 'Edit Row' : 'Add New Entry'}
             </button>
@@ -468,7 +474,7 @@ const SettlementsDataEntryPage: React.FC = () => {
           <div>
             {activeTab === 'register' ? (
               /* Add/Edit Row Form */
-              <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-6 max-w-2xl mx-auto shadow-sm">
+              <div className="mis-card p-6 max-w-2xl mx-auto">
                 <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-6">
                   {editingId ? '✏️ Edit Pay-in / Pay-out Row' : '📋 Create New Pay-in / Pay-out Row'}
                 </h2>
@@ -632,7 +638,7 @@ const SettlementsDataEntryPage: React.FC = () => {
               </div>
             ) : (
               /* View Sheet Grid Tab */
-              <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-5 shadow-xs">
+              <div className="mis-card p-5">
                 
                 {/* Search & Filter Toolbar */}
                 <div className="flex flex-col sm:flex-row gap-4 mb-5">
@@ -809,7 +815,7 @@ const SettlementsDataEntryPage: React.FC = () => {
           <div>
             {activeTab === 'register' ? (
               /* Add/Edit Ticket Form */
-              <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-6 max-w-2xl mx-auto shadow-sm">
+              <div className="mis-card p-6 max-w-2xl mx-auto">
                 <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-6">
                   {editingId ? '✏️ Edit Request Ticket' : '📋 Create New Request Ticket'}
                 </h2>
@@ -943,7 +949,7 @@ const SettlementsDataEntryPage: React.FC = () => {
               </div>
             ) : (
               /* View Client Requests Sheet Grid */
-              <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-5 shadow-xs">
+              <div className="mis-card p-5">
                 
                 {/* Search & Filter Toolbar */}
                 <div className="flex flex-col sm:flex-row gap-4 mb-5">
@@ -1097,7 +1103,7 @@ const SettlementsDataEntryPage: React.FC = () => {
           <div>
             {activeTab === 'register' ? (
               /* Add/Edit IPO Row Form */
-              <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-6 max-w-2xl mx-auto shadow-sm">
+              <div className="mis-card p-6 max-w-2xl mx-auto">
                 <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-6">
                   {editingId ? '✏️ Edit IPO Allocation' : '📋 Create New IPO Allocation'}
                 </h2>
@@ -1285,7 +1291,7 @@ const SettlementsDataEntryPage: React.FC = () => {
               </div>
             ) : (
               /* View IPO Allocations Sheet Grid */
-              <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-5 shadow-xs">
+              <div className="mis-card p-5">
                 
                 {/* Search & Filter Toolbar */}
                 <div className="flex flex-col sm:flex-row gap-4 mb-5">
@@ -1445,7 +1451,7 @@ const SettlementsDataEntryPage: React.FC = () => {
           <div>
             {activeTab === 'register' ? (
               /* Add/Edit Corporate Action Form */
-              <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-6 max-w-2xl mx-auto shadow-sm">
+              <div className="mis-card p-6 max-w-2xl mx-auto">
                 <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-6">
                   {editingId ? '✏️ Edit Corporate Action' : '📋 Create New Corporate Action'}
                 </h2>
@@ -1618,7 +1624,7 @@ const SettlementsDataEntryPage: React.FC = () => {
               </div>
             ) : (
               /* View Corporate Actions Sheet Grid */
-              <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-5 shadow-xs">
+              <div className="mis-card p-5">
                 
                 {/* Search & Filter Toolbar */}
                 <div className="flex flex-col sm:flex-row gap-4 mb-5">

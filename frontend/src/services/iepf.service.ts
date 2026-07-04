@@ -30,8 +30,10 @@ export const iepfService = {
   /**
    * Fetches dashboard metrics (KPIs and graphs).
    */
-  getDashboardData: async () => {
-    const response = await api.get('/admin/iepf/dashboard');
+  getDashboardData: async (branchId?: string, startDate?: string, endDate?: string) => {
+    const response = await api.get('/admin/iepf/dashboard', {
+      params: { branchId, startDate, endDate }
+    });
     return response.data;
   },
 

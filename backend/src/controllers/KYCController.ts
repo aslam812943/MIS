@@ -71,9 +71,14 @@ export class KYCController {
   getDashboardStats = async (req: Request, res: Response): Promise<void> => {
     try {
       const requesterId = (req as any).user.id;
-      const { branchId } = req.query;
+      const { branchId, startDate, endDate } = req.query;
 
-      const stats = await this.kycService.getDashboardStats(requesterId, branchId as string);
+      const stats = await this.kycService.getDashboardStats(
+        requesterId,
+        branchId as string,
+        startDate as string,
+        endDate as string
+      );
       res.status(HttpStatus.OK).json(stats);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to retrieve stats';
@@ -540,6 +545,68 @@ export class KYCController {
       res.status(HttpStatus.OK).json(record);
     } catch (error) {
       res.status(this.getErrorStatus(error)).json({ message: error instanceof Error ? error.message : 'Error' });
+    }
+  };
+
+  bulkImport = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const requesterId = (req as any).user.id;
+      const sheet = req.params.sheet as string;
+      const { records } = req.body;
+
+      const data = await this.kycService.bulkImport(requesterId, sheet, records);
+
+      const tableNameMap: { [key: string]: string } = {
+        'new-accounts': 'kyc_new_account',
+        'ucc-allotments': 'kyc_ucc_allotment',
+        'registry-updates': 'kyc_registry_updation',
+        'ap-sharings': 'kyc_ap_sharing',
+        'demise-reports': 'kyc_demise_reporting',
+        'ap-codes': 'kyc_ap_code_exchange',
+        'communications': 'kyc_onboarding_communication',
+        'modifications': 'kyc_modification_requests',
+        'reactivations': 'kyc_reactivation_requests',
+        'closures': 'kyc_account_closure',
+        'compliance': 'kyc_exchange_compliance',
+      };
+
+      const table = tableNameMap[sheet] || 'kyc_bulk_import';
+      logAudit(req, 'INSERT', table, undefined, undefined, { imported_rows: records.length });
+
+      res.status(HttpStatus.CREATED).json({ message: `Successfully imported ${records.length} records.`, count: records.length, data });
+    } catch (error) {
+      res.status(this.getErrorStatus(error)).json({ message: error instanceof Error ? error.message : 'Error during bulk import' });
+    }
+  };
+
+  bulkUpdate = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const requesterId = (req as any).user.id;
+      const sheet = req.params.sheet as string;
+      const { ids, updates } = req.body;
+
+      const data = await this.kycService.bulkUpdate(requesterId, sheet, ids, updates);
+
+      const tableNameMap: { [key: string]: string } = {
+        'new-accounts': 'kyc_new_account',
+        'ucc-allotments': 'kyc_ucc_allotment',
+        'registry-updates': 'kyc_registry_updation',
+        'ap-sharings': 'kyc_ap_sharing',
+        'demise-reports': 'kyc_demise_reporting',
+        'ap-codes': 'kyc_ap_code_exchange',
+        'communications': 'kyc_onboarding_communication',
+        'modifications': 'kyc_modification_requests',
+        'reactivations': 'kyc_reactivation_requests',
+        'closures': 'kyc_account_closure',
+        'compliance': 'kyc_exchange_compliance',
+      };
+
+      const table = tableNameMap[sheet] || 'kyc_bulk_update';
+      logAudit(req, 'UPDATE', table, undefined, undefined, { updated_rows: ids.length, updates });
+
+      res.status(HttpStatus.OK).json({ message: `Successfully updated ${ids.length} records.`, count: ids.length, data });
+    } catch (error) {
+      res.status(this.getErrorStatus(error)).json({ message: error instanceof Error ? error.message : 'Error during bulk update' });
     }
   };
 }
