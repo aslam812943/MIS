@@ -67,6 +67,85 @@ export class DPService {
     };
   }
 
+  private validatePayload(sheet: string, payload: any) {
+    if (!payload) throw new Error('Data payload is required.');
+
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    const boIdRegex = /^\d{16}$/;
+    const isinRegex = /^[A-Z]{2}[A-Z0-9]{9}[0-9]$/;
+
+    const TABLES_WITH_CLIENTS = [
+      'new-accounts', 'ucc-updation', 'modifications', 'demat-executions',
+      'transfers-transmissions', 'demat-rejections', 'closures', 'dis-slips',
+      'amc-charges', 'monthly-statements', 'client-queries'
+    ];
+    if (TABLES_WITH_CLIENTS.includes(sheet)) {
+      if (!payload.kyc_client_id || !uuidRegex.test(payload.kyc_client_id)) {
+        throw new Error('Invalid or missing KYC Client ID reference.');
+      }
+    }
+
+    const boIdFields = ['bo_id', 'from_bo_id', 'to_bo_id', 'bo_id_generated'];
+    for (const field of boIdFields) {
+      if (payload[field] !== undefined && payload[field] !== null && String(payload[field]).trim() !== '') {
+        if (!boIdRegex.test(String(payload[field]).trim())) {
+          throw new Error(`Field ${field} must be a valid 16-digit Demat BO ID.`);
+        }
+      }
+    }
+
+    if (payload.isin !== undefined && payload.isin !== null && String(payload.isin).trim() !== '') {
+      if (!isinRegex.test(String(payload.isin).trim().toUpperCase())) {
+        throw new Error('Invalid ISIN format. Must be a standard 12-character code starting with IN.');
+      }
+    }
+
+    const numberFields = ['quantity', 'amc_amount', 'gst_amount', 'total_amount', 'file_size_kb'];
+    for (const field of numberFields) {
+      if (payload[field] !== undefined && payload[field] !== null && payload[field] !== '') {
+        const val = Number(payload[field]);
+        if (isNaN(val) || val < 0) {
+          throw new Error(`Field ${field} must be a positive number.`);
+        }
+      }
+    }
+
+    const dateFields = [
+      'verification_date', 'uploaded_to_cdsl_date', 'upload_date', 'confirmation_date',
+      'request_date', 'processed_date', 'sent_to_rta_date', 'execution_date',
+      'rejection_date', 'resubmission_date', 'closure_date', 'backup_date',
+      'debit_date', 'generated_date', 'resolution_date'
+    ];
+    for (const field of dateFields) {
+      if (payload[field] !== undefined && payload[field] !== null && String(payload[field]).trim() !== '') {
+        const val = String(payload[field]).substring(0, 10);
+        if (!dateRegex.test(val)) {
+          throw new Error(`Field ${field} must be a valid date in YYYY-MM-DD format.`);
+        }
+      }
+    }
+
+    if (payload.status !== undefined && payload.status !== null) {
+      const allowed = ['Pending', 'Uploaded', 'Completed', 'Rejected', 'Confirmed', 'Processed', 'Sent to RTA', 'Closed', 'Resubmitted', 'Executed', 'Resolved', 'Requested', 'Approved', 'Failed', 'Success', 'Verified', 'Debited', 'Waived', 'Sent', 'Bounced', 'Open', 'Action Pending', 'In Progress', 'Escalated'];
+      if (!allowed.includes(String(payload.status).trim())) {
+        throw new Error('Invalid status value.');
+      }
+    }
+
+    if (payload.exchange !== undefined && payload.exchange !== null && String(payload.exchange).trim() !== '') {
+      if (!['NSE', 'BSE'].includes(String(payload.exchange).trim())) {
+        throw new Error('Exchange must be NSE or BSE.');
+      }
+    }
+
+    if (payload.segment !== undefined && payload.segment !== null && String(payload.segment).trim() !== '') {
+      if (!['Cash', 'F&O', 'Currency', 'Commodity'].includes(String(payload.segment).trim())) {
+        throw new Error('Segment must be Cash, F&O, Currency, or Commodity.');
+      }
+    }
+  }
+
   async getVerifiedClients(): Promise<any[]> {
     const client = supabaseAdmin;
     if (!client) throw new Error('Supabase client not initialized.');
@@ -163,6 +242,8 @@ export class DPService {
     delete (payload as any).created_at;
     delete (payload as any).updated_at;
 
+    this.validatePayload(sheet, payload);
+
     const { data: result, error } = await client.from(table).insert(payload).select().single();
     if (error) throw new Error(`Insert failed: ${error.message}`);
     return result;
@@ -193,6 +274,8 @@ export class DPService {
     delete (payload as any).id;
     delete (payload as any).created_at;
     delete (payload as any).updated_at;
+
+    this.validatePayload(sheet, payload);
 
     const { data: result, error } = await client.from(table).update(payload).eq('id', id).select().single();
     if (error) throw new Error(`Update failed: ${error.message}`);
@@ -287,6 +370,8 @@ export class DPService {
       delete item.id;
       delete item.created_at;
       delete item.updated_at;
+
+      this.validatePayload(sheet, item);
       return item;
     });
 
