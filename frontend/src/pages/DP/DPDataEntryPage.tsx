@@ -147,11 +147,71 @@ const DPDataEntryPage: React.FC = () => {
     }));
   };
 
+  const validateForm = (): boolean => {
+    // 1. Client check
+    if (isClientSheet() && !formData.kyc_client_id) {
+      toast.error('Please select a verified client first.');
+      return false;
+    }
+
+    // 2. BO ID check (exactly 16 digits)
+    const boIdFields = ['bo_id', 'from_bo_id', 'to_bo_id', 'bo_id_generated'];
+    const boIdRegex = /^\d{16}$/;
+    for (const field of boIdFields) {
+      const val = formData[field];
+      if (val !== undefined && val !== null && String(val).trim() !== '') {
+        if (!boIdRegex.test(String(val).trim())) {
+          toast.error(`${field.replace(/_/g, ' ').toUpperCase()} must be exactly a 16-digit numeric BO ID.`);
+          return false;
+        }
+      }
+    }
+
+    // 3. ISIN Code check (starts with 2 characters, total 12 alphanumeric)
+    if (formData.isin !== undefined && formData.isin !== null && String(formData.isin).trim() !== '') {
+      const isinRegex = /^[A-Z]{2}[A-Z0-9]{9}[0-9]$/;
+      if (!isinRegex.test(String(formData.isin).trim().toUpperCase())) {
+        toast.error('Invalid ISIN format. Must be a 12-character code starting with 2 letters (e.g. IN1234567890).');
+        return false;
+      }
+    }
+
+    // 4. Positive numbers check
+    const numberFields = ['quantity', 'amc_amount', 'gst_amount', 'total_amount', 'file_size_kb'];
+    for (const field of numberFields) {
+      const val = formData[field];
+      if (val !== undefined && val !== null && val !== '') {
+        if (isNaN(Number(val)) || Number(val) < 0) {
+          toast.error(`${field.replace(/_/g, ' ').toUpperCase()} must be a positive number.`);
+          return false;
+        }
+      }
+    }
+
+    // 5. Valid date check
+    const dateFields = [
+      'verification_date', 'uploaded_to_cdsl_date', 'upload_date', 'confirmation_date',
+      'request_date', 'processed_date', 'sent_to_rta_date', 'execution_date',
+      'rejection_date', 'resubmission_date', 'closure_date', 'backup_date',
+      'debit_date', 'generated_date', 'resolution_date'
+    ];
+    for (const field of dateFields) {
+      const val = formData[field];
+      if (val !== undefined && val !== null && String(val).trim() !== '') {
+        if (isNaN(Date.parse(val))) {
+          toast.error(`Please select a valid date for ${field.replace(/_/g, ' ').toUpperCase()}.`);
+          return false;
+        }
+      }
+    }
+
+    return true;
+  };
+
   // CRUD actions
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isClientSheet() && !selectedClient) {
-      toast.error('Please select a verified client first.');
+    if (!validateForm()) {
       return;
     }
 
