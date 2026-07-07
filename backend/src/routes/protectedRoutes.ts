@@ -24,6 +24,8 @@ import { SettlementService } from '../services/SettlementService.js';
 import { SettlementController } from '../controllers/SettlementController.js';
 import { KYCService } from '../services/KYCService.js';
 import { KYCController } from '../controllers/KYCController.js';
+import { DPService } from '../services/DPService.js';
+import { DPController } from '../controllers/DPController.js';
 import multer from 'multer';
 
 const router = Router();
@@ -56,6 +58,9 @@ const settlementController = new SettlementController(settlementService);
 const kycService = new KYCService();
 const kycController = new KYCController(kycService);
 const kycUpload = multer({ storage: multer.memoryStorage() });
+
+const dpService = new DPService();
+const dpController = new DPController(dpService);
 
 /**
 
@@ -190,6 +195,18 @@ router.patch('/kyc/closures/:id', requireAuth, kycController.updateClosure);
 router.get('/kyc/compliance', requireAuth, kycController.getCompliances);
 router.post('/kyc/compliance', requireAuth, kycController.createCompliance);
 router.patch('/kyc/compliance/:id', requireAuth, kycController.updateCompliance);
+
+/**
+ * DP Department endpoints
+ */
+router.get('/dp/dashboard', requireAuth, dpController.getDashboardStats);
+router.get('/dp/clients', requireAuth, dpController.getVerifiedClients);
+router.get('/dp/bulk/:sheet', requireAuth, dpController.bulkImport);
+router.patch('/dp/bulk/:sheet', requireAuth, dpController.bulkUpdate);
+router.get('/dp/:sheet', requireAuth, dpController.getEntries);
+router.post('/dp/:sheet', requireAuth, dpController.createEntry);
+router.patch('/dp/:sheet/:id', requireAuth, dpController.updateEntry);
+router.delete('/dp/:sheet/:id', requireAuth, dpController.deleteEntry);
 
 /**
  * Audit Log endpoints

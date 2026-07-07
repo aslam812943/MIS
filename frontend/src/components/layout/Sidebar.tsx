@@ -125,6 +125,8 @@ const Sidebar: React.FC = () => {
   const isKYCUser = user?.department_name?.toUpperCase() === 'KYC';
   const showKYCDashboard = isAdmin || ['ceo', 'managing_director', 'director', 'executive'].includes(user?.role || '') || (isKYCUser && isHOD);
 
+  const isDPUser = user?.department_name?.toUpperCase() === 'DP';
+  const showDPDashboard = isAdmin || ['ceo', 'managing_director', 'director', 'executive'].includes(user?.role || '') || (isDPUser && isHOD);
 
   const closeOnMobile = () => setSidebarOpen(false);
 
@@ -251,6 +253,31 @@ const Sidebar: React.FC = () => {
               to={ROUTES.KYC_DASHBOARD}
               icon={<IconIEPFDashboard />}
               label="KYC Dashboard"
+              onClick={closeOnMobile}
+            />
+          </>
+        )}
+
+        {/* DP Department Navigation */}
+        {(isDPUser || isAdmin) && (
+          <>
+            <span className="mis-sidebar-section-label">DP Department</span>
+            <NavItem
+              to={ROUTES.DP_DATA_ENTRY}
+              icon={<IconIEPFEntry />}
+              label="DP Entry"
+              onClick={closeOnMobile}
+            />
+          </>
+        )}
+
+        {showDPDashboard && (
+          <>
+            {(!isDPUser && !isAdmin) && <span className="mis-sidebar-section-label">DP Department</span>}
+            <NavItem
+              to={ROUTES.DP_DASHBOARD}
+              icon={<IconIEPFDashboard />}
+              label="DP Dashboard"
               onClick={closeOnMobile}
             />
           </>
