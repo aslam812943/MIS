@@ -11,6 +11,8 @@ import SettlementsDataEntryPage from './pages/Settlements/SettlementsDataEntryPa
 import SettlementsDashboardPage from './pages/Settlements/SettlementsDashboardPage';
 import KYCDataEntryPage from './pages/KYC/KYCDataEntryPage';
 import KYCDashboardPage from './pages/KYC/KYCDashboardPage';
+import DPDataEntryPage from './pages/DP/DPDataEntryPage';
+import DPDashboardPage from './pages/DP/DPDashboardPage';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 
 import { ROUTES } from './constants/routes';
@@ -123,6 +125,24 @@ function App() {
           element={
             <ProtectedRoute>
               <KYCDashboardPage />
+            </ProtectedRoute>
+          } 
+        />
+
+        <Route 
+          path={ROUTES.DP_DATA_ENTRY} 
+          element={
+            <ProtectedRoute>
+              <DPDataEntryPage />
+            </ProtectedRoute>
+          } 
+        />
+
+        <Route 
+          path={ROUTES.DP_DASHBOARD} 
+          element={
+            <ProtectedRoute>
+              <DPDashboardPage />
             </ProtectedRoute>
           } 
         />

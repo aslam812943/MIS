@@ -1,0 +1,412 @@
+import { supabaseAdmin } from '../config/supabase.js';
+
+const SHEET_TABLE_MAPPING: { [key: string]: string } = {
+  'new-accounts': 'dp_new_account',
+  'ucc-updation': 'dp_ucc_updation',
+  'modifications': 'dp_modification',
+  'demat-executions': 'dp_demat_execution',
+  'transfers-transmissions': 'dp_transfers_transmissions',
+  'demat-rejections': 'dp_demat_rejection',
+  'closures': 'dp_closure_execution',
+  'dis-slips': 'dp_dis_slip_upload',
+  'back-office-updates': 'dp_back_office_update',
+  'eod-backups': 'dp_eod_backup',
+  'amc-charges': 'dp_amc_charges',
+  'monthly-statements': 'dp_monthly_statements',
+  'audit-compliance': 'dp_audit_compliance',
+  'client-queries': 'dp_client_queries'
+};
+
+const TABLES_WITH_CLIENTS = [
+  'dp_new_account',
+  'dp_ucc_updation',
+  'dp_modification',
+  'dp_demat_execution',
+  'dp_transfers_transmissions',
+  'dp_demat_rejection',
+  'dp_closure_execution',
+  'dp_dis_slip_upload',
+  'dp_amc_charges',
+  'dp_monthly_statements',
+  'dp_client_queries'
+];
+
+export class DPService {
+  async verifyAccess(userId: string, requiresDashboard = false): Promise<{ authorized: boolean; role?: string; branchId?: string; departmentId?: string }> {
+    const client = supabaseAdmin;
+    if (!client) return { authorized: false };
+
+    const { data: profile, error } = await client
+      .from('profiles')
+      .select('role, branch_id, department_id, departments(name)')
+      .eq('id', userId)
+      .single();
+
+    if (error || !profile) return { authorized: false };
+
+    const role = profile.role;
+    const branchId = profile.branch_id;
+    const departmentId = profile.department_id;
+    const departmentName = (profile.departments as any)?.name || '';
+
+    const isAdminOrMgmt = role === 'admin' || ['ceo', 'managing_director', 'director', 'executive'].includes(role);
+    const isDPDept = departmentName.toUpperCase() === 'DP';
+
+    let isAuthorized = false;
+    if (requiresDashboard) {
+      isAuthorized = isAdminOrMgmt || (isDPDept && role === 'hod');
+    } else {
+      isAuthorized = isAdminOrMgmt || isDPDept;
+    }
+
+    return {
+      authorized: isAuthorized,
+      role,
+      branchId,
+      departmentId
+    };
+  }
+
+  async getVerifiedClients(): Promise<any[]> {
+    const client = supabaseAdmin;
+    if (!client) throw new Error('Supabase client not initialized.');
+    
+    const { data, error } = await client
+      .from('kyc_new_account')
+      .select('id, applicant_name, pan, aadhaar_number, mobile_number, email, date_of_birth, address')
+      .eq('status', 'Verified')
+      .order('applicant_name', { ascending: true });
+
+    if (error) throw new Error(`Failed to load verified clients: ${error.message}`);
+    return data || [];
+  }
+
+  async getEntries(
+    requesterId: string,
+    sheet: string,
+    branchIdFilter?: string,
+    search?: string,
+    startDate?: string,
+    endDate?: string
+  ): Promise<any[]> {
+    const client = supabaseAdmin;
+    if (!client) throw new Error('Supabase client not initialized.');
+
+    const access = await this.verifyAccess(requesterId);
+    if (!access.authorized) throw new Error('Unauthorized.');
+
+    const table = SHEET_TABLE_MAPPING[sheet];
+    if (!table) throw new Error('Invalid sheet identifier.');
+
+    let targetBranchId: string | undefined = branchIdFilter;
+    if (access.role === 'employee') {
+      targetBranchId = access.branchId || undefined;
+    }
+
+    const hasClient = TABLES_WITH_CLIENTS.includes(table);
+    let selectString = '*';
+    if (hasClient) {
+      selectString = '*, kyc_new_account(applicant_name, pan, aadhaar_number, mobile_number, email, date_of_birth, address)';
+    }
+
+    let query = client.from(table).select(selectString);
+
+    if (targetBranchId) {
+      query = query.eq('branch_id', targetBranchId);
+    }
+    if (startDate) {
+      query = query.gte('created_at', startDate);
+    }
+    if (endDate) {
+      query = query.lte('created_at', `${endDate}T23:59:59.999Z`);
+    }
+
+    if (search && hasClient) {
+      const { data: matchingClients } = await client
+        .from('kyc_new_account')
+        .select('id')
+        .or(`applicant_name.ilike.%${search}%,pan.ilike.%${search}%`);
+      
+      const ids = (matchingClients || []).map(c => c.id);
+      if (ids.length > 0) {
+        query = query.in('kyc_client_id', ids);
+      } else {
+        query = query.eq('id', '00000000-0000-0000-0000-000000000000');
+      }
+    }
+
+    const { data, error } = await query.order('created_at', { ascending: false });
+    if (error) throw new Error(`Query failed: ${error.message}`);
+    return data || [];
+  }
+
+  async createEntry(requesterId: string, sheet: string, data: any): Promise<any> {
+    const client = supabaseAdmin;
+    if (!client) throw new Error('Supabase client not initialized.');
+
+    const access = await this.verifyAccess(requesterId);
+    if (!access.authorized) throw new Error('Unauthorized.');
+
+    const table = SHEET_TABLE_MAPPING[sheet];
+    if (!table) throw new Error('Invalid sheet mapping.');
+
+    const branchId = access.role === 'employee' ? access.branchId : (data.branch_id || access.branchId);
+
+    const payload = {
+      ...data,
+      branch_id: branchId,
+      created_by: requesterId
+    };
+
+    delete (payload as any).kyc_new_account;
+    delete (payload as any).id;
+    delete (payload as any).created_at;
+    delete (payload as any).updated_at;
+
+    const { data: result, error } = await client.from(table).insert(payload).select().single();
+    if (error) throw new Error(`Insert failed: ${error.message}`);
+    return result;
+  }
+
+  async updateEntry(requesterId: string, sheet: string, id: string, updates: any): Promise<any> {
+    const client = supabaseAdmin;
+    if (!client) throw new Error('Supabase client not initialized.');
+
+    const access = await this.verifyAccess(requesterId);
+    if (!access.authorized) throw new Error('Unauthorized.');
+
+    const table = SHEET_TABLE_MAPPING[sheet];
+    if (!table) throw new Error('Invalid sheet mapping.');
+
+    let query = client.from(table).select('id, branch_id').eq('id', id).single();
+    const { data: record, error: fetchError } = await query;
+    if (fetchError || !record) throw new Error('Record not found.');
+
+    if (access.role === 'employee' && access.branchId && record.branch_id !== access.branchId) {
+      throw new Error('Unauthorized branch access.');
+    }
+
+    const payload = { ...updates };
+    delete (payload as any).kyc_new_account;
+    delete (payload as any).branch_id;
+    delete (payload as any).created_by;
+    delete (payload as any).id;
+    delete (payload as any).created_at;
+    delete (payload as any).updated_at;
+
+    const { data: result, error } = await client.from(table).update(payload).eq('id', id).select().single();
+    if (error) throw new Error(`Update failed: ${error.message}`);
+    return result;
+  }
+
+  async deleteEntry(requesterId: string, sheet: string, id: string): Promise<void> {
+    const client = supabaseAdmin;
+    if (!client) throw new Error('Supabase client not initialized.');
+
+    const access = await this.verifyAccess(requesterId);
+    if (!access.authorized) throw new Error('Unauthorized.');
+
+    const table = SHEET_TABLE_MAPPING[sheet];
+    if (!table) throw new Error('Invalid sheet mapping.');
+
+    const { data: record, error: fetchError } = await client.from(table).select('branch_id').eq('id', id).single();
+    if (fetchError || !record) throw new Error('Record not found.');
+
+    if (access.role === 'employee' && access.branchId && record.branch_id !== access.branchId) {
+      throw new Error('Unauthorized branch access.');
+    }
+
+    const { error } = await client.from(table).delete().eq('id', id);
+    if (error) throw new Error(`Delete failed: ${error.message}`);
+  }
+
+  async bulkUpdate(requesterId: string, sheet: string, ids: string[], updates: any): Promise<any> {
+    const client = supabaseAdmin;
+    if (!client) throw new Error('Supabase client not initialized.');
+
+    const access = await this.verifyAccess(requesterId);
+    if (!access.authorized) throw new Error('Unauthorized.');
+
+    const table = SHEET_TABLE_MAPPING[sheet];
+    if (!table) throw new Error('Invalid sheet mapping.');
+
+    if ((access.role === 'employee' || access.role === 'hod') && access.branchId) {
+      const { data: mismatchRows } = await client
+        .from(table)
+        .select('id')
+        .in('id', ids)
+        .neq('branch_id', access.branchId);
+      if (mismatchRows && mismatchRows.length > 0) {
+        throw new Error('Unauthorized: Selected records contain rows outside your branch.');
+      }
+    }
+
+    const safeUpdates: any = {};
+    if (updates.status !== undefined) safeUpdates.status = String(updates.status).trim();
+    if (sheet === 'new-accounts') {
+      if (updates.pan_copy !== undefined) safeUpdates.pan_copy = !!updates.pan_copy;
+      if (updates.aadhaar_copy !== undefined) safeUpdates.aadhaar_copy = !!updates.aadhaar_copy;
+      if (updates.bank_proof !== undefined) safeUpdates.bank_proof = !!updates.bank_proof;
+      if (updates.photograph !== undefined) safeUpdates.photograph = !!updates.photograph;
+      if (updates.signature !== undefined) safeUpdates.signature = !!updates.signature;
+    }
+
+    const { data, error } = await client.from(table).update(safeUpdates).in('id', ids).select();
+    if (error) throw new Error(`Bulk update failed: ${error.message}`);
+    return data;
+  }
+
+  async bulkImport(requesterId: string, sheet: string, records: any[]): Promise<any> {
+    const client = supabaseAdmin;
+    if (!client) throw new Error('Supabase client not initialized.');
+
+    const access = await this.verifyAccess(requesterId);
+    if (!access.authorized) throw new Error('Unauthorized.');
+
+    const table = SHEET_TABLE_MAPPING[sheet];
+    if (!table) throw new Error('Invalid sheet mapping.');
+
+    if (!Array.isArray(records)) throw new Error('Records must be an array.');
+    if (records.length > 500) throw new Error('Bulk import limit exceeded (500 records max).');
+
+    const defaultBranchId = access.branchId;
+
+    const validatedRecords = records.map((row: any) => {
+      const branchId = access.role === 'employee' ? defaultBranchId : (row.branch_id || defaultBranchId);
+      if ((access.role === 'employee' || access.role === 'hod') && defaultBranchId && branchId !== defaultBranchId) {
+        throw new Error('Unauthorized: Row contains foreign branch ID.');
+      }
+
+      const item: any = {
+        ...row,
+        branch_id: branchId,
+        created_by: requesterId
+      };
+
+      delete item.kyc_new_account;
+      delete item.id;
+      delete item.created_at;
+      delete item.updated_at;
+      return item;
+    });
+
+    const { data, error } = await client.from(table).insert(validatedRecords).select();
+    if (error) throw new Error(`Bulk insert failed: ${error.message}`);
+    return data;
+  }
+
+  async getDashboardStats(
+    requesterId: string,
+    branchIdFilter?: string,
+    startDate?: string,
+    endDate?: string
+  ): Promise<any> {
+    const client = supabaseAdmin;
+    if (!client) throw new Error('Supabase client not initialized.');
+
+    const access = await this.verifyAccess(requesterId, true);
+    if (!access.authorized) throw new Error('Unauthorized dashboard access.');
+
+    let targetBranchId: string | undefined = branchIdFilter;
+    if (access.role === 'employee') {
+      targetBranchId = access.branchId || undefined;
+    }
+
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (startDate && !dateRegex.test(startDate)) throw new Error('Invalid start date format.');
+    if (endDate && !dateRegex.test(endDate)) throw new Error('Invalid end date format.');
+
+    const applyFilters = <T extends any>(query: T): T => {
+      let q: any = query;
+      if (targetBranchId) q = q.eq('branch_id', targetBranchId);
+      if (startDate) q = q.gte('created_at', startDate);
+      if (endDate) q = q.lte('created_at', `${endDate}T23:59:59.999Z`);
+      return q;
+    };
+
+    // Query 1: New Accounts
+    const { data: newAccounts } = await applyFilters(
+      client.from('dp_new_account').select('status, created_at')
+    );
+
+    // Query 2: Modifications
+    const { data: modifications } = await applyFilters(
+      client.from('dp_modification').select('status')
+    );
+
+    // Query 3: Demat Executions
+    const { data: dematExecs } = await applyFilters(
+      client.from('dp_demat_execution').select('status')
+    );
+
+    // Query 4: DIS Slips
+    const { data: disSlips } = await applyFilters(
+      client.from('dp_dis_slip_upload').select('scan_upload_status')
+    );
+
+    // Query 5: Client Queries
+    const { data: queries } = await applyFilters(
+      client.from('dp_client_queries').select('status, query_type')
+    );
+
+    // Query 6: Audits
+    const { data: audits } = await applyFilters(
+      client.from('dp_audit_compliance').select('status')
+    );
+
+    // Aggregates
+    const accountsCount = (newAccounts || []).length;
+    const pendingModifications = (modifications || []).filter(m => m.status === 'Pending').length;
+    const completedDemats = (dematExecs || []).filter(d => d.status === 'Confirmed').length;
+    const activeQueries = (queries || []).filter(q => q.status === 'Open' || q.status === 'In Progress').length;
+    const openAudits = (audits || []).filter(a => a.status === 'Open' || a.status === 'Action Pending').length;
+
+    // Line trends: Account openings over the months
+    const monthlyCounts = Array(12).fill(0);
+    (newAccounts || []).forEach(acc => {
+      if (acc.created_at) {
+        const monthIndex = new Date(acc.created_at).getMonth();
+        if (monthIndex >= 0 && monthIndex < 12) monthlyCounts[monthIndex]++;
+      }
+    });
+
+    // Donut chart: DIS scans upload status
+    const disStatus = { Uploaded: 0, Pending: 0, Failed: 0 };
+    (disSlips || []).forEach(dis => {
+      const status = dis.scan_upload_status as keyof typeof disStatus;
+      if (status in disStatus) disStatus[status]++;
+    });
+
+    // Bar chart: Query distribution by type
+    const queryTypes: { [key: string]: number } = {
+      'Delayed Transfer': 0,
+      'AMC Issue': 0,
+      'Account Details': 0,
+      'Document Status': 0,
+      'Other': 0
+    };
+    (queries || []).forEach(q => {
+      const type = q.query_type;
+      if (type && type in queryTypes) {
+        const key = type as keyof typeof queryTypes;
+        queryTypes[key] = (queryTypes[key] || 0) + 1;
+      }
+    });
+
+    return {
+      kpis: {
+        totalAccounts: accountsCount,
+        pendingModifications,
+        completedDemats,
+        activeQueries,
+        openAudits
+      },
+      charts: {
+        accountOpenings: monthlyCounts,
+        disUploadStatus: [disStatus.Uploaded, disStatus.Pending, disStatus.Failed],
+        queryTypes: Object.values(queryTypes),
+        queryLabels: Object.keys(queryTypes)
+      }
+    };
+  }
+}

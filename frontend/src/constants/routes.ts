@@ -15,6 +15,8 @@ export const ROUTES = {
   SETTLEMENTS_DASHBOARD: '/settlements-dashboard',
   KYC_DATA_ENTRY: '/kyc-entry',
   KYC_DASHBOARD: '/kyc-dashboard',
+  DP_DATA_ENTRY: '/dp-entry',
+  DP_DASHBOARD: '/dp-dashboard',
   ROOT: '/',
 } as const;
 
