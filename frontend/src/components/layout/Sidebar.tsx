@@ -128,6 +128,9 @@ const Sidebar: React.FC = () => {
   const isDPUser = user?.department_name?.toUpperCase() === 'DP';
   const showDPDashboard = isAdmin || ['ceo', 'managing_director', 'director', 'executive'].includes(user?.role || '') || (isDPUser && isHOD);
 
+  const isITUser = user?.department_name?.toUpperCase() === 'IT';
+  const showITDashboard = isAdmin || ['ceo', 'managing_director', 'director', 'executive'].includes(user?.role || '') || (isITUser && isHOD);
+
   const closeOnMobile = () => setSidebarOpen(false);
 
   const initials = user?.full_name
@@ -278,6 +281,31 @@ const Sidebar: React.FC = () => {
               to={ROUTES.DP_DASHBOARD}
               icon={<IconIEPFDashboard />}
               label="DP Dashboard"
+              onClick={closeOnMobile}
+            />
+          </>
+        )}
+
+        {/* IT Department Navigation */}
+        {(isITUser || isAdmin) && (
+          <>
+            <span className="mis-sidebar-section-label">IT Department</span>
+            <NavItem
+              to={ROUTES.IT_DATA_ENTRY}
+              icon={<IconIEPFEntry />}
+              label="IT Entry"
+              onClick={closeOnMobile}
+            />
+          </>
+        )}
+
+        {showITDashboard && (
+          <>
+            {(!isITUser && !isAdmin) && <span className="mis-sidebar-section-label">IT Department</span>}
+            <NavItem
+              to={ROUTES.IT_DASHBOARD}
+              icon={<IconIEPFDashboard />}
+              label="IT Dashboard"
               onClick={closeOnMobile}
             />
           </>

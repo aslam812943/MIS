@@ -26,6 +26,8 @@ import { KYCService } from '../services/KYCService.js';
 import { KYCController } from '../controllers/KYCController.js';
 import { DPService } from '../services/DPService.js';
 import { DPController } from '../controllers/DPController.js';
+import { ITService } from '../services/ITService.js';
+import { ITController } from '../controllers/ITController.js';
 import multer from 'multer';
 
 const router = Router();
@@ -61,6 +63,9 @@ const kycUpload = multer({ storage: multer.memoryStorage() });
 
 const dpService = new DPService();
 const dpController = new DPController(dpService);
+
+const itService = new ITService();
+const itController = new ITController(itService);
 
 /**
 
@@ -207,6 +212,18 @@ router.get('/dp/:sheet', requireAuth, dpController.getEntries);
 router.post('/dp/:sheet', requireAuth, dpController.createEntry);
 router.patch('/dp/:sheet/:id', requireAuth, dpController.updateEntry);
 router.delete('/dp/:sheet/:id', requireAuth, dpController.deleteEntry);
+
+/**
+ * IT Department endpoints
+ */
+router.get('/it/dashboard', requireAuth, itController.getDashboardStats);
+router.get('/it/dropdown/vendors', requireAuth, itController.getVendorsDropdown);
+router.get('/it/bulk/:sheet', requireAuth, itController.bulkImport);
+router.patch('/it/bulk/:sheet', requireAuth, itController.bulkUpdate);
+router.get('/it/:sheet', requireAuth, itController.getEntries);
+router.post('/it/:sheet', requireAuth, itController.createEntry);
+router.patch('/it/:sheet/:id', requireAuth, itController.updateEntry);
+router.delete('/it/:sheet/:id', requireAuth, itController.deleteEntry);
 
 /**
  * Audit Log endpoints

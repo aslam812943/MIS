@@ -13,6 +13,8 @@ import KYCDataEntryPage from './pages/KYC/KYCDataEntryPage';
 import KYCDashboardPage from './pages/KYC/KYCDashboardPage';
 import DPDataEntryPage from './pages/DP/DPDataEntryPage';
 import DPDashboardPage from './pages/DP/DPDashboardPage';
+import ITDataEntryPage from './pages/IT/ITDataEntryPage';
+import ITDashboardPage from './pages/IT/ITDashboardPage';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 
 import { ROUTES } from './constants/routes';
@@ -143,6 +145,24 @@ function App() {
           element={
             <ProtectedRoute>
               <DPDashboardPage />
+            </ProtectedRoute>
+          } 
+        />
+
+        <Route 
+          path={ROUTES.IT_DATA_ENTRY} 
+          element={
+            <ProtectedRoute>
+              <ITDataEntryPage />
+            </ProtectedRoute>
+          } 
+        />
+
+        <Route 
+          path={ROUTES.IT_DASHBOARD} 
+          element={
+            <ProtectedRoute>
+              <ITDashboardPage />
             </ProtectedRoute>
           } 
         />
