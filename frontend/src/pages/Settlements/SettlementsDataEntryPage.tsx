@@ -54,6 +54,14 @@ const INITIAL_CORP_STATE = {
   branch_id: '',
 };
 
+interface VerifiedClient {
+  id: string;
+  applicant_name: string;
+  pan: string;
+  mobile_number?: string;
+  email?: string;
+}
+
 const SettlementsDataEntryPage: React.FC = () => {
   // Authentication & Branch Checking
   const currentUser = authService.getCurrentUser();
@@ -76,6 +84,11 @@ const SettlementsDataEntryPage: React.FC = () => {
   const [fetching, setFetching] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
+  // KYC verified client lookup
+  const [kycClients, setKycClients] = useState<VerifiedClient[]>([]);
+  const [clientSearchText, setClientSearchText] = useState('');
+  const [clientDropdownOpen, setClientDropdownOpen] = useState(false);
+
   // Filters
   const [statusFilter, setStatusFilter] = useState('');
   const [branchFilter, setBranchFilter] = useState('');
@@ -85,6 +98,7 @@ const SettlementsDataEntryPage: React.FC = () => {
 
   useEffect(() => {
     fetchBranches();
+    fetchKycClients();
   }, []);
 
   // Adapt state and filters when switching sheet tabs
@@ -94,8 +108,9 @@ const SettlementsDataEntryPage: React.FC = () => {
     setStatusFilter('');
     setBranchFilter('');
     setSearchTerm('');
+    setClientSearchText('');
     setRecords([]); // Clear records immediately to prevent cross-tab render crashes!
-    
+
     if (sheetTab === 'payin_payout') {
       setFormData({
         ...INITIAL_PAYIN_STATE,
@@ -181,6 +196,63 @@ const SettlementsDataEntryPage: React.FC = () => {
       [fieldName]: value,
     }));
   };
+
+  const fetchKycClients = async () => {
+    try {
+      const data = await settlementService.getVerifiedClients();
+      setKycClients(data || []);
+    } catch (err) {
+      console.error('Failed to load verified clients:', err);
+    }
+  };
+
+  const filteredKycClients = kycClients.filter((c) =>
+    c.applicant_name.toLowerCase().includes(clientSearchText.toLowerCase()) ||
+    c.pan.toLowerCase().includes(clientSearchText.toLowerCase())
+  );
+
+  const handleKycClientSelect = (client: VerifiedClient) => {
+    setClientSearchText(client.applicant_name);
+    setClientDropdownOpen(false);
+    handleInputChange('client_name', client.applicant_name);
+  };
+
+  const renderClientNameField = () => (
+    <div className="mis-field relative">
+      <label className="mis-label">Client Name</label>
+      <input
+        type="text"
+        value={clientSearchText}
+        onChange={(e) => {
+          const val = e.target.value;
+          setClientSearchText(val);
+          setClientDropdownOpen(true);
+          // Allow free typing to still land in the form field if the
+          // client isn't found in the verified list.
+          handleInputChange('client_name', val);
+        }}
+        onFocus={() => setClientDropdownOpen(true)}
+        onBlur={() => setTimeout(() => setClientDropdownOpen(false), 150)}
+        placeholder="Search KYC verified client name or PAN..."
+        className="mis-input"
+        required
+      />
+      {clientDropdownOpen && filteredKycClients.length > 0 && (
+        <div className="absolute z-10 w-full mt-1 max-h-56 overflow-y-auto bg-slate-800 border border-slate-700 rounded-lg shadow-lg">
+          {filteredKycClients.map((c) => (
+            <div
+              key={c.id}
+              onMouseDown={() => handleKycClientSelect(c)}
+              className="px-4 py-2 hover:bg-slate-700 cursor-pointer text-xs flex justify-between items-center text-slate-200"
+            >
+              <span className="font-semibold">{c.applicant_name}</span>
+              <span className="text-slate-400 text-[10px]">{c.pan}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 
   const validateForm = () => {
     if (sheetTab === 'payin_payout') {
@@ -293,6 +365,7 @@ const SettlementsDataEntryPage: React.FC = () => {
         ...nextFormState,
         branch_id: userBranchId,
       });
+      setClientSearchText('');
       fetchRecords();
     } catch (err: any) {
       console.error('Submit error:', err);
@@ -351,6 +424,7 @@ const SettlementsDataEntryPage: React.FC = () => {
         branch_id: record.branch_id || userBranchId,
       });
     }
+    setClientSearchText(record.client_name || '');
     setActiveTab('register');
   };
 
@@ -371,48 +445,32 @@ const SettlementsDataEntryPage: React.FC = () => {
         </div>
 
         {/* Dynamic Sheets Tab bar */}
-        <div className="flex border-b border-slate-200 dark:border-slate-800 mb-6 bg-slate-100/50 dark:bg-slate-900/50 p-1 rounded-lg flex-wrap">
+        <div className="mis-module-tabs flex-wrap mb-6">
           <button
+            type="button"
             onClick={() => setSheetTab('payin_payout')}
-            className={`flex-1 min-w-[120px] py-2 text-sm font-semibold rounded-md transition-all ${
-              sheetTab === 'payin_payout'
-                ? 'text-teal-600 dark:text-teal-400 shadow-sm'
-                : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
-            }`}
-            style={sheetTab === 'payin_payout' ? { background: 'var(--bg-card)', color: 'var(--accent)' } : undefined}
+            className={`mis-module-tab ${sheetTab === 'payin_payout' ? 'active' : ''}`}
           >
             📊 Pay-in / Pay-out Sheet
           </button>
           <button
+            type="button"
             onClick={() => setSheetTab('client_requests')}
-            className={`flex-1 min-w-[120px] py-2 text-sm font-semibold rounded-md transition-all ${
-              sheetTab === 'client_requests'
-                ? 'text-teal-600 dark:text-teal-400 shadow-sm'
-                : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
-            }`}
-            style={sheetTab === 'client_requests' ? { background: 'var(--bg-card)', color: 'var(--accent)' } : undefined}
+            className={`mis-module-tab ${sheetTab === 'client_requests' ? 'active' : ''}`}
           >
             🎫 Client Requests Sheet
           </button>
           <button
+            type="button"
             onClick={() => setSheetTab('ipo_allocation')}
-            className={`flex-1 min-w-[120px] py-2 text-sm font-semibold rounded-md transition-all ${
-              sheetTab === 'ipo_allocation'
-                ? 'text-teal-600 dark:text-teal-400 shadow-sm'
-                : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
-            }`}
-            style={sheetTab === 'ipo_allocation' ? { background: 'var(--bg-card)', color: 'var(--accent)' } : undefined}
+            className={`mis-module-tab ${sheetTab === 'ipo_allocation' ? 'active' : ''}`}
           >
             📈 IPO Allocation Sheet
           </button>
           <button
+            type="button"
             onClick={() => setSheetTab('corporate_actions')}
-            className={`flex-1 min-w-[120px] py-2 text-sm font-semibold rounded-md transition-all ${
-              sheetTab === 'corporate_actions'
-                ? 'text-teal-600 dark:text-teal-400 shadow-sm'
-                : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
-            }`}
-            style={sheetTab === 'corporate_actions' ? { background: 'var(--bg-card)', color: 'var(--accent)' } : undefined}
+            className={`mis-module-tab ${sheetTab === 'corporate_actions' ? 'active' : ''}`}
           >
             📢 Corporate Actions Sheet
           </button>
@@ -420,12 +478,13 @@ const SettlementsDataEntryPage: React.FC = () => {
 
         {/* Form / List Toggle Panel */}
         <div className="flex justify-between items-center mb-6">
-          <div className="flex bg-slate-200/50 dark:bg-slate-800/50 p-1 rounded-md">
+          <div className="mis-tabs">
             <button
+              type="button"
               onClick={() => {
                 setActiveTab('list');
                 setEditingId(null);
-                
+
                 let nextFormState = {};
                 if (sheetTab === 'payin_payout') nextFormState = INITIAL_PAYIN_STATE;
                 else if (sheetTab === 'client_requests') nextFormState = INITIAL_CLIENT_STATE;
@@ -436,24 +495,16 @@ const SettlementsDataEntryPage: React.FC = () => {
                   ...nextFormState,
                   branch_id: userBranchId,
                 });
+                setClientSearchText('');
               }}
-              className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${
-                activeTab === 'list'
-                  ? 'shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-              }`}
-              style={activeTab === 'list' ? { background: 'var(--bg-card)', color: 'var(--text-primary)' } : undefined}
+              className={`mis-tab ${activeTab === 'list' ? 'active' : ''}`}
             >
               📝 View Sheet Grid
             </button>
             <button
+              type="button"
               onClick={() => setActiveTab('register')}
-              className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${
-                activeTab === 'register'
-                  ? 'shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-              }`}
-              style={activeTab === 'register' ? { background: 'var(--bg-card)', color: 'var(--text-primary)' } : undefined}
+              className={`mis-tab ${activeTab === 'register' ? 'active' : ''}`}
             >
               ➕ {editingId ? 'Edit Row' : 'Add New Entry'}
             </button>
@@ -505,17 +556,7 @@ const SettlementsDataEntryPage: React.FC = () => {
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="mis-field">
-                      <label className="mis-label">Client Name</label>
-                      <input
-                        type="text"
-                        value={formData.client_name}
-                        onChange={(e) => handleInputChange('client_name', e.target.value)}
-                        placeholder="Rohan Sharma"
-                        className="mis-input"
-                        required
-                      />
-                    </div>
+                    {renderClientNameField()}
                     <div className="mis-field">
                       <label className="mis-label">Stock Symbol</label>
                       <input
@@ -621,6 +662,7 @@ const SettlementsDataEntryPage: React.FC = () => {
                           ...INITIAL_PAYIN_STATE,
                           branch_id: userBranchId,
                         });
+                        setClientSearchText('');
                       }}
                       className="mis-btn mis-btn-ghost text-sm"
                     >
@@ -833,17 +875,7 @@ const SettlementsDataEntryPage: React.FC = () => {
                         required
                       />
                     </div>
-                    <div className="mis-field">
-                      <label className="mis-label">Client Name</label>
-                      <input
-                        type="text"
-                        value={formData.client_name}
-                        onChange={(e) => handleInputChange('client_name', e.target.value)}
-                        placeholder="Amit Kumar"
-                        className="mis-input"
-                        required
-                      />
-                    </div>
+                    {renderClientNameField()}
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -932,6 +964,7 @@ const SettlementsDataEntryPage: React.FC = () => {
                           ...INITIAL_CLIENT_STATE,
                           branch_id: userBranchId,
                         });
+                        setClientSearchText('');
                       }}
                       className="mis-btn mis-btn-ghost text-sm"
                     >
@@ -1135,17 +1168,7 @@ const SettlementsDataEntryPage: React.FC = () => {
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="mis-field">
-                      <label className="mis-label">Client Name</label>
-                      <input
-                        type="text"
-                        value={formData.client_name || ''}
-                        onChange={(e) => handleInputChange('client_name', e.target.value)}
-                        placeholder="Priya Patel"
-                        className="mis-input"
-                        required
-                      />
-                    </div>
+                    {renderClientNameField()}
                     <div className="mis-field">
                       <label className="mis-label">IPO Name</label>
                       <input
@@ -1274,6 +1297,7 @@ const SettlementsDataEntryPage: React.FC = () => {
                           ...INITIAL_IPO_STATE,
                           branch_id: userBranchId,
                         });
+                        setClientSearchText('');
                       }}
                       className="mis-btn mis-btn-ghost text-sm"
                     >
@@ -1469,17 +1493,7 @@ const SettlementsDataEntryPage: React.FC = () => {
                         required
                       />
                     </div>
-                    <div className="mis-field">
-                      <label className="mis-label">Client Name</label>
-                      <input
-                        type="text"
-                        value={formData.client_name || ''}
-                        onChange={(e) => handleInputChange('client_name', e.target.value)}
-                        placeholder="Vijay Shekhar"
-                        className="mis-input"
-                        required
-                      />
-                    </div>
+                    {renderClientNameField()}
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1607,6 +1621,7 @@ const SettlementsDataEntryPage: React.FC = () => {
                           ...INITIAL_CORP_STATE,
                           branch_id: userBranchId,
                         });
+                        setClientSearchText('');
                       }}
                       className="mis-btn mis-btn-ghost text-sm"
                     >

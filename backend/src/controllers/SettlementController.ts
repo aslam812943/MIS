@@ -322,4 +322,17 @@ export class SettlementController {
       res.status(this.getErrorStatus(error)).json({ message });
     }
   };
+
+  /**
+   * Fetch KYC-verified clients for the entry-form lookup dropdown.
+   */
+  getVerifiedClients = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const clients = await this.settlementService.getVerifiedClients();
+      res.status(HttpStatus.OK).json(clients);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to retrieve verified clients';
+      res.status(this.getErrorStatus(error)).json({ message });
+    }
+  };
 }

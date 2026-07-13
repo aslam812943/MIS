@@ -19,6 +19,8 @@ export const ROUTES = {
   DP_DASHBOARD: '/dp-dashboard',
   IT_DATA_ENTRY: '/it-entry',
   IT_DASHBOARD: '/it-dashboard',
+  FINANCE_DATA_ENTRY: '/finance-entry',
+  FINANCE_DASHBOARD: '/finance-dashboard',
   ROOT: '/',
 } as const;
 

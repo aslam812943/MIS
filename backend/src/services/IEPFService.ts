@@ -576,4 +576,22 @@ export class IEPFService {
     if (error) return [];
     return data;
   }
+
+  /**
+   * Fetches KYC-verified investors so a claim can be filled by selecting an
+   * existing verified record instead of typing the name/PAN by hand.
+   */
+  async getVerifiedInvestors(): Promise<any[]> {
+    const client = supabaseAdmin;
+    if (!client) throw new Error('Supabase client not initialized.');
+
+    const { data, error } = await client
+      .from('kyc_new_account')
+      .select('id, applicant_name, pan, mobile_number, email')
+      .eq('status', 'Verified')
+      .order('applicant_name', { ascending: true });
+
+    if (error) throw new Error(`Failed to load verified investors: ${error.message}`);
+    return data || [];
+  }
 }

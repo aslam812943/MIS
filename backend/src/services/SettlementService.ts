@@ -1384,4 +1384,22 @@ export class SettlementService {
 
     return data as any;
   }
+
+  /**
+   * Fetches KYC-verified clients so settlement entries can be filled by
+   * selecting an existing verified record instead of typing the name by hand.
+   */
+  async getVerifiedClients(): Promise<any[]> {
+    const client = supabaseAdmin;
+    if (!client) throw new Error('Supabase client not initialized.');
+
+    const { data, error } = await client
+      .from('kyc_new_account')
+      .select('id, applicant_name, pan, mobile_number, email')
+      .eq('status', 'Verified')
+      .order('applicant_name', { ascending: true });
+
+    if (error) throw new Error(`Failed to load verified clients: ${error.message}`);
+    return data || [];
+  }
 }

@@ -124,4 +124,17 @@ export class IEPFController {
       res.status(this.getErrorStatus(error)).json({ message });
     }
   };
+
+  /**
+   * Fetch KYC-verified investors for the claim lookup dropdown.
+   */
+  getVerifiedInvestors = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const investors = await this.iepfService.getVerifiedInvestors();
+      res.status(HttpStatus.OK).json(investors);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to retrieve verified investors';
+      res.status(this.getErrorStatus(error)).json({ message });
+    }
+  };
 }
