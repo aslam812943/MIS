@@ -43,5 +43,13 @@ export const iepfService = {
   getIEPFStaff: async () => {
     const response = await api.get('/admin/iepf/staff');
     return response.data;
+  },
+
+  /**
+   * Fetches KYC-verified investors for the claim lookup dropdown.
+   */
+  getVerifiedInvestors: async () => {
+    const response = await api.get('/admin/iepf/investors');
+    return response.data;
   }
 };

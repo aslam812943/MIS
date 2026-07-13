@@ -133,6 +133,14 @@ export const settlementService = {
   updateCorporateActionRecord: async (id: string, recordData: any) => {
     const response = await api.patch(`/admin/settlements/corporate-actions/${id}`, recordData);
     return response.data;
+  },
+
+  /**
+   * Fetches KYC-verified clients for the entry-form lookup dropdown.
+   */
+  getVerifiedClients: async () => {
+    const response = await api.get('/admin/settlements/clients');
+    return response.data;
   }
 };
 

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useLayoutEffect, useRef } from 'react';
 import { NavLink } from 'react-router-dom';
 import { ROUTES } from '../../constants/routes';
 import { authService } from '../../services/auth.service';
@@ -110,9 +110,29 @@ const NavItem: React.FC<NavItemProps> = ({ to, icon, label, badge, onClick }) =>
   </NavLink>
 );
 
+// Every page mounts its own <DashboardLayout>, so the sidebar fully
+// remounts on each route change. Persisting the nav scroll offset here
+// (outside the component) keeps it stable across those remounts instead
+// of snapping back to the top on every navigation.
+let savedNavScrollTop = 0;
+
 /* ── Sidebar Component ────────────────────────────────────── */
 const Sidebar: React.FC = () => {
   const { sidebarOpen, setSidebarOpen } = useLayout();
+  const navRef = useRef<HTMLElement | null>(null);
+
+  useLayoutEffect(() => {
+    if (navRef.current) {
+      navRef.current.scrollTop = savedNavScrollTop;
+    }
+  }, []);
+
+  const handleNavScroll = () => {
+    if (navRef.current) {
+      savedNavScrollTop = navRef.current.scrollTop;
+    }
+  };
+
   const { theme, toggleTheme } = useTheme();
   const user = authService.getCurrentUser();
   const isAdmin = user?.role === 'admin';
@@ -130,6 +150,9 @@ const Sidebar: React.FC = () => {
 
   const isITUser = user?.department_name?.toUpperCase() === 'IT';
   const showITDashboard = isAdmin || ['ceo', 'managing_director', 'director', 'executive'].includes(user?.role || '') || (isITUser && isHOD);
+
+  const isFinanceUser = user?.department_name?.toUpperCase() === 'FINANCE';
+  const showFinanceDashboard = isAdmin || ['ceo', 'managing_director', 'director', 'executive'].includes(user?.role || '') || (isFinanceUser && isHOD);
 
   const closeOnMobile = () => setSidebarOpen(false);
 
@@ -158,7 +181,7 @@ const Sidebar: React.FC = () => {
       </div>
 
       {/* Navigation */}
-      <nav className="mis-sidebar-nav">
+      <nav className="mis-sidebar-nav" ref={navRef} onScroll={handleNavScroll}>
         <span className="mis-sidebar-section-label">Main</span>
 
         <NavItem
@@ -306,6 +329,31 @@ const Sidebar: React.FC = () => {
               to={ROUTES.IT_DASHBOARD}
               icon={<IconIEPFDashboard />}
               label="IT Dashboard"
+              onClick={closeOnMobile}
+            />
+          </>
+        )}
+
+        {/* Finance Department Navigation */}
+        {(isFinanceUser || isAdmin) && (
+          <>
+            <span className="mis-sidebar-section-label">Finance Department</span>
+            <NavItem
+              to={ROUTES.FINANCE_DATA_ENTRY}
+              icon={<IconIEPFEntry />}
+              label="Finance Entry"
+              onClick={closeOnMobile}
+            />
+          </>
+        )}
+
+        {showFinanceDashboard && (
+          <>
+            {(!isFinanceUser && !isAdmin) && <span className="mis-sidebar-section-label">Finance Department</span>}
+            <NavItem
+              to={ROUTES.FINANCE_DASHBOARD}
+              icon={<IconIEPFDashboard />}
+              label="Finance Dashboard"
               onClick={closeOnMobile}
             />
           </>

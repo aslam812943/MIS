@@ -25,6 +25,14 @@ const INITIAL_FORM_STATE = {
   branch_id: '',
 };
 
+interface VerifiedInvestor {
+  id: string;
+  applicant_name: string;
+  pan: string;
+  mobile_number?: string;
+  email?: string;
+}
+
 const IEPFDataEntryPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'register' | 'list'>('register');
   const [formData, setFormData] = useState(INITIAL_FORM_STATE);
@@ -33,7 +41,12 @@ const IEPFDataEntryPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  
+
+  // KYC verified investor lookup
+  const [investors, setInvestors] = useState<VerifiedInvestor[]>([]);
+  const [investorSearchText, setInvestorSearchText] = useState('');
+  const [investorDropdownOpen, setInvestorDropdownOpen] = useState(false);
+
   // Search and Filter states
   const [statusFilter, setStatusFilter] = useState('');
   const [branchFilter, setBranchFilter] = useState('');
@@ -43,6 +56,7 @@ const IEPFDataEntryPage: React.FC = () => {
 
   useEffect(() => {
     fetchMetadata();
+    fetchInvestors();
   }, []);
 
   useEffect(() => {
@@ -82,6 +96,30 @@ const IEPFDataEntryPage: React.FC = () => {
     setFormData((prev) => ({
       ...prev,
       [fieldName]: value,
+    }));
+  };
+
+  const fetchInvestors = async () => {
+    try {
+      const data = await iepfService.getVerifiedInvestors();
+      setInvestors(data || []);
+    } catch (err) {
+      console.error('Failed to load verified investors:', err);
+    }
+  };
+
+  const filteredInvestors = investors.filter((inv) =>
+    inv.applicant_name.toLowerCase().includes(investorSearchText.toLowerCase()) ||
+    inv.pan.toLowerCase().includes(investorSearchText.toLowerCase())
+  );
+
+  const handleInvestorSelect = (investor: VerifiedInvestor) => {
+    setInvestorSearchText(investor.applicant_name);
+    setInvestorDropdownOpen(false);
+    setFormData((prev) => ({
+      ...prev,
+      investor_name: investor.applicant_name,
+      pan_number: investor.pan,
     }));
   };
 
@@ -233,6 +271,7 @@ const IEPFDataEntryPage: React.FC = () => {
           ...INITIAL_FORM_STATE,
           branch_id: formData.branch_id, // preserve branch selection
         });
+        setInvestorSearchText('');
       }
     } catch (err: any) {
       console.error(err);
@@ -262,6 +301,7 @@ const IEPFDataEntryPage: React.FC = () => {
       shares_released: claim.shares_released || 0,
       branch_id: claim.branch_id || '',
     });
+    setInvestorSearchText(claim.investor_name || '');
     setActiveTab('register');
     toast.success('Loaded claim data for editing.');
   };
@@ -269,6 +309,7 @@ const IEPFDataEntryPage: React.FC = () => {
   const handleCancelEdit = () => {
     setEditingId(null);
     setFormData(INITIAL_FORM_STATE);
+    setInvestorSearchText('');
     setActiveTab('list');
   };
 
@@ -300,6 +341,7 @@ const IEPFDataEntryPage: React.FC = () => {
                     onConfirm: () => {
                       setEditingId(null);
                       setFormData(INITIAL_FORM_STATE);
+                      setInvestorSearchText('');
                       setActiveTab('register');
                       setConfirmModal(INITIAL_CONFIRM_STATE);
                     }
@@ -343,6 +385,42 @@ const IEPFDataEntryPage: React.FC = () => {
                     disabled
                   />
                 </div>
+                <div className="mis-field relative sm:col-span-2">
+                  <label className="mis-label">Search KYC Verified Investor *</label>
+                  <input
+                    type="text"
+                    placeholder="Type investor name or PAN to search..."
+                    className="mis-input"
+                    value={investorSearchText}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setInvestorSearchText(val);
+                      setInvestorDropdownOpen(true);
+                      // Allow free typing to still land in the form fields if the
+                      // investor isn't found in the verified list.
+                      handleInputChange('investor_name', val);
+                    }}
+                    onFocus={() => setInvestorDropdownOpen(true)}
+                    onBlur={() => setTimeout(() => setInvestorDropdownOpen(false), 150)}
+                  />
+                  {investorDropdownOpen && filteredInvestors.length > 0 && (
+                    <div className="absolute z-10 w-full mt-1 max-h-56 overflow-y-auto bg-slate-800 border border-slate-700 rounded-lg shadow-lg">
+                      {filteredInvestors.map((inv) => (
+                        <div
+                          key={inv.id}
+                          onMouseDown={() => handleInvestorSelect(inv)}
+                          className="px-4 py-2 hover:bg-slate-700 cursor-pointer text-xs flex justify-between items-center text-slate-200"
+                        >
+                          <span className="font-semibold">{inv.applicant_name}</span>
+                          <span className="text-slate-400 text-[10px]">{inv.pan}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <p className="text-[10.5px] mt-1" style={{ color: 'var(--text-secondary)' }}>
+                    Select a KYC verified investor to auto-fill name and PAN, or type a name/PAN manually if not found.
+                  </p>
+                </div>
                 <div className="mis-field">
                   <label className="mis-label">Investor Name *</label>
                   <input
@@ -350,7 +428,10 @@ const IEPFDataEntryPage: React.FC = () => {
                     placeholder="e.g. Ravi Kumar"
                     className="mis-input"
                     value={formData.investor_name}
-                    onChange={(e) => handleInputChange('investor_name', e.target.value)}
+                    onChange={(e) => {
+                      handleInputChange('investor_name', e.target.value);
+                      setInvestorSearchText(e.target.value);
+                    }}
                   />
                 </div>
                 <div className="mis-field">

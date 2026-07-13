@@ -560,22 +560,18 @@ const DPDataEntryPage: React.FC = () => {
             >
               📤 Bulk Import CSV
             </button>
-            <div className="flex bg-slate-100 dark:bg-slate-900 p-1 rounded-lg border" style={{ borderColor: 'var(--border)' }}>
+            <div className="mis-tabs">
               <button
+                type="button"
                 onClick={() => setActiveTab('list')}
-                className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${
-                  activeTab === 'list' ? 'shadow-xs' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-                }`}
-                style={activeTab === 'list' ? { background: 'var(--bg-card)', color: 'var(--accent)' } : undefined}
+                className={`mis-tab ${activeTab === 'list' ? 'active' : ''}`}
               >
                 📝 View Grid
               </button>
               <button
+                type="button"
                 onClick={() => setActiveTab('register')}
-                className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${
-                  activeTab === 'register' ? 'shadow-xs' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-                }`}
-                style={activeTab === 'register' ? { background: 'var(--bg-card)', color: 'var(--accent)' } : undefined}
+                className={`mis-tab ${activeTab === 'register' ? 'active' : ''}`}
               >
                 ➕ {editingId ? 'Edit' : 'Add Entry'}
               </button>
@@ -584,15 +580,13 @@ const DPDataEntryPage: React.FC = () => {
         </header>
 
         {/* 14 Sheet Tab Bar */}
-        <div className="flex border-b border-slate-200 dark:border-slate-800 mb-2 bg-slate-100/50 dark:bg-slate-900/50 p-1 rounded-lg flex-wrap gap-1">
+        <div className="mis-module-tabs flex-wrap">
           {Object.keys(SHEET_TABLE_MAPPING).map(key => (
             <button
               key={key}
+              type="button"
               onClick={() => setSheetTab(key)}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
-                sheetTab === key ? 'shadow-sm text-teal-600 dark:text-teal-400' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-              }`}
-              style={sheetTab === key ? { background: 'var(--bg-card)', color: 'var(--accent)' } : undefined}
+              className={`mis-module-tab ${sheetTab === key ? 'active' : ''}`}
             >
               📄 {key.replace(/-/g, ' ').toUpperCase()}
             </button>

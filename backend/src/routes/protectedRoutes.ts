@@ -28,6 +28,8 @@ import { DPService } from '../services/DPService.js';
 import { DPController } from '../controllers/DPController.js';
 import { ITService } from '../services/ITService.js';
 import { ITController } from '../controllers/ITController.js';
+import { FinanceService } from '../services/FinanceService.js';
+import { FinanceController } from '../controllers/FinanceController.js';
 import multer from 'multer';
 
 const router = Router();
@@ -66,6 +68,8 @@ const dpController = new DPController(dpService);
 
 const itService = new ITService();
 const itController = new ITController(itService);
+const financeService = new FinanceService();
+const financeController = new FinanceController(financeService);
 
 /**
 
@@ -131,6 +135,7 @@ router.post('/iepf/claims', requireAuth, iepfController.createClaim);
 router.patch('/iepf/claims/:id', requireAuth, iepfController.updateClaim);
 router.get('/iepf/dashboard', requireAuth, iepfController.getDashboardData);
 router.get('/iepf/staff', requireAuth, iepfController.getIEPFStaff);
+router.get('/iepf/investors', requireAuth, iepfController.getVerifiedInvestors);
 
 /**
  * Settlements Department endpoints
@@ -148,6 +153,7 @@ router.get('/settlements/corporate-actions', requireAuth, settlementController.g
 router.post('/settlements/corporate-actions', requireAuth, settlementController.createCorporateActionRecord);
 router.patch('/settlements/corporate-actions/:id', requireAuth, settlementController.updateCorporateActionRecord);
 router.get('/settlements/dashboard', requireAuth, settlementController.getDashboardStats);
+router.get('/settlements/clients', requireAuth, settlementController.getVerifiedClients);
 
 /**
  * KYC Department endpoints
@@ -224,6 +230,17 @@ router.get('/it/:sheet', requireAuth, itController.getEntries);
 router.post('/it/:sheet', requireAuth, itController.createEntry);
 router.patch('/it/:sheet/:id', requireAuth, itController.updateEntry);
 router.delete('/it/:sheet/:id', requireAuth, itController.deleteEntry);
+
+/**
+ * Finance Department endpoints
+ */
+router.get('/finance/dashboard', requireAuth, financeController.getDashboardStats);
+router.post('/finance/bulk/:sheet', requireAuth, financeController.bulkImport);
+router.patch('/finance/bulk/:sheet', requireAuth, financeController.bulkUpdate);
+router.get('/finance/:sheet', requireAuth, financeController.getEntries);
+router.post('/finance/:sheet', requireAuth, financeController.createEntry);
+router.patch('/finance/:sheet/:id', requireAuth, financeController.updateEntry);
+router.delete('/finance/:sheet/:id', requireAuth, financeController.deleteEntry);
 
 /**
  * Audit Log endpoints
