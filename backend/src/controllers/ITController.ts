@@ -25,14 +25,33 @@ export class ITController {
     return HttpStatus.INTERNAL_SERVER_ERROR;
   }
 
+  /**
+   * Recognized validation/authorization errors (400/403) carry a specific
+   * message that's safe to show the user. Anything that falls through to
+   * 500 is an unexpected failure — usually a raw Postgres/Supabase error —
+   * which used to be forwarded to the client verbatim. Those are now logged
+   * server-side and replaced with a generic message in the response.
+   */
+  private respondError(res: Response, error: unknown, fallbackMessage: string): void {
+    const status = this.getErrorStatus(error);
+    const rawMessage = error instanceof Error ? error.message : fallbackMessage;
+
+    if (status === HttpStatus.INTERNAL_SERVER_ERROR) {
+      console.error('[ITController]', rawMessage);
+      res.status(status).json({ message: fallbackMessage });
+      return;
+    }
+
+    res.status(status).json({ message: rawMessage });
+  }
+
   getVendorsDropdown = async (req: Request, res: Response): Promise<void> => {
     try {
       const requesterId = (req as any).user.id;
       const vendors = await this.itService.getVendorsDropdown(requesterId);
       res.status(HttpStatus.OK).json(vendors);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to retrieve vendors';
-      res.status(this.getErrorStatus(error)).json({ message });
+      this.respondError(res, error, 'Failed to retrieve vendors.');
     }
   };
 
@@ -49,8 +68,7 @@ export class ITController {
       );
       res.status(HttpStatus.OK).json(stats);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to retrieve dashboard stats';
-      res.status(this.getErrorStatus(error)).json({ message });
+      this.respondError(res, error, 'Failed to retrieve dashboard stats.');
     }
   };
 
@@ -70,8 +88,7 @@ export class ITController {
       );
       res.status(HttpStatus.OK).json(entries);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to retrieve entries';
-      res.status(this.getErrorStatus(error)).json({ message });
+      this.respondError(res, error, 'Failed to retrieve entries.');
     }
   };
 
@@ -79,9 +96,9 @@ export class ITController {
     try {
       const requesterId = (req as any).user.id;
       const { sheet } = req.params;
-      
+
       const entry = await this.itService.createEntry(requesterId, sheet as string, req.body);
-      
+
       // Audit log entry creation
       await logAudit(
         req,
@@ -94,8 +111,7 @@ export class ITController {
 
       res.status(HttpStatus.CREATED).json(entry);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to create entry';
-      res.status(this.getErrorStatus(error)).json({ message });
+      this.respondError(res, error, 'Failed to create entry.');
     }
   };
 
@@ -118,8 +134,7 @@ export class ITController {
 
       res.status(HttpStatus.OK).json(entry);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to update entry';
-      res.status(this.getErrorStatus(error)).json({ message });
+      this.respondError(res, error, 'Failed to update entry.');
     }
   };
 
@@ -142,8 +157,7 @@ export class ITController {
 
       res.status(HttpStatus.NO_CONTENT).send();
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to delete entry';
-      res.status(this.getErrorStatus(error)).json({ message });
+      this.respondError(res, error, 'Failed to delete entry.');
     }
   };
 
@@ -161,13 +175,12 @@ export class ITController {
         `it_${String(sheet).replace(/-/g, '_')}`,
         undefined,
         null,
-        { updated_rows: ids.length, updates }
+        { updated_rows: Array.isArray(ids) ? ids.length : 0, updates }
       );
 
       res.status(HttpStatus.OK).json(updated);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to apply batch updates';
-      res.status(this.getErrorStatus(error)).json({ message });
+      this.respondError(res, error, 'Failed to apply batch updates.');
     }
   };
 
@@ -185,13 +198,12 @@ export class ITController {
         `it_${String(sheet).replace(/-/g, '_')}`,
         undefined,
         null,
-        { imported_rows: records.length }
+        { imported_rows: Array.isArray(records) ? records.length : 0 }
       );
 
       res.status(HttpStatus.CREATED).json(imported);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to complete CSV import';
-      res.status(this.getErrorStatus(error)).json({ message });
+      this.respondError(res, error, 'Failed to complete CSV import.');
     }
   };
 }

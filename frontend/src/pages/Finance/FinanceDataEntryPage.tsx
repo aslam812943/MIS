@@ -11,6 +11,122 @@ const STATUS_FIELD_MAP: { [key: string]: string } = {
   'cash-bank-position': 'bank_reconciliation_status'
 };
 
+interface SheetHelpConfig {
+  why: string;
+  fields: { label: string; note: string }[];
+  remember: string;
+}
+
+// Plain-English explanations shown next to each data entry form, written for
+// operations staff (not developers) — what this sheet is for and why each
+// field matters. Keeps the same wording style across every department.
+const SHEET_HELP: Record<string, SheetHelpConfig> = {
+  'pnl-summary': {
+    why: 'This is the day-by-day record of how the firm is actually performing financially. Each day\'s entry rolls up automatically into the monthly Profit & Loss, revenue trend, and margin figures — it\'s the core financial performance tracker for the whole firm.',
+    fields: [
+      { label: 'Date', note: 'The day this entry covers — enter one row per day, don\'t wait until month-end to add everything up by hand.' },
+      { label: 'Cash / F&O / Commodity Brokerage Revenue', note: 'Revenue earned that day from each trading segment, kept separate since each is tracked and reported differently.' },
+      { label: 'DP & Other Income', note: 'Any non-brokerage income for the day, e.g. DP charges, AMC fees.' },
+      { label: 'Operating Expense', note: 'The day\'s operating costs.' },
+      { label: 'Cash Flow through Bank', note: 'Net cash that actually moved through the bank that day.' },
+      { label: 'Remarks', note: 'Any notes on an unusual entry, e.g. a one-off adjustment.' },
+    ],
+    remember: 'Enter one row per day — the dashboard automatically totals every day into the monthly P&L, revenue trend, and margin numbers. Don\'t wait until month-end to add it all up by hand.',
+  },
+  'compliance-renewals': {
+    why: 'The firm has ongoing statutory and contractual obligations — taxes, insurance, licenses, deposits — that must be renewed or filed on time. This sheet tracks every one of them so a missed deadline never happens by accident; missing a TDS or GST filing carries real financial penalties.',
+    fields: [
+      { label: 'Renewal / Filing Type', note: 'What this is — a tax filing, insurance renewal, license fee, deposit renewal, etc.' },
+      { label: 'Item Name / Description', note: 'What exactly is being renewed or filed.' },
+      { label: 'Reference No.', note: 'The policy/challan/FD number for this item — needed to trace it later if there\'s a dispute.' },
+      { label: 'Amount', note: 'The amount due or paid.' },
+      { label: 'Due Date', note: 'The actual statutory or contractual deadline — this is what drives the compliance dashboard\'s alerts.' },
+      { label: 'Last Paid / Renewed Date', note: 'When this was last actioned.' },
+      { label: 'Frequency', note: 'How often this recurs — one-time, monthly, quarterly, etc.' },
+      { label: 'Alert Lead Time (Days)', note: 'How many days before the Due Date the dashboard should start warning.' },
+      { label: 'Status', note: 'Pending / Paid / Renewed / Filed = on track. Overdue = the deadline has passed unactioned — needs immediate attention.' },
+      { label: 'Remarks', note: 'Any notes on this item.' },
+    ],
+    remember: 'Set the Due Date and Alert Lead Time accurately — this is exactly what drives the compliance dashboard\'s early-warning alerts. A missed statutory filing means a real penalty, not just a delay.',
+  },
+  'exchange-reporting': {
+    why: 'SEBI and the exchanges require the firm to submit periodic reports — segregation reports, holdings statements, settlement reports — on a fixed schedule. This sheet tracks that every submission actually went out on time.',
+    fields: [
+      { label: 'Submission Type', note: 'Which regulatory report this is.' },
+      { label: 'Exchange', note: 'Which exchange this report goes to (NSE, BSE, MCX, or All).' },
+      { label: 'Period Date', note: 'Which day or period this report actually covers.' },
+      { label: 'Due Date', note: 'The exchange\'s deadline for this submission.' },
+      { label: 'Submitted Date', note: 'When it was actually sent.' },
+      { label: 'Status', note: 'Pending / Submitted On-Time = fine. Submitted Late / Not Submitted = a compliance gap that needs explaining.' },
+      { label: 'Remarks', note: 'Any notes, e.g. reason for a late submission.' },
+    ],
+    remember: 'These are regulatory submissions with hard deadlines — mark the Submitted Date the same day it\'s actually sent, not in advance.',
+  },
+  'fund-movement': {
+    why: 'Every day, client money moves in and out of the firm\'s bank account through payins and payouts. This sheet tracks the daily totals so fund movement can be reconciled against the bank statement and any mismatch is caught early.',
+    fields: [
+      { label: 'Date', note: 'The day this entry covers.' },
+      { label: 'Total Payin Amount / Count', note: 'How much client money came in that day, and how many separate transactions made up that total.' },
+      { label: 'Total Payout Amount / Count', note: 'How much went out that day, and how many transactions.' },
+      { label: 'Remarks', note: 'Any notes on unusual fund movement that day.' },
+    ],
+    remember: 'Payin/Payout totals should match the bank statement for that day — a mismatch here usually means a reconciliation issue that needs investigating, not just a typo.',
+  },
+  'client-requests': {
+    why: 'Clients raise general requests and brokerage revision requests that need to be tracked to resolution — this sheet is the ticket log so nothing gets handled informally and forgotten.',
+    fields: [
+      { label: 'Request Date', note: 'When the client actually made the request.' },
+      { label: 'Request Type', note: 'A General Client Request, or a Brokerage Revision Request (asking for a different brokerage rate).' },
+      { label: 'Client Name / ID', note: 'Who made the request.' },
+      { label: 'Description', note: 'What they\'re actually asking for, in enough detail that whoever handles it doesn\'t need to ask again.' },
+      { label: 'Status', note: 'Pending = received. In Process = being worked. Approved / Rejected = decision made. Completed = fully actioned.' },
+      { label: 'Resolved Date', note: 'When the request was actually closed out.' },
+      { label: 'Remarks', note: 'Any notes on how it was handled.' },
+    ],
+    remember: 'Always fill in Resolved Date when closing a request — this is what the dashboard uses to measure how quickly client requests are actually being handled.',
+  },
+  'referral-commission': {
+    why: 'Referrers who introduce clients earn a commission based on that client\'s trading. This sheet tracks what\'s owed each month and whether it was actually paid, so payouts are accurate and on time.',
+    fields: [
+      { label: 'Referrer Name', note: 'Who introduced the client and is owed commission.' },
+      { label: 'Period (Month)', note: 'Which billing month this commission covers.' },
+      { label: 'Commission Amount', note: 'How much is owed for this period.' },
+      { label: 'Statement Generated?', note: 'Tick only once the commission statement has actually been generated for the referrer.' },
+      { label: 'Statement Date / Payment Date', note: 'When the statement was issued, and when payment was actually made.' },
+      { label: 'Payment Status', note: 'Pending = not yet paid. Paid = payment sent. On Hold = payment deliberately withheld (e.g. a dispute).' },
+      { label: 'Remarks', note: 'Any notes on this commission period.' },
+    ],
+    remember: 'Don\'t mark Payment Status as Paid until the payment has actually gone out — this is the figure the referrer will expect to match their bank credit.',
+  },
+  'cash-bank-position': {
+    why: 'The firm\'s cash and bank balances must be tracked and reconciled daily — this is a core financial control, and for NRI client transactions it also feeds the mandatory PIS (Portfolio Investment Scheme) reporting.',
+    fields: [
+      { label: 'Date', note: 'The day this position is for.' },
+      { label: 'Cash in Hand', note: 'Physical cash held that day.' },
+      { label: 'Cash at Bank', note: 'The bank balance that day.' },
+      { label: 'Bank Name', note: 'Which bank account this position refers to.' },
+      { label: 'Bank Reconciliation Status', note: 'Reconciled = the bank statement matches our books. Pending = not yet checked. Discrepancy Found = numbers don\'t match — must be investigated before it can be marked Reconciled.' },
+      { label: 'PIS Reporting Done?', note: 'Tick only once that day\'s Portfolio Investment Scheme reporting (for NRI client transactions) has actually been filed, where applicable.' },
+      { label: 'PIS Reporting Date', note: 'When that filing was made.' },
+      { label: 'Remarks', note: 'Any notes on this day\'s position.' },
+    ],
+    remember: 'Never mark Bank Reconciliation Status as Reconciled until the numbers actually match the bank statement — this is a core financial control, not a formality to tick off.',
+  },
+  'recurring-payables': {
+    why: 'The firm has recurring bills and EMIs — rent, utilities, loan payments — that repeat on a schedule. This sheet tracks each one so nothing is missed, duplicated, or paid late.',
+    fields: [
+      { label: 'Payable Type', note: 'What kind of bill this is — EMI, mobile, internet, rent, or another utility.' },
+      { label: 'Description', note: 'A specific description of this payable.' },
+      { label: 'Amount', note: 'How much is due.' },
+      { label: 'Due Date', note: 'When it must be paid.' },
+      { label: 'Paid Date', note: 'When it was actually paid.' },
+      { label: 'Status', note: 'Pending = not yet paid. Paid = settled. Overdue = past due date, unpaid.' },
+      { label: 'Remarks', note: 'Any notes on this payable.' },
+    ],
+    remember: 'Keep Status current — a bill sitting as Pending past its Due Date should be caught here before it turns into a late fee or a service disruption.',
+  },
+};
+
 const FinanceDataEntryPage: React.FC = () => {
   const currentUser = authService.getCurrentUser();
   const isAdmin = currentUser?.role === 'admin';
@@ -469,6 +585,57 @@ const FinanceDataEntryPage: React.FC = () => {
     }
   };
 
+  // Plain-English "why are we collecting this" panel shown beside the entry
+  // form — same content for every employee, sheet by sheet.
+  const renderHelpPanel = () => {
+    const help = SHEET_HELP[sheetTab];
+    if (!help) return null;
+
+    return (
+      <div
+        className="border rounded-xl p-5 shadow-xs space-y-4 lg:sticky lg:top-4"
+        style={{ background: 'var(--panel-inset-soft)', borderColor: 'var(--border)' }}
+      >
+        <div>
+          <h3 className="text-sm font-bold flex items-center gap-1.5 mb-1.5" style={{ color: 'var(--text-primary)' }}>
+            💡 Why this sheet exists
+          </h3>
+          <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+            {help.why}
+          </p>
+        </div>
+
+        <hr style={{ borderColor: 'var(--border)' }} />
+
+        <div>
+          <h3 className="text-sm font-bold mb-2.5" style={{ color: 'var(--text-primary)' }}>
+            📖 What each field means
+          </h3>
+          <div className="space-y-3">
+            {help.fields.map((f) => (
+              <div key={f.label}>
+                <div className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>{f.label}</div>
+                <div className="text-[11px] leading-relaxed mt-0.5" style={{ color: 'var(--text-secondary)' }}>{f.note}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div
+          className="p-3 rounded-lg border-l-4"
+          style={{ background: 'var(--bg-card)', borderColor: 'var(--accent)' }}
+        >
+          <div className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--accent)' }}>
+            ⚠️ Remember
+          </div>
+          <p className="text-[11px] leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+            {help.remember}
+          </p>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <DashboardLayout>
       <div className="mis-page mis-animate-in max-w-7xl mx-auto space-y-8">
@@ -658,8 +825,9 @@ const FinanceDataEntryPage: React.FC = () => {
           </div>
         ) : (
 
-          /* Data Entry Form Card */
-          <div className="mis-card p-6 max-w-2xl mx-auto">
+          /* Data Entry Form Card + plain-English help panel */
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-6 items-start max-w-6xl mx-auto">
+          <div className="mis-card p-6">
             <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-6 flex items-center gap-1.5 border-b pb-3" style={{ borderColor: 'var(--border)' }}>
               📋 {editingId ? '✏️ Modify Record Row' : '➕ Create New Record Row'}
             </h2>
@@ -818,6 +986,9 @@ const FinanceDataEntryPage: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+
+          {renderHelpPanel()}
           </div>
         )}
 

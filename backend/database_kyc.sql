@@ -18,7 +18,7 @@ DROP TABLE IF EXISTS kyc_exchange_compliance CASCADE;
 CREATE TABLE IF NOT EXISTS kyc_new_account (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     applicant_name VARCHAR(255) NOT NULL,
-    pan VARCHAR(20) NOT NULL,
+    pan VARCHAR(20) NOT NULL UNIQUE,
     aadhaar_number VARCHAR(20) NOT NULL,
     mobile_number VARCHAR(20) NOT NULL,
     email VARCHAR(255) NOT NULL,

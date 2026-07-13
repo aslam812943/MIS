@@ -18,6 +18,8 @@ const ACTION_STYLES: Record<string, { badgeClass: string; label: string }> = {
   INSERT: { badgeClass: 'mis-badge-success', label: 'Created' },
   UPDATE: { badgeClass: 'mis-badge-warning', label: 'Updated' },
   DELETE: { badgeClass: 'mis-badge', label: 'Deleted' },
+  LOGIN: { badgeClass: 'mis-badge-success', label: 'Signed In' },
+  LOGOUT: { badgeClass: 'mis-badge-neutral', label: 'Signed Out' },
 };
 
 const TABLE_LABELS: Record<string, string> = {
@@ -26,7 +28,38 @@ const TABLE_LABELS: Record<string, string> = {
   modules: 'Modules',
   profiles: 'Users',
   data_entries: 'Data Entries',
+  auth_sessions: 'Login / Logout',
 };
+
+/** Formats a duration in seconds as e.g. "2h 14m", "38m", or "12s". */
+function formatDuration(seconds: number | null | undefined): string {
+  if (seconds === null || seconds === undefined) return 'Unknown';
+  if (seconds < 60) return `${seconds}s`;
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  return `${minutes}m`;
+}
+
+/** Shortens a raw User-Agent string down to a readable device/browser summary. */
+function summarizeDevice(userAgent: string | undefined): string {
+  if (!userAgent || userAgent === 'Unknown') return 'Unknown device';
+  const ua = userAgent;
+  const browser =
+    /Edg\//.test(ua) ? 'Edge' :
+    /Chrome\//.test(ua) ? 'Chrome' :
+    /Firefox\//.test(ua) ? 'Firefox' :
+    /Safari\//.test(ua) && !/Chrome\//.test(ua) ? 'Safari' :
+    'Browser';
+  const os =
+    /Windows/.test(ua) ? 'Windows' :
+    /Mac OS X/.test(ua) ? 'macOS' :
+    /Android/.test(ua) ? 'Android' :
+    /iPhone|iPad/.test(ua) ? 'iOS' :
+    /Linux/.test(ua) ? 'Linux' :
+    'Unknown OS';
+  return `${browser} on ${os}`;
+}
 
 const HIDDEN_DIFF_KEYS = new Set(['id', 'created_at', 'updated_at']);
 
@@ -125,6 +158,51 @@ const DiffPane: React.FC<DiffPaneProps> = ({ variant, title, data, lookups }) =>
   );
 };
 
+/* ─── Session Event Detail (Login / Logout) ─────────────────── */
+interface SessionEventDetailProps {
+  log: AuditLog;
+}
+
+const SessionEventDetail: React.FC<SessionEventDetailProps> = ({ log }) => {
+  const meta = log.new_data || {};
+  const rows: { label: string; value: React.ReactNode }[] = [
+    { label: log.action === 'LOGIN' ? 'Signed In At' : 'Signed Out At', value: formatDate(log.created_at) },
+  ];
+
+  if (log.action === 'LOGOUT') {
+    rows.push({ label: 'Session Duration', value: formatDuration(meta.duration_seconds) });
+  }
+
+  rows.push(
+    { label: 'Device', value: summarizeDevice(meta.user_agent) },
+    { label: 'IP Address', value: meta.ip || 'Unknown' },
+  );
+
+  return (
+    <div className="mis-audit-diff-body">
+      <p className="mis-audit-diff-label">Session details</p>
+      <div className="mis-diff-pane">
+        <div className="mis-diff-pane-body">
+          <div className="mis-diff-fields">
+            {rows.map((r) => (
+              <div key={r.label} className="mis-diff-field">
+                <span className="mis-diff-field-key">{r.label}</span>
+                <div className="mis-diff-field-val">{r.value}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+      {log.action === 'LOGIN' && (
+        <p className="text-xs mt-3" style={{ color: 'var(--text-muted)' }}>
+          No matching Signed Out entry means this session ended by the browser closing or the 2-hour
+          login expiring, rather than clicking Sign Out.
+        </p>
+      )}
+    </div>
+  );
+};
+
 /* ─── Diff Modal ──────────────────────────────────────────── */
 interface DiffModalProps {
   log: AuditLog;
@@ -134,6 +212,7 @@ interface DiffModalProps {
 
 const DiffModal: React.FC<DiffModalProps> = ({ log, lookups, onClose }) => {
   const style = ACTION_STYLES[log.action] || ACTION_STYLES.UPDATE;
+  const isSessionEvent = log.table_name === 'auth_sessions';
   const hasBefore = !!log.old_data && getDiffEntries(log.old_data).length > 0;
   const hasAfter = !!log.new_data && getDiffEntries(log.new_data).length > 0;
   const showSplit = hasBefore && hasAfter;
@@ -188,36 +267,42 @@ const DiffModal: React.FC<DiffModalProps> = ({ log, lookups, onClose }) => {
           </button>
         </div>
 
-        <div className="mis-audit-diff-body">
-          <p className="mis-audit-diff-label">Data comparison</p>
-          <div className={`mis-audit-diff-grid${showSplit ? ' mis-audit-diff-grid--split' : ''}`}>
-            {hasBefore && (
-              <DiffPane variant="before" title="Before" data={log.old_data} lookups={lookups} />
-            )}
-            {hasAfter && (
-              <DiffPane variant="after" title="After" data={log.new_data} lookups={lookups} />
-            )}
-            {!hasBefore && !hasAfter && (
-              <div className="mis-diff-pane">
-                <div className="mis-diff-pane-empty">No field data available for this record.</div>
+        {isSessionEvent ? (
+          <SessionEventDetail log={log} />
+        ) : (
+          <>
+            <div className="mis-audit-diff-body">
+              <p className="mis-audit-diff-label">Data comparison</p>
+              <div className={`mis-audit-diff-grid${showSplit ? ' mis-audit-diff-grid--split' : ''}`}>
+                {hasBefore && (
+                  <DiffPane variant="before" title="Before" data={log.old_data} lookups={lookups} />
+                )}
+                {hasAfter && (
+                  <DiffPane variant="after" title="After" data={log.new_data} lookups={lookups} />
+                )}
+                {!hasBefore && !hasAfter && (
+                  <div className="mis-diff-pane">
+                    <div className="mis-diff-pane-empty">No field data available for this record.</div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {log.record_id && (
+              <div className="mis-audit-diff-footer">
+                <span>
+                  Record: <strong style={{ color: 'var(--text-primary)' }}>
+                    {resolveRecordLabel(log.table_name, log.record_id, lookups)}
+                  </strong>
+                </span>
+                {resolveRecordLabel(log.table_name, log.record_id, lookups) !== log.record_id && (
+                  <span style={{ opacity: 0.55, marginLeft: '0.75rem' }} title={log.record_id}>
+                    ({log.record_id.slice(0, 8)}…)
+                  </span>
+                )}
               </div>
             )}
-          </div>
-        </div>
-
-        {log.record_id && (
-          <div className="mis-audit-diff-footer">
-            <span>
-              Record: <strong style={{ color: 'var(--text-primary)' }}>
-                {resolveRecordLabel(log.table_name, log.record_id, lookups)}
-              </strong>
-            </span>
-            {resolveRecordLabel(log.table_name, log.record_id, lookups) !== log.record_id && (
-              <span style={{ opacity: 0.55, marginLeft: '0.75rem' }} title={log.record_id}>
-                ({log.record_id.slice(0, 8)}…)
-              </span>
-            )}
-          </div>
+          </>
         )}
       </div>
     </div>
@@ -339,6 +424,8 @@ const AuditLogsTab: React.FC = () => {
               <option value="INSERT">✅ Created</option>
               <option value="UPDATE">✏️ Updated</option>
               <option value="DELETE">🗑️ Deleted</option>
+              <option value="LOGIN">🔓 Signed In</option>
+              <option value="LOGOUT">🔒 Signed Out</option>
             </select>
           </div>
 
@@ -355,6 +442,7 @@ const AuditLogsTab: React.FC = () => {
               <option value="modules">📦 Modules</option>
               <option value="profiles">👤 Users</option>
               <option value="data_entries">📝 Data Entries</option>
+              <option value="auth_sessions">🔐 Login / Logout</option>
             </select>
           </div>
 
@@ -449,6 +537,11 @@ const AuditLogsTab: React.FC = () => {
                     </td>
                     <td style={{ color: 'var(--text-primary)' }}>
                       {TABLE_LABELS[log.table_name] || log.table_name}
+                      {log.action === 'LOGOUT' && (
+                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                          ⏱ {formatDuration(log.new_data?.duration_seconds)}
+                        </div>
+                      )}
                     </td>
                     <td>
                       <span className="text-sm font-semibold" style={{ color: 'var(--accent)' }}>{log.user_email}</span>

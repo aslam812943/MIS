@@ -33,6 +33,183 @@ const SHEET_TABLE_MAPPING: { [key: string]: string } = {
   'client-queries': 'dp_client_queries'
 };
 
+interface SheetHelpConfig {
+  why: string;
+  fields: { label: string; note: string }[];
+  remember: string;
+}
+
+// Plain-English explanations shown next to each data entry form, written for
+// operations staff (not developers) — what this sheet is for and why each
+// field matters. Keeps the same wording style across every department.
+const SHEET_HELP: Record<string, SheetHelpConfig> = {
+  'new-accounts': {
+    why: 'This is where a client\'s already-verified KYC gets turned into an actual Demat (BO) account with CDSL — the account their shares will physically sit in. Without a BO ID here, a client can be fully KYC-verified and still not be able to hold a single share.',
+    fields: [
+      { label: 'Documents Checklist', note: 'Tick a box only after you have actually checked and uploaded that document to CDSL — this is your proof due diligence was done, not just a formality.' },
+      { label: 'Verified By / Verification Date', note: 'Who checked this account opening and when — needed for the audit trail.' },
+      { label: 'Uploaded to CDSL Date', note: 'The date the account details were actually sent to CDSL for BO ID generation.' },
+      { label: 'BO ID Generated', note: 'The 16-digit Beneficiary Owner ID CDSL issues once it accepts the account — this is what proves the demat account now exists.' },
+      { label: 'Status', note: 'Pending = not yet sent. Uploaded = sent, awaiting CDSL. Completed = BO ID received, account is live. Rejected = CDSL sent it back, check why.' },
+      { label: 'Remarks', note: 'Any internal notes, e.g. a document that still needs to be re-scanned.' },
+    ],
+    remember: 'Always link the client from "Search KYC Verified Client" instead of typing details by hand — a demat account can only be opened for a client whose KYC is already Verified.',
+  },
+  'ucc-updation': {
+    why: 'The client\'s Unique Client Code needs to be mapped to their demat account on the DP side too, so the exchange, the depository, and the trading side all agree on which BO ID belongs to which trading segment.',
+    fields: [
+      { label: 'Exchange Name', note: 'Which exchange (NSE or BSE) this UCC mapping is for.' },
+      { label: 'Trading Segment', note: 'Which market the client trades in — Cash, F&O, Currency, or Commodity. Each needs its own confirmation.' },
+      { label: 'Upload Date to Exchange', note: 'When this mapping was submitted to the exchange.' },
+      { label: 'Exchange Confirmation Date', note: 'When the exchange confirmed it back.' },
+      { label: 'Registration Status', note: 'Pending = not yet sent. Uploaded = sent, awaiting reply. Confirmed = mapping is active. Rejected = sent back, needs correction.' },
+    ],
+    remember: 'Make sure this matches what KYC already allotted for the same client — a mismatched UCC here can misroute the client\'s trades.',
+  },
+  'modifications': {
+    why: 'When a client\'s address, mobile, bank details, or nominee changes, the demat account record held with CDSL must be updated too — it doesn\'t update automatically just because KYC was changed. This sheet is that update, with a paper trail.',
+    fields: [
+      { label: 'BO ID (Demat Number)', note: 'The demat account this change applies to.' },
+      { label: 'Modification Type', note: 'What is being changed — Address, Mobile, Email, Bank Details, Nominee, Signature, or Other.' },
+      { label: 'Previous Registered Value / New Requested Value', note: 'Write exactly what was on file before and what it\'s changing to — this is the proof if the change is ever disputed.' },
+      { label: 'Request Date / Processed Date', note: 'When the client asked for the change, and when it was actually updated with CDSL.' },
+      { label: 'Status', note: 'Pending = received, not yet done. Processed = updated with CDSL. Rejected = could not be processed.' },
+    ],
+    remember: 'Always fill in both the old and new value — this is what protects the firm if a client later disputes a change to their demat account.',
+  },
+  'demat-executions': {
+    why: 'When a client hands in physical paper share certificates to be converted into electronic (demat) form, this tracks that request all the way through the Registrar & Transfer Agent (RTA) who actually performs the conversion.',
+    fields: [
+      { label: 'Client BO ID', note: 'The demat account the shares will be credited into.' },
+      { label: 'DRF Request Number', note: 'The Dematerialisation Request Form number — the official reference for this conversion request.' },
+      { label: 'Share ISIN Code', note: 'The unique 12-character code identifying exactly which security/share is being converted.' },
+      { label: 'Company Name / Certificate Number / Folio Number', note: 'The details printed on the physical share certificate being converted — copy these exactly, a mismatch will get the request rejected by the RTA.' },
+      { label: 'Shares Quantity', note: 'How many shares are on this certificate.' },
+      { label: 'RTA Name', note: 'Which Registrar & Transfer Agent is processing this conversion for that company.' },
+      { label: 'Date Sent to RTA', note: 'When the physical certificate and form were sent off.' },
+      { label: 'Status', note: 'Sent to RTA = submitted, awaiting action. Confirmed = shares credited electronically. Rejected = RTA sent it back. Resubmitted = corrected and sent again. Closed = fully done.' },
+    ],
+    remember: 'Double-check the certificate number and folio number before submitting — these are the most common reasons an RTA rejects a demat request.',
+  },
+  'transfers-transmissions': {
+    why: 'This tracks shares actually moving from one demat account to another — either a Transfer (the client chooses to move shares, e.g. a gift) or a Transmission (shares moving because the original holder passed away, following on from KYC\'s Demise Reporting).',
+    fields: [
+      { label: 'Type', note: 'Transfer = client-initiated movement. Transmission = movement following a death, to the legal heir.' },
+      { label: 'Sender BO ID / Receiver BO ID', note: 'The demat account the shares are moving from, and the one they\'re moving to.' },
+      { label: 'Share ISIN', note: 'Which security is being moved.' },
+      { label: 'Transfer Quantity', note: 'How many shares are being moved.' },
+      { label: 'Documents Checklist/Info', note: 'What supporting paperwork was provided (transfer deed, death certificate, succession certificate, etc.).' },
+      { label: 'Request Date / Execution Date', note: 'When the request was made, and when the shares actually moved.' },
+      { label: 'Status', note: 'Pending = not yet executed. Executed = shares have moved. Rejected = could not be processed.' },
+    ],
+    remember: 'For a Transmission, never execute without the supporting legal documents (death certificate / succession certificate) attached — this is a legally sensitive action.',
+  },
+  'demat-rejections': {
+    why: 'Sometimes an RTA sends a demat request back instead of accepting it — wrong signature, damaged certificate, name mismatch, etc. This sheet tracks why it was rejected and what was done to fix and resubmit it, so nothing gets silently dropped.',
+    fields: [
+      { label: 'DRF Number', note: 'The original Dematerialisation Request Form number that was rejected.' },
+      { label: 'RTA Rejection Reason', note: 'Write exactly what the RTA said was wrong — this tells you precisely what needs fixing.' },
+      { label: 'Rejection Date', note: 'The date the RTA sent the rejection.' },
+      { label: 'Corrective Action Taken', note: 'What was actually done to fix the issue (e.g. new signature obtained, certificate re-scanned).' },
+      { label: 'Resubmitted to RTA Date', note: 'When the corrected request was sent back.' },
+      { label: 'Status', note: 'Pending = not yet fixed and resubmitted. Resolved = corrected and accepted.' },
+    ],
+    remember: 'Always record the exact rejection reason before marking corrective action — guessing at the fix without it usually leads to a second rejection.',
+  },
+  'closures': {
+    why: 'When a client wants to close their demat account, it has to be confirmed empty first — you cannot close an account that still holds shares or has pending obligations. This sheet is that formal closure record.',
+    fields: [
+      { label: 'Client BO ID', note: 'The demat account being closed.' },
+      { label: 'Closure Reason', note: 'Why the client is closing (e.g. moving to another DP, no longer trading).' },
+      { label: 'Holdings Check Status', note: 'Clean = account is empty and safe to close. Pending Obligations = there\'s an unsettled trade. Shares Present = shares still sitting in the account — closure cannot proceed until this is Clean.' },
+      { label: 'Request Date / Closure Execution Date', note: 'When the client asked to close, and when the account was actually shut.' },
+      { label: 'Status', note: 'Requested = received. Approved = cleared to proceed. Closed = fully shut. Rejected = could not be closed.' },
+    ],
+    remember: 'Never mark Closed while Holdings Check Status shows anything other than Clean — closing an account with shares or obligations still in it can trap the client\'s holdings.',
+  },
+  'dis-slips': {
+    why: 'A Delivery Instruction Slip is the signed form a client uses to authorise shares leaving their demat account (for a sale or transfer). CDSL requires proof that this slip was received and scanned into CDAS before the instruction is acted on — this sheet is that proof.',
+    fields: [
+      { label: 'Client BO ID', note: 'The demat account the shares are moving out of.' },
+      { label: 'DIS Slip Reference Number', note: 'The unique number printed on the physical DIS slip the client signed.' },
+      { label: 'Share ISIN', note: 'Which security is being moved out.' },
+      { label: 'Quantity Transferred', note: 'How many shares this slip authorises moving.' },
+      { label: 'Execution Date', note: 'The date the instruction was actually carried out.' },
+      { label: 'CDAS Scan Upload Status', note: 'Pending = not yet scanned in. Uploaded = successfully scanned into CDSL\'s system. Failed = scan upload failed, needs retrying.' },
+      { label: 'Uploaded By / Upload Date to CDAS', note: 'Who did the scan upload, and when.' },
+    ],
+    remember: 'A DIS instruction should not be treated as complete until the scan shows Uploaded — a missing scan is a compliance gap even if the shares already moved.',
+  },
+  'back-office-updates': {
+    why: 'The DP system needs its trade, holdings, and ledger files run and synced regularly so our records match the exchange and depository. This sheet is the log proving these routine but critical system runs actually happened.',
+    fields: [
+      { label: 'File Type', note: 'Which file was run — Trade File, Holdings File, Ledger File, or Other.' },
+      { label: 'Run Date', note: 'The date this file was processed.' },
+      { label: 'Performed By Staff Name', note: 'Who ran it.' },
+      { label: 'Execution Status', note: 'Success = ran cleanly. Failed = the run errored and needs to be redone — don\'t leave a Failed run unaddressed.' },
+      { label: 'Remarks', note: 'Any notes, e.g. what caused a failure.' },
+    ],
+    remember: 'A Failed status here means our records may be out of sync with the exchange/depository — flag it to your supervisor immediately, don\'t just log it and move on.',
+  },
+  'eod-backups': {
+    why: 'Every end of day, the DP system\'s data must be backed up — if something goes wrong, this backup is what stops client holdings data from being permanently lost. This is a baseline operational safety requirement, not optional housekeeping.',
+    fields: [
+      { label: 'Backup Target Date', note: 'Which day\'s data this backup covers.' },
+      { label: 'Backup Type', note: 'Full = a complete copy of everything. Incremental = only what changed since the last backup.' },
+      { label: 'Backup File Size (KB)', note: 'The size of the backup file — a sudden drop to near-zero usually means the backup didn\'t actually run properly.' },
+      { label: 'Verified By Staff Name', note: 'Who checked that the backup completed and is usable.' },
+      { label: 'Status', note: 'Success = backup completed. Failed = it didn\'t — this needs immediate follow-up. Verified = someone has confirmed the backup file is good.' },
+    ],
+    remember: 'Never mark a backup Verified without actually checking the file — an unverified "Success" that turns out to be corrupt is only discovered when it\'s too late, during an actual data-loss event.',
+  },
+  'amc-charges': {
+    why: 'Every demat account is billed an Annual Maintenance Charge for CDSL to keep holding it. This sheet tracks what each client is billed and whether it was actually debited, so nothing is missed or double-charged.',
+    fields: [
+      { label: 'Client BO ID', note: 'The demat account being billed.' },
+      { label: 'Billing Month', note: 'Which billing cycle this charge belongs to (e.g. "July 2026").' },
+      { label: 'AMC Charge Amount / GST Amount / Total Debited Amount', note: 'The base charge, the tax on it, and the final total actually debited — keep these consistent, Total should equal AMC + GST.' },
+      { label: 'Debit Execution Date', note: 'The date the amount was actually taken from the client.' },
+      { label: 'Billing Status', note: 'Pending = not yet billed. Debited = charged successfully. Waived = charge was excused. Failed = the debit attempt failed.' },
+    ],
+    remember: 'Double-check that Total Debited Amount actually equals AMC + GST before saving — a mismatch here is a billing error the client will notice.',
+  },
+  'monthly-statements': {
+    why: 'SEBI requires every client to receive a periodic statement of their holdings. This sheet tracks that each client\'s monthly statement was actually generated and successfully delivered — not just prepared.',
+    fields: [
+      { label: 'Client BO ID', note: 'Which client this statement is for.' },
+      { label: 'Period', note: 'Which month this statement covers (e.g. "June 2026").' },
+      { label: 'Generation Date', note: 'When the statement was produced.' },
+      { label: 'Dispatch Method', note: 'How it was sent — Email, Post, or Both.' },
+      { label: 'Delivery Status', note: 'Sent = delivered. Bounced = delivery failed (bad email/address) — needs a retry via another method. Pending = not yet sent.' },
+    ],
+    remember: 'A Bounced statement is a compliance gap, not just an inconvenience — always follow up with an alternate delivery method rather than leaving it Bounced.',
+  },
+  'audit-compliance': {
+    why: 'CDSL and SEBI periodically inspect DP operations, and the firm runs its own internal checks too. This sheet is the official record of every finding raised and whether it was actually fixed — this is exactly what gets reviewed if the firm is ever audited.',
+    fields: [
+      { label: 'Audit / Inspection Type', note: 'Internal = our own review. CDSL Inspection / SEBI = a regulator-driven audit.' },
+      { label: 'Audit Target Period', note: 'Which period this audit covered (e.g. "FY 2025-26").' },
+      { label: 'Auditor Name', note: 'Who conducted the audit.' },
+      { label: 'Compliance Deviation / Finding', note: 'Exactly what the audit found wrong — be specific, this is a formal record.' },
+      { label: 'Remediation Action Taken', note: 'What was actually done to fix the finding.' },
+      { label: 'Closure Status', note: 'Open = finding raised, nothing done yet. Action Pending = fix in progress. Closed = fully remediated.' },
+      { label: 'Closure Date', note: 'When the finding was actually closed out.' },
+    ],
+    remember: 'Never mark a finding Closed without a real Remediation Action on file — an unresolved finding marked Closed is worse than an open one if it resurfaces in the next audit.',
+  },
+  'client-queries': {
+    why: 'Clients raise questions and complaints specifically about their demat account — a delayed transfer, an AMC charge dispute, missing documents. This sheet is the ticket log that makes sure every query gets tracked to resolution instead of being handled informally and forgotten.',
+    fields: [
+      { label: 'Client Complaint / Query Type', note: 'What kind of issue this is — Delayed Transfer, AMC Issue, Account Details, Document Status, or Other.' },
+      { label: 'Query Description', note: 'What the client actually asked or complained about, in their own terms.' },
+      { label: 'Assigned Executive Name', note: 'Who is responsible for resolving this.' },
+      { label: 'Ticket Status', note: 'Open = just logged. In Progress = being worked on. Resolved = done. Escalated = needs a supervisor\'s attention.' },
+      { label: 'Resolution Date', note: 'When the query was actually closed out.' },
+    ],
+    remember: 'If a query has been Open or In Progress for more than a few days with no movement, escalate it — a client complaint about their own holdings should never go quiet.',
+  },
+};
+
 const DPDataEntryPage: React.FC = () => {
   const currentUser = authService.getCurrentUser();
   const isAdmin = currentUser?.role === 'admin';
@@ -537,6 +714,57 @@ const DPDataEntryPage: React.FC = () => {
     c.pan.toLowerCase().includes(clientSearchText.toLowerCase())
   );
 
+  // Plain-English "why are we collecting this" panel shown beside the entry
+  // form — same content for every employee, sheet by sheet.
+  const renderHelpPanel = () => {
+    const help = SHEET_HELP[sheetTab];
+    if (!help) return null;
+
+    return (
+      <div
+        className="border rounded-xl p-5 shadow-xs space-y-4 lg:sticky lg:top-4"
+        style={{ background: 'var(--panel-inset-soft)', borderColor: 'var(--border)' }}
+      >
+        <div>
+          <h3 className="text-sm font-bold flex items-center gap-1.5 mb-1.5" style={{ color: 'var(--text-primary)' }}>
+            💡 Why this sheet exists
+          </h3>
+          <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+            {help.why}
+          </p>
+        </div>
+
+        <hr style={{ borderColor: 'var(--border)' }} />
+
+        <div>
+          <h3 className="text-sm font-bold mb-2.5" style={{ color: 'var(--text-primary)' }}>
+            📖 What each field means
+          </h3>
+          <div className="space-y-3">
+            {help.fields.map((f) => (
+              <div key={f.label}>
+                <div className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>{f.label}</div>
+                <div className="text-[11px] leading-relaxed mt-0.5" style={{ color: 'var(--text-secondary)' }}>{f.note}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div
+          className="p-3 rounded-lg border-l-4"
+          style={{ background: 'var(--bg-card)', borderColor: 'var(--accent)' }}
+        >
+          <div className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--accent)' }}>
+            ⚠️ Remember
+          </div>
+          <p className="text-[11px] leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+            {help.remember}
+          </p>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <DashboardLayout>
       <div className="mis-page mis-animate-in max-w-7xl mx-auto space-y-8">
@@ -594,12 +822,13 @@ const DPDataEntryPage: React.FC = () => {
         </div>
 
         {activeTab === 'register' ? (
-          /* Data Input Form Card */
-          <div className="mis-card p-6 max-w-2xl mx-auto">
+          /* Data Input Form Card + plain-English help panel */
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-6 items-start max-w-6xl mx-auto">
+          <div className="mis-card p-6">
             <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-6 flex items-center gap-1.5 border-b pb-3" style={{ borderColor: 'var(--border)' }}>
               📋 {editingId ? '✏️ Modify Record Row' : '➕ Create New Record Row'}
             </h2>
-            
+
             <form onSubmit={handleSubmit} className="space-y-5 text-left">
               {/* KYC Client Lookup Dropdown (Only for associated sheets) */}
               {isClientSheet() && (
@@ -735,6 +964,9 @@ const DPDataEntryPage: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+
+          {renderHelpPanel()}
           </div>
         ) : (
           /* Grid View Tab */

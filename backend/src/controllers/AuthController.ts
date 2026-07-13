@@ -1,6 +1,7 @@
 import { type Request, type Response } from 'express';
 import type { IAuthService } from '../services/interfaces/IAuthService.js';
 import { HttpStatus } from '../utils/httpStatus.js';
+import { logLoginEvent, logLogoutEvent } from '../utils/auditLogger.js';
 import jwt from 'jsonwebtoken';
 
 /**
@@ -46,6 +47,13 @@ export class AuthController {
         maxAge: 2 * 60 * 60 * 1000, // 2 hours in milliseconds
       });
 
+      // Record the login in the audit trail (fire-and-forget, doesn't block the response)
+      logLoginEvent(req, {
+        id: loginResult.user.id,
+        email: loginResult.user.email,
+        role: loginResult.user.role
+      });
+
       // Send user data back (but not the session token as it's in the cookie)
       res.status(HttpStatus.OK).json({
         user: loginResult.user,
@@ -59,9 +67,21 @@ export class AuthController {
 
   /**
    * Processes the user logout request.
-   * Clears the authentication cookie.
+   * Clears the authentication cookie and records the logout (with session
+   * duration) in the audit trail.
    */
   logout = async (req: Request, res: Response): Promise<void> => {
+    const token = req.cookies?.token;
+
+    if (token) {
+      try {
+        const decoded: any = jwt.verify(token, process.env.JWT_SECRET || 'mis-super-secret-key-2025');
+        await logLogoutEvent(req, { id: decoded.id, email: decoded.email, role: decoded.role });
+      } catch {
+        // Token already invalid/expired — nothing meaningful to record.
+      }
+    }
+
     res.clearCookie('token');
     res.status(HttpStatus.OK).json({ message: 'Logged out successfully' });
   };

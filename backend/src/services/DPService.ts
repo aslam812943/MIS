@@ -31,6 +31,26 @@ const TABLES_WITH_CLIENTS = [
   'dp_client_queries'
 ];
 
+// Mirrors each table's DB CHECK constraint on `status` in database_dp.sql.
+// dis-slips (scan_upload_status) and monthly-statements (dispatch_status)
+// deliberately have no entry here — they don't have a `status` column at
+// all, so a sheet not listed here cleanly rejects a batch status update
+// instead of failing with a raw "column does not exist" DB error.
+const SHEET_STATUS_OPTIONS: { [key: string]: string[] } = {
+  'new-accounts': ['Pending', 'Uploaded', 'Completed', 'Rejected'],
+  'ucc-updation': ['Pending', 'Uploaded', 'Confirmed', 'Rejected'],
+  'modifications': ['Pending', 'Processed', 'Rejected'],
+  'demat-executions': ['Sent to RTA', 'Confirmed', 'Rejected', 'Resubmitted', 'Closed'],
+  'transfers-transmissions': ['Pending', 'Executed', 'Rejected'],
+  'demat-rejections': ['Pending', 'Resolved'],
+  'closures': ['Requested', 'Approved', 'Closed', 'Rejected'],
+  'back-office-updates': ['Success', 'Failed'],
+  'eod-backups': ['Success', 'Failed', 'Verified'],
+  'amc-charges': ['Pending', 'Debited', 'Waived', 'Failed'],
+  'audit-compliance': ['Open', 'Action Pending', 'Closed'],
+  'client-queries': ['Open', 'In Progress', 'Resolved', 'Escalated'],
+};
+
 export class DPService {
   async verifyAccess(userId: string, requiresDashboard = false): Promise<{ authorized: boolean; role?: string; branchId?: string; departmentId?: string }> {
     const client = supabaseAdmin;
@@ -67,7 +87,7 @@ export class DPService {
     };
   }
 
-  private validatePayload(sheet: string, payload: any) {
+  private async validatePayload(client: NonNullable<typeof supabaseAdmin>, sheet: string, payload: any) {
     if (!payload) throw new Error('Data payload is required.');
 
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -83,6 +103,22 @@ export class DPService {
     if (TABLES_WITH_CLIENTS.includes(sheet)) {
       if (!payload.kyc_client_id || !uuidRegex.test(payload.kyc_client_id)) {
         throw new Error('Invalid or missing KYC Client ID reference.');
+      }
+
+      // The client-picker in the UI only ever lists Verified clients, but
+      // the API itself didn't check this — a request built by hand could
+      // reference any kyc_new_account row, including one still Pending or
+      // Rejected, and DP would process it as if KYC was already cleared.
+      const { data: kycClient, error: kycErr } = await client
+        .from('kyc_new_account')
+        .select('status')
+        .eq('id', payload.kyc_client_id)
+        .single();
+      if (kycErr || !kycClient) {
+        throw new Error('Linked KYC client record was not found.');
+      }
+      if (kycClient.status !== 'Verified') {
+        throw new Error('Linked client\'s KYC is not yet Verified. Only Verified clients can be processed here.');
       }
     }
 
@@ -201,11 +237,14 @@ export class DPService {
     }
 
     if (search && hasClient) {
+      // PostgREST's or() filter is a raw string — unescaped commas/parens in
+      // user input could inject extra filter clauses, so strip them first.
+      const safeSearch = search.replace(/[,()]/g, '').slice(0, 100).trim();
       const { data: matchingClients } = await client
         .from('kyc_new_account')
         .select('id')
-        .or(`applicant_name.ilike.%${search}%,pan.ilike.%${search}%`);
-      
+        .or(`applicant_name.ilike.%${safeSearch}%,pan.ilike.%${safeSearch}%`);
+
       const ids = (matchingClients || []).map(c => c.id);
       if (ids.length > 0) {
         query = query.in('kyc_client_id', ids);
@@ -242,7 +281,7 @@ export class DPService {
     delete (payload as any).created_at;
     delete (payload as any).updated_at;
 
-    this.validatePayload(sheet, payload);
+    await this.validatePayload(client, sheet, payload);
 
     const { data: result, error } = await client.from(table).insert(payload).select().single();
     if (error) throw new Error(`Insert failed: ${error.message}`);
@@ -263,7 +302,10 @@ export class DPService {
     const { data: record, error: fetchError } = await query;
     if (fetchError || !record) throw new Error('Record not found.');
 
-    if (access.role === 'employee' && access.branchId && record.branch_id !== access.branchId) {
+    // Branch is locked at creation time (the edit form never shows a branch
+    // selector), so an HOD editing a record outside their own branch should
+    // be blocked the same way bulkUpdate() already blocks it.
+    if ((access.role === 'employee' || access.role === 'hod') && access.branchId && record.branch_id !== access.branchId) {
       throw new Error('Unauthorized branch access.');
     }
 
@@ -275,7 +317,7 @@ export class DPService {
     delete (payload as any).created_at;
     delete (payload as any).updated_at;
 
-    this.validatePayload(sheet, payload);
+    await this.validatePayload(client, sheet, payload);
 
     const { data: result, error } = await client.from(table).update(payload).eq('id', id).select().single();
     if (error) throw new Error(`Update failed: ${error.message}`);
@@ -295,7 +337,7 @@ export class DPService {
     const { data: record, error: fetchError } = await client.from(table).select('branch_id').eq('id', id).single();
     if (fetchError || !record) throw new Error('Record not found.');
 
-    if (access.role === 'employee' && access.branchId && record.branch_id !== access.branchId) {
+    if ((access.role === 'employee' || access.role === 'hod') && access.branchId && record.branch_id !== access.branchId) {
       throw new Error('Unauthorized branch access.');
     }
 
@@ -307,11 +349,15 @@ export class DPService {
     const client = supabaseAdmin;
     if (!client) throw new Error('Supabase client not initialized.');
 
+    updates = updates || {};
+
     const access = await this.verifyAccess(requesterId);
     if (!access.authorized) throw new Error('Unauthorized.');
 
     const table = SHEET_TABLE_MAPPING[sheet];
     if (!table) throw new Error('Invalid sheet mapping.');
+
+    if (!Array.isArray(ids) || ids.length === 0) throw new Error('At least one record id is required.');
 
     if ((access.role === 'employee' || access.role === 'hod') && access.branchId) {
       const { data: mismatchRows } = await client
@@ -325,13 +371,24 @@ export class DPService {
     }
 
     const safeUpdates: any = {};
-    if (updates.status !== undefined) safeUpdates.status = String(updates.status).trim();
+    if (updates.status !== undefined) {
+      const cleanStatus = String(updates.status).trim();
+      const allowedStatuses = SHEET_STATUS_OPTIONS[sheet];
+      if (!allowedStatuses || !allowedStatuses.includes(cleanStatus)) {
+        throw new Error('Invalid status value for this sheet.');
+      }
+      safeUpdates.status = cleanStatus;
+    }
     if (sheet === 'new-accounts') {
       if (updates.pan_copy !== undefined) safeUpdates.pan_copy = !!updates.pan_copy;
       if (updates.aadhaar_copy !== undefined) safeUpdates.aadhaar_copy = !!updates.aadhaar_copy;
       if (updates.bank_proof !== undefined) safeUpdates.bank_proof = !!updates.bank_proof;
       if (updates.photograph !== undefined) safeUpdates.photograph = !!updates.photograph;
       if (updates.signature !== undefined) safeUpdates.signature = !!updates.signature;
+    }
+
+    if (Object.keys(safeUpdates).length === 0) {
+      throw new Error('No valid update properties provided.');
     }
 
     const { data, error } = await client.from(table).update(safeUpdates).in('id', ids).select();
@@ -354,26 +411,32 @@ export class DPService {
 
     const defaultBranchId = access.branchId;
 
-    const validatedRecords = records.map((row: any) => {
-      const branchId = access.role === 'employee' ? defaultBranchId : (row.branch_id || defaultBranchId);
-      if ((access.role === 'employee' || access.role === 'hod') && defaultBranchId && branchId !== defaultBranchId) {
-        throw new Error('Unauthorized: Row contains foreign branch ID.');
+    const validatedRecords: any[] = [];
+    for (let i = 0; i < records.length; i++) {
+      const row = records[i];
+      try {
+        const branchId = access.role === 'employee' ? defaultBranchId : (row.branch_id || defaultBranchId);
+        if ((access.role === 'employee' || access.role === 'hod') && defaultBranchId && branchId !== defaultBranchId) {
+          throw new Error('Unauthorized: Row contains foreign branch ID.');
+        }
+
+        const item: any = {
+          ...row,
+          branch_id: branchId,
+          created_by: requesterId
+        };
+
+        delete item.kyc_new_account;
+        delete item.id;
+        delete item.created_at;
+        delete item.updated_at;
+
+        await this.validatePayload(client, sheet, item);
+        validatedRecords.push(item);
+      } catch (err: any) {
+        throw new Error(`Row ${i + 1}: ${err.message}`);
       }
-
-      const item: any = {
-        ...row,
-        branch_id: branchId,
-        created_by: requesterId
-      };
-
-      delete item.kyc_new_account;
-      delete item.id;
-      delete item.created_at;
-      delete item.updated_at;
-
-      this.validatePayload(sheet, item);
-      return item;
-    });
+    }
 
     const { data, error } = await client.from(table).insert(validatedRecords).select();
     if (error) throw new Error(`Bulk insert failed: ${error.message}`);

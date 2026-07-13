@@ -21,12 +21,33 @@ export class IEPFController {
         msg.includes('Locked') ||
         msg.includes('negative') ||
         msg.includes('date') ||
-        msg.includes('format')
+        msg.includes('format') ||
+        msg.includes('not found')
       ) {
         return 400; // Bad Request
       }
     }
     return HttpStatus.INTERNAL_SERVER_ERROR;
+  }
+
+  /**
+   * Recognized validation/authorization errors (400/403) carry a specific
+   * message that's safe to show the user. Anything that falls through to
+   * 500 is an unexpected failure — usually a raw Postgres/Supabase error —
+   * which used to be forwarded to the client verbatim. Those are now logged
+   * server-side and replaced with a generic message in the response.
+   */
+  private respondError(res: Response, error: unknown, fallbackMessage: string): void {
+    const status = this.getErrorStatus(error);
+    const rawMessage = error instanceof Error ? error.message : fallbackMessage;
+
+    if (status === HttpStatus.INTERNAL_SERVER_ERROR) {
+      console.error('[IEPFController]', rawMessage);
+      res.status(status).json({ message: fallbackMessage });
+      return;
+    }
+
+    res.status(status).json({ message: rawMessage });
   }
 
   /**
@@ -45,8 +66,7 @@ export class IEPFController {
 
       res.status(HttpStatus.OK).json(claims);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to retrieve claims';
-      res.status(this.getErrorStatus(error)).json({ message });
+      this.respondError(res, error, 'Failed to retrieve claims.');
     }
   };
 
@@ -63,8 +83,7 @@ export class IEPFController {
 
       res.status(HttpStatus.CREATED).json(claim);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to create claim';
-      res.status(this.getErrorStatus(error)).json({ message });
+      this.respondError(res, error, 'Failed to create claim.');
     }
   };
 
@@ -87,8 +106,7 @@ export class IEPFController {
 
       res.status(HttpStatus.OK).json(claim);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to update claim';
-      res.status(this.getErrorStatus(error)).json({ message });
+      this.respondError(res, error, 'Failed to update claim.');
     }
   };
 
@@ -107,8 +125,7 @@ export class IEPFController {
       );
       res.status(HttpStatus.OK).json(dashboardData);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to retrieve dashboard metrics';
-      res.status(this.getErrorStatus(error)).json({ message });
+      this.respondError(res, error, 'Failed to retrieve dashboard metrics.');
     }
   };
 
@@ -120,8 +137,7 @@ export class IEPFController {
       const staff = await this.iepfService.getIEPFStaff();
       res.status(HttpStatus.OK).json(staff);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to retrieve department staff';
-      res.status(this.getErrorStatus(error)).json({ message });
+      this.respondError(res, error, 'Failed to retrieve department staff.');
     }
   };
 
@@ -133,8 +149,7 @@ export class IEPFController {
       const investors = await this.iepfService.getVerifiedInvestors();
       res.status(HttpStatus.OK).json(investors);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to retrieve verified investors';
-      res.status(this.getErrorStatus(error)).json({ message });
+      this.respondError(res, error, 'Failed to retrieve verified investors.');
     }
   };
 }

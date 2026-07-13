@@ -244,6 +244,144 @@ const SHEET_FIELDS: Record<SheetType, FieldConfig[]> = {
   ],
 };
 
+interface SheetHelpConfig {
+  why: string;
+  fields: { label: string; note: string }[];
+  remember: string;
+}
+
+// Plain-English explanations shown next to each data entry form, written for
+// operations staff (not developers) — what this sheet is for and why each
+// field matters. Keep the language simple: this is read by branch employees.
+const SHEET_HELP: Record<SheetType, SheetHelpConfig> = {
+  new_account: {
+    why: 'This is where a brand-new client\'s identity documents are captured and checked before they are allowed to trade. Every other sheet in KYC links back to the PAN entered here, so getting this record right the first time matters more than any other sheet.',
+    fields: [
+      { label: 'Applicant Name', note: 'The client\'s full legal name, exactly as printed on their PAN card. Do not use nicknames or short forms.' },
+      { label: 'PAN Card Number', note: 'The client\'s permanent 10-character Income Tax ID (e.g. ABCDE1234F). This is the client\'s unique identity across the whole KYC system — it can only be onboarded once.' },
+      { label: 'Aadhaar Number', note: 'The client\'s 12-digit Aadhaar number, used to confirm identity and address as required by SEBI KYC rules.' },
+      { label: 'Mobile Number', note: 'The client\'s own active 10-digit mobile number, used for OTPs and account alerts. Must belong to the client, not a relative or the branch.' },
+      { label: 'Email', note: 'The client\'s email address, used for statements, contract notes, and account alerts.' },
+      { label: 'Date of Birth', note: 'Confirms the client is an adult and matches the DOB on their PAN/Aadhaar.' },
+      { label: 'Address', note: 'The client\'s current residential address, as shown on their KYC proof.' },
+      { label: 'Documents Checklist', note: 'Tick a box only after you have actually seen and safely filed that document. This checklist is your proof that due diligence was really done.' },
+      { label: 'Verified By / Verification Date', note: 'Who checked and approved this client, and when — needed for the audit trail.' },
+      { label: 'Verification Status', note: 'Pending = still being checked. Verified = approved, client can move on to UCC Allotment. Rejected = documents failed the check.' },
+      { label: 'Remarks', note: 'Any internal notes, e.g. a document that is still missing or a follow-up that is needed.' },
+    ],
+    remember: 'A client\'s PAN can only be onboarded once. If they already exist, use "View Sheet Grid" to search for them instead of creating a duplicate row — the system will now block a second entry with the same PAN.',
+  },
+  ucc_allotment: {
+    why: 'Once a client is verified, their details must be sent to the stock exchange (NSE/BSE) to get a Unique Client Code (UCC). Without a confirmed UCC, the client cannot legally place a single trade.',
+    fields: [
+      { label: 'Client Name / PAN', note: 'Pick the client using "Link Onboarded Client Profile" above instead of typing — this guarantees it matches an already-verified client and can\'t be mistyped.' },
+      { label: 'Exchange', note: 'Which exchange (NSE or BSE) this UCC request is going to.' },
+      { label: 'Segment', note: 'Which market the client wants to trade in — Cash, F&O, Currency, or Commodity. Each segment needs its own UCC mapping.' },
+      { label: 'UCC Code', note: 'The Unique Client Code the exchange sends back once it accepts the request — proof the client can now trade.' },
+      { label: 'Upload Date / Confirmation Date', note: 'When we submitted the request, and when the exchange confirmed it.' },
+      { label: 'Status', note: 'Pending = not yet sent. Uploaded = sent, awaiting exchange reply. Confirmed = client can trade. Rejected = exchange sent it back, check why.' },
+    ],
+    remember: 'Always use the client-linking dropdown rather than free typing — a mismatched name/PAN here can register the UCC against the wrong client.',
+  },
+  registry_updation: {
+    why: 'SEBI requires every client\'s KYC to also be registered with a central registry (CKYC) or a KYC Registration Agency (KRA), so any other bank or broker in India can verify the same client without collecting the same documents all over again.',
+    fields: [
+      { label: 'Client Name / PAN', note: 'Use the client-linking dropdown so this always matches the correct verified client.' },
+      { label: 'Registry', note: 'CKYC is the government Central KYC registry; KRA is a private KYC Registration Agency. Choose whichever this submission is going to.' },
+      { label: 'Upload Date', note: 'The date we submitted the client\'s KYC data to this registry.' },
+      { label: 'Status', note: 'Pending / Verified / Rejected — did the registry accept the data as submitted.' },
+      { label: 'Rejection Reason', note: 'If rejected, write exactly what the registry flagged as wrong, so it can be corrected and resubmitted.' },
+    ],
+    remember: 'Always fill in the Rejection Reason when status is Rejected — without it, nobody else knows what needs fixing before resubmission.',
+  },
+  ap_sharing: {
+    why: 'Some clients are brought in by an Authorised Person (AP) / sub-broker / remisier, who earns a share of the brokerage on that client\'s trades. This sheet records who introduced the client and what percentage they are owed, so commission payouts are correct.',
+    fields: [
+      { label: 'AP Name / AP Code', note: 'The Authorised Person who introduced this client. AP Code is their unique exchange-registered ID.' },
+      { label: 'Client Name', note: 'The client this sharing arrangement applies to.' },
+      { label: 'Sharing Percentage (%)', note: 'What percentage of brokerage on this client\'s trades goes to the AP. Take this figure from the signed AP agreement — never estimate it.' },
+      { label: 'Effective Date', note: 'The date this sharing percentage starts applying.' },
+      { label: 'Status', note: 'Active = currently in effect. Revised = the percentage was changed. Terminated = the arrangement has ended.' },
+    ],
+    remember: 'Double-check the percentage against the signed AP agreement before saving — a wrong number here means a wrong commission payout later.',
+  },
+  demise_reporting: {
+    why: 'If a client passes away, their account must be frozen and the shares formally transferred to their legal heir. This sheet is the official record that starts that process — mistakes here have real legal and family consequences, so accuracy matters more than speed.',
+    fields: [
+      { label: 'Client Name / PAN', note: 'The deceased client\'s details, linked from their onboarding record.' },
+      { label: 'Date of Demise', note: 'The actual date the client passed away, exactly as shown on the death certificate — not the date we found out.' },
+      { label: 'Reported Date', note: 'The date this was reported to us / entered into this system.' },
+      { label: 'Death Certificate', note: 'Upload a clear scan or photo of the official death certificate — this is the legal proof required before any transmission action can begin.' },
+      { label: 'Status', note: 'Reported = logged here. Forwarded to DP = sent to the DP team to freeze holdings and start transmission. Closed = transmission fully completed.' },
+      { label: 'Remarks', note: 'Any notes for the DP / back-office team handling the transmission.' },
+    ],
+    remember: 'This is a sensitive, legally important record. Always attach the death certificate before moving the status to "Forwarded to DP".',
+  },
+  ap_code_exchange: {
+    why: 'Just like a client needs a UCC, an Authorised Person\'s own code must be registered and kept up to date with the exchange, so their activity and commissions are tracked correctly under SEBI rules.',
+    fields: [
+      { label: 'AP Name / AP Code', note: 'The Authorised Person\'s name and their exchange-registered code.' },
+      { label: 'Exchange', note: 'NSE or BSE — which exchange this code is being registered or updated with.' },
+      { label: 'Upload Date', note: 'When the code details were submitted to the exchange.' },
+      { label: 'Status', note: 'Pending = submitted, awaiting exchange confirmation. Confirmed = the exchange has accepted and registered the code.' },
+    ],
+    remember: 'Keep this in sync with the AP\'s actual exchange registration — an unconfirmed code can mean the AP\'s trades aren\'t being tracked correctly.',
+  },
+  onboarding_communication: {
+    why: 'SEBI requires the firm to keep proof that we actually contacted every new client after onboarding — a welcome letter, SMS, call, or email. This sheet is that proof, not just a courtesy record.',
+    fields: [
+      { label: 'Client Name', note: 'Which client this communication was sent to.' },
+      { label: 'Communication Mode', note: 'How we reached them — Letter, SMS, Call, or Email.' },
+      { label: 'Sent Date', note: 'When the communication was sent.' },
+      { label: 'Status', note: 'Sent = delivered successfully. Failed = delivery failed (bad number/address). Not Reachable = client could not be contacted — needs follow-up.' },
+      { label: 'Remarks', note: 'Any notes, e.g. the client asked for a callback, or the number on file is wrong.' },
+    ],
+    remember: 'If status is Failed or Not Reachable, note it and try an alternate contact method — we need to show a genuine attempt was made to reach every client.',
+  },
+  modification_requests: {
+    why: 'Clients sometimes need to update sensitive details on file — address, mobile, email, bank, nomination, or signature. Because these are identity fields, every change must be logged with proof, so there\'s a clear trail if it\'s ever questioned later.',
+    fields: [
+      { label: 'Client Name / PAN', note: 'The client asking for the change.' },
+      { label: 'Modification Type', note: 'What is being changed — Address, Mobile, Email, Bank Details, Nomination, Signature, or Other.' },
+      { label: 'Old Value / New Value', note: 'Write exactly what was on file before, and exactly what it\'s being changed to. This is the audit trail if the change is ever disputed.' },
+      { label: 'Supporting Document', note: 'Upload the client\'s signed request or proof for the new detail (e.g. new address proof).' },
+      { label: 'Request Date / Processed Date', note: 'When the client asked for the change, and when it was actually made in our records.' },
+      { label: 'Status', note: 'Pending = received, not yet actioned. Processed = change completed. Rejected = could not be processed (e.g. proof was insufficient).' },
+    ],
+    remember: 'Always fill in both Old Value and New Value and attach proof — this is what protects the firm if a client later disputes a change to their details.',
+  },
+  reactivation: {
+    why: 'An account that has gone dormant or inactive needs a formal request and approval before it can trade again — SEBI treats inactive accounts differently. This sheet is that formal request and its outcome.',
+    fields: [
+      { label: 'Client Name / PAN', note: 'The client whose dormant account needs reactivating.' },
+      { label: 'Reason for Reactivation', note: 'Why the account went inactive and why it should be reopened now. This is required for the approval trail.' },
+      { label: 'Request Date / Processed Date', note: 'When the client asked to reactivate, and when it was actually completed.' },
+      { label: 'Status', note: 'Pending = under review. Processed = account is active again. Rejected = reactivation was not approved.' },
+    ],
+    remember: 'A clear Reason is required every time — this is exactly what gets checked if a reactivation is ever audited.',
+  },
+  account_closure: {
+    why: 'When a client wants to stop trading with us, their account/UCC must be formally closed. This protects the client (no further charges or liability) and the firm (a clear record of exactly when responsibility ended).',
+    fields: [
+      { label: 'Client Name / PAN', note: 'The client closing their account.' },
+      { label: 'Reason for Closure', note: 'Why the client wants to close (e.g. moving to another broker, no longer trading). Keep this on file in case of a future dispute.' },
+      { label: 'Request Date / Closure Date', note: 'When the client asked to close, and when the account/UCC was actually closed.' },
+      { label: 'Status', note: 'Pending = request received. Processed = account fully closed. Rejected = closure could not proceed (e.g. pending dues or holdings).' },
+    ],
+    remember: 'Make sure the client has no pending dues or unsettled holdings before marking a closure as Processed.',
+  },
+  exchange_compliance: {
+    why: 'SEBI and the exchanges run mandatory periodic checks — PAN-Aadhaar linking, annual KYC refresh, nomination opt-in — that every client must complete by a deadline. This sheet tracks who\'s done, who isn\'t, and who\'s coming due, so nothing slips through.',
+    fields: [
+      { label: 'Client Name / PAN', note: 'The client this compliance check applies to.' },
+      { label: 'Compliance Item', note: 'Which mandatory check this is — PAN-Aadhaar Linkage, Annual KYC Refresh, Nomination Opt-in/Opt-out, or another exchange mandate.' },
+      { label: 'Due Date', note: 'The deadline SEBI/the exchange has set for this to be completed.' },
+      { label: 'Status', note: 'Compliant = done. Non-Compliant = deadline passed and it\'s still not done (account may get restricted). Due = deadline is still coming up.' },
+    ],
+    remember: 'Check this sheet regularly — once a Due Date passes with no action, the exchange can restrict that client\'s trading account.',
+  },
+};
+
 const getBackendSheetName = (tab: SheetType): string => {
   const map: Record<SheetType, string> = {
     new_account: 'new-accounts',
@@ -883,6 +1021,57 @@ const KYCDataEntryPage: React.FC = () => {
           </select>
           <p className="text-[10px] mt-1.5" style={{ color: 'var(--text-secondary)' }}>
             Linking populated records here automatically loads name & PAN, and maintains consistency across tracker modules.
+          </p>
+        </div>
+      </div>
+    );
+  };
+
+  // Plain-English "why are we collecting this" panel shown beside the entry
+  // form — same content for every employee, sheet by sheet.
+  const renderHelpPanel = () => {
+    const help = SHEET_HELP[sheetTab];
+    if (!help) return null;
+
+    return (
+      <div
+        className="border rounded-xl p-5 shadow-xs space-y-4 lg:sticky lg:top-4"
+        style={{ background: 'var(--panel-inset-soft)', borderColor: 'var(--border)' }}
+      >
+        <div>
+          <h3 className="text-sm font-bold flex items-center gap-1.5 mb-1.5" style={{ color: 'var(--text-primary)' }}>
+            💡 Why this sheet exists
+          </h3>
+          <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+            {help.why}
+          </p>
+        </div>
+
+        <hr style={{ borderColor: 'var(--border)' }} />
+
+        <div>
+          <h3 className="text-sm font-bold mb-2.5" style={{ color: 'var(--text-primary)' }}>
+            📖 What each field means
+          </h3>
+          <div className="space-y-3">
+            {help.fields.map((f) => (
+              <div key={f.label}>
+                <div className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>{f.label}</div>
+                <div className="text-[11px] leading-relaxed mt-0.5" style={{ color: 'var(--text-secondary)' }}>{f.note}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div
+          className="p-3 rounded-lg border-l-4"
+          style={{ background: 'var(--bg-card)', borderColor: 'var(--accent)' }}
+        >
+          <div className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--accent)' }}>
+            ⚠️ Remember
+          </div>
+          <p className="text-[11px] leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+            {help.remember}
           </p>
         </div>
       </div>
@@ -2330,58 +2519,62 @@ const KYCDataEntryPage: React.FC = () => {
             </div>
           </div>
         ) : (
-          /* Register Entry Tab Form */
-          <div className="border rounded-xl p-6 max-w-2xl mx-auto shadow-xs" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-            <h2 className="text-lg font-bold mb-6 flex items-center gap-1.5" style={{ color: 'var(--text-primary)' }}>
-              {editingId ? '✏️ Edit Row Entry' : '📝 Create New Row Entry'}
-            </h2>
-            
-            <form onSubmit={handleSubmit} className="space-y-4">
-              
-              {/* Dynamic inputs */}
-              {renderFormFields()}
+          /* Register Entry Tab Form + plain-English help panel */
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-6 items-start max-w-6xl mx-auto">
+            <div className="border rounded-xl p-6 shadow-xs" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+              <h2 className="text-lg font-bold mb-6 flex items-center gap-1.5" style={{ color: 'var(--text-primary)' }}>
+                {editingId ? '✏️ Edit Row Entry' : '📝 Create New Row Entry'}
+              </h2>
 
-              <hr className="border-slate-200 dark:border-slate-800 my-6" style={{ borderColor: 'var(--border)' }} />
+              <form onSubmit={handleSubmit} className="space-y-4">
 
-              {/* Branch Assignment (Locked for non-admin/management) */}
-              <div className="mis-field">
-                <label className="mis-label">Branch Office Allocation</label>
-                <select
-                  value={formData.branch_id}
-                  onChange={(e) => handleInputChange('branch_id', e.target.value)}
-                  disabled={!hasMultiBranchAccess}
-                  className="mis-select disabled:opacity-50"
-                  required
-                >
-                  <option value="">-- Choose Branch --</option>
-                  {branches.map((b) => (
-                    <option key={b.id} value={b.id}>{b.name}</option>
-                  ))}
-                </select>
-              </div>
+                {/* Dynamic inputs */}
+                {renderFormFields()}
 
-              {/* Action Buttons */}
-              <div className="flex justify-end gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveTab('list');
-                    setEditingId(null);
-                  }}
-                  className="px-4 py-2 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
-                  style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="px-4 py-2 bg-teal-600 hover:bg-teal-700 disabled:bg-teal-400 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-1"
-                >
-                  {loading ? 'Saving...' : editingId ? '💾 Save Changes' : '➕ Add Record'}
-                </button>
-              </div>
-            </form>
+                <hr className="border-slate-200 dark:border-slate-800 my-6" style={{ borderColor: 'var(--border)' }} />
+
+                {/* Branch Assignment (Locked for non-admin/management) */}
+                <div className="mis-field">
+                  <label className="mis-label">Branch Office Allocation</label>
+                  <select
+                    value={formData.branch_id}
+                    onChange={(e) => handleInputChange('branch_id', e.target.value)}
+                    disabled={!hasMultiBranchAccess}
+                    className="mis-select disabled:opacity-50"
+                    required
+                  >
+                    <option value="">-- Choose Branch --</option>
+                    {branches.map((b) => (
+                      <option key={b.id} value={b.id}>{b.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex justify-end gap-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTab('list');
+                      setEditingId(null);
+                    }}
+                    className="px-4 py-2 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
+                    style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="px-4 py-2 bg-teal-600 hover:bg-teal-700 disabled:bg-teal-400 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-1"
+                  >
+                    {loading ? 'Saving...' : editingId ? '💾 Save Changes' : '➕ Add Record'}
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            {renderHelpPanel()}
           </div>
         )}
 

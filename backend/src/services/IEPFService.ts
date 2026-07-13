@@ -4,19 +4,17 @@ import type { IEPFClaim } from '../models/iepfClaim.model.js';
 export class IEPFService {
   
   /**
-   * Helper to escape HTML tags to prevent XSS (Cross-Site Scripting).
+   * Strips NUL/control characters, which Postgres rejects outright in text
+   * columns. Deliberately does NOT HTML-entity-encode the value: the React
+   * frontend never uses dangerouslySetInnerHTML for this data, so it already
+   * renders stored text safely as plain text. Encoding it here as well used
+   * to corrupt ordinary investor names and remarks — e.g. "D'Souza" or
+   * "S&P bond transfer" — into literal "D&#39;Souza" strings that were then
+   * displayed verbatim (React doesn't decode HTML entities in text nodes).
    */
-  private escapeXSS(str: string): string {
-    return str.replace(/[&<>'"]/g, (tag) => {
-      const chars: Record<string, string> = {
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        "'": '&#39;',
-        '"': '&quot;'
-      };
-      return chars[tag] || tag;
-    });
+  private sanitizeText(str: string): string {
+    const controlCharPattern = new RegExp('[' + String.fromCharCode(0) + '-' + String.fromCharCode(31) + String.fromCharCode(127) + ']', 'g');
+    return str.replace(controlCharPattern, '');
   }
 
   /**
@@ -161,7 +159,7 @@ export class IEPFService {
 
     const claimToInsert: any = {
       claim_number: claimNumber,
-      investor_name: this.escapeXSS(claimData.investor_name.trim()),
+      investor_name: this.sanitizeText(claimData.investor_name.trim()),
       pan_number: claimData.pan_number.trim().toUpperCase(),
       claim_type: claimData.claim_type,
       amount: Number(claimData.amount) || 0,
@@ -174,7 +172,7 @@ export class IEPFService {
     };
 
     if (claimData.client_id) {
-      claimToInsert.client_id = this.escapeXSS(claimData.client_id.trim());
+      claimToInsert.client_id = this.sanitizeText(claimData.client_id.trim());
     }
 
     if (claimToInsert.status === 'Documents Pending') {
@@ -185,7 +183,7 @@ export class IEPFService {
 
     if (claimToInsert.status === 'Closed') {
       claimToInsert.closed_date = claimData.closed_date || new Date().toISOString().split('T')[0];
-      claimToInsert.resolution_remarks = this.escapeXSS(claimData.resolution_remarks || '');
+      claimToInsert.resolution_remarks = this.sanitizeText(claimData.resolution_remarks || '');
       claimToInsert.amount_released = Number(claimData.amount_released) || 0;
       claimToInsert.shares_released = Number(claimData.shares_released) || 0;
     }
@@ -264,7 +262,7 @@ export class IEPFService {
     };
 
     // Safely transfer inputs and sanitize text fields
-    if (claimData.investor_name !== undefined) claimToUpdate.investor_name = this.escapeXSS(claimData.investor_name.trim());
+    if (claimData.investor_name !== undefined) claimToUpdate.investor_name = this.sanitizeText(claimData.investor_name.trim());
     if (claimData.pan_number !== undefined) claimToUpdate.pan_number = claimData.pan_number.trim().toUpperCase();
     if (claimData.claim_type !== undefined) claimToUpdate.claim_type = claimData.claim_type;
     if (claimData.amount !== undefined) claimToUpdate.amount = Number(claimData.amount);
@@ -288,7 +286,7 @@ export class IEPFService {
 
       if (claimToUpdate.status === 'Closed') {
         claimToUpdate.closed_date = claimData.closed_date || new Date().toISOString().split('T')[0];
-        claimToUpdate.resolution_remarks = this.escapeXSS(claimData.resolution_remarks || '');
+        claimToUpdate.resolution_remarks = this.sanitizeText(claimData.resolution_remarks || '');
         claimToUpdate.amount_released = Number(claimData.amount_released) || 0;
         claimToUpdate.shares_released = Number(claimData.shares_released) || 0;
       } else {
@@ -304,7 +302,7 @@ export class IEPFService {
       }
       if (existingClaim.status === 'Closed') {
         if (claimData.closed_date !== undefined) claimToUpdate.closed_date = claimData.closed_date;
-        if (claimData.resolution_remarks !== undefined) claimToUpdate.resolution_remarks = this.escapeXSS(claimData.resolution_remarks || '');
+        if (claimData.resolution_remarks !== undefined) claimToUpdate.resolution_remarks = this.sanitizeText(claimData.resolution_remarks || '');
         if (claimData.amount_released !== undefined) claimToUpdate.amount_released = Number(claimData.amount_released);
         if (claimData.shares_released !== undefined) claimToUpdate.shares_released = Number(claimData.shares_released);
       }

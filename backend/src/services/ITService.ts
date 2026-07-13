@@ -12,6 +12,23 @@ const SHEET_TABLE_MAPPING: { [key: string]: string } = {
   'projects': 'it_projects'
 };
 
+// Mirrors each table's DB CHECK constraint on `status` in database_it.sql.
+// 'diagrams' has no entry — it has no status column at all.
+const SHEET_STATUS_OPTIONS: { [key: string]: string[] } = {
+  'audits': ['Scheduled', 'In Progress', 'Report Received', 'Submitted', 'Overdue'],
+  'audit-findings': ['Open', 'In Progress', 'Implemented', 'Closed', 'Overdue'],
+  'vendors': ['Active', 'Under Renewal', 'Expired', 'Terminated'],
+  'assets': ['Active', 'Under Repair', 'Retired', 'Disposed'],
+  'cybersecurity-compliance': ['Compliant', 'Non-Compliant', 'Due for Review', 'In Remediation'],
+  'tickets': ['Open', 'In Progress', 'Resolved', 'Closed'],
+  'incidents': ['Identified', 'Investigating', 'Mitigated', 'Resolved'],
+  'projects': ['Planning', 'In Progress', 'On Hold', 'Completed', 'Cancelled'],
+};
+
+// Only audit-findings and incidents have a `severity` column.
+const SHEETS_WITH_SEVERITY = new Set(['audit-findings', 'incidents']);
+const SEVERITY_OPTIONS = ['Critical', 'High', 'Medium', 'Low'];
+
 export class ITService {
   /**
    * Verifies if the requester has permission to access IT department data.
@@ -91,15 +108,19 @@ export class ITService {
     return yearsElapsed >= Number(asset.useful_life_years);
   }
 
+  /**
+   * Strips NUL/control characters, which Postgres rejects outright in text
+   * columns. Deliberately does NOT HTML-entity-encode the value: the React
+   * frontend never uses dangerouslySetInnerHTML for this data, so it already
+   * renders stored text safely as plain text. Encoding it here as well used
+   * to corrupt ordinary IT text like "R&D server", "Vendor's contract", or
+   * "Rack 3/B" into literal "R&amp;D server" strings that were then
+   * displayed verbatim (React doesn't decode HTML entities in text nodes).
+   */
   private sanitizeString(str: any): any {
     if (typeof str !== 'string') return str;
-    return str
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#x27;')
-      .replace(/\//g, '&#x2F;');
+    const controlCharPattern = new RegExp('[' + String.fromCharCode(0) + '-' + String.fromCharCode(31) + String.fromCharCode(127) + ']', 'g');
+    return str.replace(controlCharPattern, '');
   }
 
   private sanitizePayload(payload: any) {
@@ -203,11 +224,15 @@ export class ITService {
       }
     }
 
-    // Constraints validation
-    if (payload.status !== undefined && payload.status !== null) {
-      const allowed = ['Scheduled', 'In Progress', 'Report Received', 'Submitted', 'Overdue', 'Open', 'Implemented', 'Closed', 'Active', 'Under Renewal', 'Expired', 'Terminated', 'Under Repair', 'Retired', 'Disposed', 'Compliant', 'Non-Compliant', 'Due for Review', 'In Remediation', 'Resolved', 'Identified', 'Investigating', 'Mitigated', 'Planning', 'On Hold', 'Completed', 'Cancelled'];
-      if (!allowed.includes(String(payload.status).trim())) {
-        throw new Error('Invalid status value.');
+    // Constraints validation. Status is sheet-specific (e.g. 'vendors' only
+    // allows Active/Under Renewal/Expired/Terminated, not 'tickets'
+    // Open/In Progress/etc) — validating against one merged list across all
+    // 9 sheets would let a wrong-sheet value pass here and only fail later
+    // against the database CHECK constraint with a raw, unfriendly error.
+    if (payload.status !== undefined && payload.status !== null && String(payload.status).trim() !== '') {
+      const allowed = SHEET_STATUS_OPTIONS[sheet];
+      if (!allowed || !allowed.includes(String(payload.status).trim())) {
+        throw new Error('Invalid status value for this sheet.');
       }
     }
 
@@ -292,14 +317,21 @@ export class ITService {
     }
 
     if (search) {
-      if (sheet === 'vendors') {
-        query = query.or(`vendor_name.ilike.%${search}%,poc_name.ilike.%${search}%`);
-      } else if (sheet === 'assets') {
-        query = query.or(`asset_id.ilike.%${search}%,make_model.ilike.%${search}%`);
-      } else if (sheet === 'audits') {
-        query = query.ilike('audit_name', `%${search}%`);
-      } else if (sheet === 'tickets') {
-        query = query.or(`ticket_number.ilike.%${search}%,issue_description.ilike.%${search}%`);
+      // PostgREST's or()/ilike() filters are built from a raw string, so
+      // comma/parenthesis characters in user input can inject extra filter
+      // clauses. Strip the syntax metacharacters and cap the length first.
+      const safeSearch = search.replace(/[,()]/g, '').slice(0, 100).trim();
+
+      if (safeSearch) {
+        if (sheet === 'vendors') {
+          query = query.or(`vendor_name.ilike.%${safeSearch}%,poc_name.ilike.%${safeSearch}%`);
+        } else if (sheet === 'assets') {
+          query = query.or(`asset_id.ilike.%${safeSearch}%,make_model.ilike.%${safeSearch}%`);
+        } else if (sheet === 'audits') {
+          query = query.ilike('audit_name', `%${safeSearch}%`);
+        } else if (sheet === 'tickets') {
+          query = query.or(`ticket_number.ilike.%${safeSearch}%,issue_description.ilike.%${safeSearch}%`);
+        }
       }
     }
 
@@ -363,7 +395,10 @@ export class ITService {
     const { data: record, error: fetchError } = await query;
     if (fetchError || !record) throw new Error('Record not found.');
 
-    if (access.role === 'employee' && access.branchId && record.branch_id !== access.branchId) {
+    // Branch is locked at creation time (the edit form never shows a branch
+    // selector), so an HOD editing a record outside their own branch should
+    // be blocked the same way bulkUpdate() already blocks it.
+    if ((access.role === 'employee' || access.role === 'hod') && access.branchId && record.branch_id !== access.branchId) {
       throw new Error('Unauthorized branch access.');
     }
 
@@ -396,7 +431,7 @@ export class ITService {
     const { data: record, error: fetchError } = await client.from(table).select('branch_id').eq('id', id).single();
     if (fetchError || !record) throw new Error('Record not found.');
 
-    if (access.role === 'employee' && access.branchId && record.branch_id !== access.branchId) {
+    if ((access.role === 'employee' || access.role === 'hod') && access.branchId && record.branch_id !== access.branchId) {
       throw new Error('Unauthorized branch access.');
     }
 
@@ -408,11 +443,15 @@ export class ITService {
     const client = supabaseAdmin;
     if (!client) throw new Error('Supabase client not initialized.');
 
+    updates = updates || {};
+
     const access = await this.verifyAccess(requesterId);
     if (!access.authorized) throw new Error('Unauthorized.');
 
     const table = SHEET_TABLE_MAPPING[sheet];
     if (!table) throw new Error('Invalid sheet mapping.');
+
+    if (!Array.isArray(ids) || ids.length === 0) throw new Error('At least one record id is required.');
 
     if ((access.role === 'employee' || access.role === 'hod') && access.branchId) {
       const { data: mismatchRows } = await client
@@ -426,9 +465,33 @@ export class ITService {
     }
 
     const safeUpdates: any = {};
-    if (updates.status !== undefined) safeUpdates.status = String(updates.status).trim();
-    if (updates.severity !== undefined) safeUpdates.severity = String(updates.severity).trim();
-    if (updates.assigned_to !== undefined) safeUpdates.assigned_to = String(updates.assigned_to).trim();
+
+    if (updates.status !== undefined) {
+      const cleanStatus = String(updates.status).trim();
+      const allowedStatuses = SHEET_STATUS_OPTIONS[sheet];
+      if (!allowedStatuses || !allowedStatuses.includes(cleanStatus)) {
+        throw new Error('Invalid status value for this sheet.');
+      }
+      safeUpdates.status = cleanStatus;
+    }
+
+    if (updates.severity !== undefined) {
+      const cleanSeverity = String(updates.severity).trim();
+      if (!SHEETS_WITH_SEVERITY.has(sheet) || !SEVERITY_OPTIONS.includes(cleanSeverity)) {
+        throw new Error('Invalid severity value for this sheet.');
+      }
+      safeUpdates.severity = cleanSeverity;
+    }
+
+    if (updates.assigned_to !== undefined) {
+      const cleanAssignee = String(updates.assigned_to).trim().slice(0, 255);
+      if (!cleanAssignee) throw new Error('Assigned To cannot be empty.');
+      safeUpdates.assigned_to = cleanAssignee;
+    }
+
+    if (Object.keys(safeUpdates).length === 0) {
+      throw new Error('No valid update properties provided.');
+    }
 
     const { data, error } = await client.from(table).update(safeUpdates).in('id', ids).select();
     if (error) throw new Error(`Bulk update failed: ${error.message}`);
