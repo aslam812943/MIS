@@ -18,7 +18,10 @@ export class KYCController {
         msg.includes('Required') ||
         msg.includes('cannot exceed') ||
         msg.includes('must be') ||
-        msg.includes('percentage')
+        msg.includes('percentage') ||
+        msg.includes('already onboarded') ||
+        msg.includes('Duplicate PAN') ||
+        msg.includes('already imported')
       ) {
         return HttpStatus.BAD_REQUEST;
       }

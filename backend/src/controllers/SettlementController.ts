@@ -21,12 +21,33 @@ export class SettlementController {
         msg.includes('required') ||
         msg.includes('exists') ||
         msg.includes('cannot exceed') ||
-        msg.includes('must be an integer')
+        msg.includes('must be an integer') ||
+        msg.includes('not found')
       ) {
         return 400; // Bad Request
       }
     }
     return HttpStatus.INTERNAL_SERVER_ERROR;
+  }
+
+  /**
+   * Recognized validation/authorization errors (400/403) carry a specific
+   * message that's safe to show the user. Anything that falls through to
+   * 500 is an unexpected failure — usually a raw Postgres/Supabase error —
+   * which used to be forwarded to the client verbatim. Those are now logged
+   * server-side and replaced with a generic message in the response.
+   */
+  private respondError(res: Response, error: unknown, fallbackMessage: string): void {
+    const status = this.getErrorStatus(error);
+    const rawMessage = error instanceof Error ? error.message : fallbackMessage;
+
+    if (status === HttpStatus.INTERNAL_SERVER_ERROR) {
+      console.error('[SettlementController]', rawMessage);
+      res.status(status).json({ message: fallbackMessage });
+      return;
+    }
+
+    res.status(status).json({ message: rawMessage });
   }
 
   /* ═══════════════════════════════════════════════
@@ -50,8 +71,7 @@ export class SettlementController {
 
       res.status(HttpStatus.OK).json(stats);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to retrieve dashboard stats';
-      res.status(this.getErrorStatus(error)).json({ message });
+      this.respondError(res, error, 'Failed to retrieve dashboard stats.');
     }
   };
 
@@ -75,8 +95,7 @@ export class SettlementController {
 
       res.status(HttpStatus.OK).json(records);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to retrieve records';
-      res.status(this.getErrorStatus(error)).json({ message });
+      this.respondError(res, error, 'Failed to retrieve records.');
     }
   };
 
@@ -93,8 +112,7 @@ export class SettlementController {
 
       res.status(HttpStatus.CREATED).json(record);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to create record';
-      res.status(this.getErrorStatus(error)).json({ message });
+      this.respondError(res, error, 'Failed to create record.');
     }
   };
 
@@ -117,8 +135,7 @@ export class SettlementController {
 
       res.status(HttpStatus.OK).json(record);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to update record';
-      res.status(this.getErrorStatus(error)).json({ message });
+      this.respondError(res, error, 'Failed to update record.');
     }
   };
 
@@ -142,8 +159,7 @@ export class SettlementController {
 
       res.status(HttpStatus.OK).json(records);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to retrieve Client Requests';
-      res.status(this.getErrorStatus(error)).json({ message });
+      this.respondError(res, error, 'Failed to retrieve Client Requests.');
     }
   };
 
@@ -160,8 +176,7 @@ export class SettlementController {
 
       res.status(HttpStatus.CREATED).json(record);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to create Client Request';
-      res.status(this.getErrorStatus(error)).json({ message });
+      this.respondError(res, error, 'Failed to create Client Request.');
     }
   };
 
@@ -184,8 +199,7 @@ export class SettlementController {
 
       res.status(HttpStatus.OK).json(record);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to update Client Request';
-      res.status(this.getErrorStatus(error)).json({ message });
+      this.respondError(res, error, 'Failed to update Client Request.');
     }
   };
 
@@ -209,8 +223,7 @@ export class SettlementController {
 
       res.status(HttpStatus.OK).json(records);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to retrieve IPO Allocations';
-      res.status(this.getErrorStatus(error)).json({ message });
+      this.respondError(res, error, 'Failed to retrieve IPO Allocations.');
     }
   };
 
@@ -227,8 +240,7 @@ export class SettlementController {
 
       res.status(HttpStatus.CREATED).json(record);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to create IPO Allocation';
-      res.status(this.getErrorStatus(error)).json({ message });
+      this.respondError(res, error, 'Failed to create IPO Allocation.');
     }
   };
 
@@ -251,8 +263,7 @@ export class SettlementController {
 
       res.status(HttpStatus.OK).json(record);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to update IPO Allocation';
-      res.status(this.getErrorStatus(error)).json({ message });
+      this.respondError(res, error, 'Failed to update IPO Allocation.');
     }
   };
 
@@ -276,8 +287,7 @@ export class SettlementController {
 
       res.status(HttpStatus.OK).json(records);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to retrieve Corporate Actions';
-      res.status(this.getErrorStatus(error)).json({ message });
+      this.respondError(res, error, 'Failed to retrieve Corporate Actions.');
     }
   };
 
@@ -294,8 +304,7 @@ export class SettlementController {
 
       res.status(HttpStatus.CREATED).json(record);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to create Corporate Action record';
-      res.status(this.getErrorStatus(error)).json({ message });
+      this.respondError(res, error, 'Failed to create Corporate Action record.');
     }
   };
 
@@ -318,8 +327,7 @@ export class SettlementController {
 
       res.status(HttpStatus.OK).json(record);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to update Corporate Action record';
-      res.status(this.getErrorStatus(error)).json({ message });
+      this.respondError(res, error, 'Failed to update Corporate Action record.');
     }
   };
 
@@ -331,8 +339,7 @@ export class SettlementController {
       const clients = await this.settlementService.getVerifiedClients();
       res.status(HttpStatus.OK).json(clients);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to retrieve verified clients';
-      res.status(this.getErrorStatus(error)).json({ message });
+      this.respondError(res, error, 'Failed to retrieve verified clients.');
     }
   };
 }

@@ -1,5 +1,24 @@
 import { supabaseAdmin } from '../config/supabase.js';
 
+// Mirrors each table's DB CHECK constraint in database_kyc.sql exactly.
+// Used by bulkUpdate() so a batch status change can't write a value the
+// database would reject anyway (it previously wrote whatever string was
+// sent with only a .trim(), relying entirely on the DB constraint and
+// surfacing a raw Postgres error to the client if it didn't match).
+const SHEET_STATUS_OPTIONS: { [key: string]: string[] } = {
+  'new-accounts': ['Pending', 'Verified', 'Rejected'],
+  'ucc-allotments': ['Pending', 'Uploaded', 'Confirmed', 'Rejected'],
+  'registry-updates': ['Pending', 'Verified', 'Rejected'],
+  'ap-sharings': ['Active', 'Revised', 'Terminated'],
+  'demise-reports': ['Reported', 'Forwarded to DP', 'Closed'],
+  'ap-codes': ['Pending', 'Confirmed'],
+  'communications': ['Sent', 'Failed', 'Not Reachable'],
+  'modifications': ['Pending', 'Processed', 'Rejected'],
+  'reactivations': ['Pending', 'Processed', 'Rejected'],
+  'closures': ['Pending', 'Processed', 'Rejected'],
+  'compliance': ['Compliant', 'Non-Compliant', 'Due'],
+};
+
 export class KYCService {
   /**
    * Helper method to verify if a user is authorized to perform KYC actions.
@@ -115,6 +134,24 @@ export class KYCService {
     return dateStr;
   }
 
+  /**
+   * Throws if `pan` is already present in kyc_new_account (the master
+   * client-onboarding table). Pass `excludeId` when checking an update so a
+   * record isn't flagged as a duplicate of itself. This is an app-level
+   * check — see the UNIQUE constraint added in database_kyc.sql for the
+   * database-level backstop that closes the race-condition window between
+   * two concurrent requests both passing this check at the same time.
+   */
+  private async assertPanNotOnboarded(client: NonNullable<typeof supabaseAdmin>, pan: string, excludeId?: string): Promise<void> {
+    let query = client.from('kyc_new_account').select('id').eq('pan', pan).limit(1);
+    if (excludeId) query = query.neq('id', excludeId);
+    const { data, error } = await query.maybeSingle();
+    if (error) throw new Error(error.message);
+    if (data) {
+      throw new Error(`PAN ${pan} is already onboarded in New Account Onboarding. Search the existing record instead of creating a duplicate.`);
+    }
+  }
+
   // ═══════════════════════════════════════════════
   // FILE UPLOAD UTILITY
   // ═══════════════════════════════════════════════
@@ -194,6 +231,12 @@ export class KYCService {
     const address = this.validateRequiredString(recordData.address, 'Address', 1000);
     const date_of_birth = this.validateDate(recordData.date_of_birth, 'Date of Birth');
 
+    // A PAN identifies one investor. This is the master onboarding table, so
+    // the same PAN must never be onboarded twice — that would create two
+    // separate "client identities" for the same person across every sheet
+    // that links back here (UCC, registry, modifications, etc.).
+    await this.assertPanNotOnboarded(client, pan);
+
     const branch_id = recordData.branch_id || access.branchId;
     if (!branch_id) throw new Error('Branch assignment is required.');
 
@@ -237,7 +280,11 @@ export class KYCService {
 
     const updatedData: any = {};
     if (recordData.applicant_name !== undefined) updatedData.applicant_name = this.validateRequiredString(recordData.applicant_name, 'Applicant Name');
-    if (recordData.pan !== undefined) updatedData.pan = this.validatePAN(recordData.pan);
+    if (recordData.pan !== undefined) {
+      const newPan = this.validatePAN(recordData.pan);
+      await this.assertPanNotOnboarded(client, newPan, id);
+      updatedData.pan = newPan;
+    }
     if (recordData.aadhaar_number !== undefined) updatedData.aadhaar_number = this.validateAadhaar(recordData.aadhaar_number);
     if (recordData.mobile_number !== undefined) updatedData.mobile_number = this.validateMobile(recordData.mobile_number);
     if (recordData.email !== undefined) updatedData.email = this.validateEmail(recordData.email);
@@ -1585,6 +1632,30 @@ export class KYCService {
     const targetTable = tableNameMap[sheet];
     if (!targetTable) throw new Error(`Invalid sheet identifier: ${sheet}`);
 
+    if (sheet === 'new-accounts') {
+      // Guard against duplicate PANs both within the uploaded file itself
+      // and against clients already onboarded in previous uploads/entries.
+      const pansInBatch: string[] = validatedRecords.map(r => r.pan);
+      const seen = new Set<string>();
+      const dupesInBatch = new Set<string>();
+      for (const p of pansInBatch) {
+        if (seen.has(p)) dupesInBatch.add(p);
+        seen.add(p);
+      }
+      if (dupesInBatch.size > 0) {
+        throw new Error(`Duplicate PAN(s) within the uploaded file: ${[...dupesInBatch].join(', ')}. Each PAN can only be onboarded once.`);
+      }
+
+      const { data: existingPans, error: existErr } = await client
+        .from('kyc_new_account')
+        .select('pan')
+        .in('pan', pansInBatch);
+      if (existErr) throw new Error(existErr.message);
+      if (existingPans && existingPans.length > 0) {
+        throw new Error(`These PAN(s) are already onboarded and cannot be imported again: ${existingPans.map((r: any) => r.pan).join(', ')}.`);
+      }
+    }
+
     const { data, error } = await client
       .from(targetTable)
       .insert(validatedRecords)
@@ -1638,8 +1709,13 @@ export class KYCService {
     const safeUpdates: any = {};
 
     if (updates.status !== undefined) {
-      safeUpdates.status = String(updates.status).trim();
-      
+      const cleanStatus = String(updates.status).trim();
+      const allowedStatuses = SHEET_STATUS_OPTIONS[sheet];
+      if (!allowedStatuses || !allowedStatuses.includes(cleanStatus)) {
+        throw new Error(`Invalid status value for this sheet.`);
+      }
+      safeUpdates.status = cleanStatus;
+
       if (sheet === 'new-accounts' && safeUpdates.status === 'Verified') {
         safeUpdates.verified_by = access.role === 'hod' ? 'KYC HOD' : 'KYC Employee';
         safeUpdates.verification_date = new Date().toISOString().split('T')[0];

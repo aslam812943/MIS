@@ -2,7 +2,7 @@ export interface AuditLog {
   id: string;
   table_name: string;
   record_id?: string;
-  action: 'INSERT' | 'UPDATE' | 'DELETE';
+  action: 'INSERT' | 'UPDATE' | 'DELETE' | 'LOGIN' | 'LOGOUT';
   old_data?: any;
   new_data?: any;
   user_id?: string;

@@ -7,6 +7,28 @@ import { orgService } from '../../services/org.service';
 import ConfirmModal from '../../components/common/ConfirmModal';
 import { INITIAL_CONFIRM_STATE, type ConfirmDialogState } from '../../types/confirm.types';
 
+// Plain-English explanation shown next to the claim form, written for
+// operations staff (not developers) — why this page exists and what each
+// field means.
+const IEPF_HELP = {
+  why: 'When a company doesn\'t pay out dividends or transfer shares to an investor for 7 straight years, that unclaimed money and those shares are legally handed over to the government\'s Investor Education and Protection Fund (IEPF). The investor doesn\'t lose it — but getting it back means filing a formal claim with the company/RTA. This page is where we log and manage every client\'s claim through that process, from filing to final resolution.',
+  fields: [
+    { label: 'Claim Number', note: 'Auto-generated once the claim is submitted — a unique reference for this case, used in all future correspondence about it.' },
+    { label: 'Investor Name', note: 'The investor\'s full legal name, exactly matching what\'s on record with the company/RTA and their PAN. A mismatch here can get the claim rejected.' },
+    { label: 'PAN Card Number', note: 'The investor\'s PAN — used to verify identity and match against the company\'s and RTA\'s existing records.' },
+    { label: 'Claim Type', note: 'Dividend Recovery, Shares Transfer, or Both — what the investor is actually reclaiming from IEPF.' },
+    { label: 'Claim Date', note: 'When this claim was formally logged.' },
+    { label: 'Amount', note: 'The dividend amount being reclaimed (shown only for Dividend or Both claim types).' },
+    { label: 'Number of Shares', note: 'How many shares are being reclaimed (shown only for Shares or Both claim types).' },
+    { label: 'Status', note: 'New = just logged. Under Verification = being checked. Documents Pending = something\'s missing from the investor. Approved / Rejected = decision made. Closed = fully resolved.' },
+    { label: 'Expected Closure Date', note: 'A realistic estimate of when this claim should be resolved — helps set the right expectation with the investor.' },
+    { label: 'Branch Office', note: 'Which branch is handling this claim.' },
+    { label: 'Pending Reasons', note: 'Only shown when Status is Documents Pending — tick exactly what\'s missing (PAN mismatch, Aadhaar, signature, bank details, legal documents) so the investor knows precisely what to send in.' },
+    { label: 'Closed Date / Amount Released / Shares Released / Resolution Remarks', note: 'Only shown when Status is Closed — the final outcome: when it closed, what was actually released, and notes on how it was resolved. This is the permanent record of the case.' },
+  ],
+  remember: 'Never mark a claim Closed without filling in Resolution Remarks and the actual Amount/Shares Released — this is the final record of what the investor received, and it\'s what gets checked if the claim is ever disputed later.',
+};
+
 const INITIAL_FORM_STATE = {
   claim_number: '',
   investor_name: '',
@@ -313,6 +335,51 @@ const IEPFDataEntryPage: React.FC = () => {
     setActiveTab('list');
   };
 
+  // Plain-English "why are we collecting this" panel shown beside the claim form.
+  const renderHelpPanel = () => (
+    <div
+      className="border rounded-xl p-5 shadow-xs space-y-4 lg:sticky lg:top-4"
+      style={{ background: 'var(--panel-inset-soft)', borderColor: 'var(--border)' }}
+    >
+      <div>
+        <h3 className="text-sm font-bold flex items-center gap-1.5 mb-1.5" style={{ color: 'var(--text-primary)' }}>
+          💡 Why this page exists
+        </h3>
+        <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+          {IEPF_HELP.why}
+        </p>
+      </div>
+
+      <hr style={{ borderColor: 'var(--border)' }} />
+
+      <div>
+        <h3 className="text-sm font-bold mb-2.5" style={{ color: 'var(--text-primary)' }}>
+          📖 What each field means
+        </h3>
+        <div className="space-y-3">
+          {IEPF_HELP.fields.map((f) => (
+            <div key={f.label}>
+              <div className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>{f.label}</div>
+              <div className="text-[11px] leading-relaxed mt-0.5" style={{ color: 'var(--text-secondary)' }}>{f.note}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div
+        className="p-3 rounded-lg border-l-4"
+        style={{ background: 'var(--bg-card)', borderColor: 'var(--accent)' }}
+      >
+        <div className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--accent)' }}>
+          ⚠️ Remember
+        </div>
+        <p className="text-[11px] leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+          {IEPF_HELP.remember}
+        </p>
+      </div>
+    </div>
+  );
+
   return (
     <DashboardLayout>
       <div className="mis-page mis-animate-in max-w-5xl mx-auto">
@@ -364,10 +431,11 @@ const IEPFDataEntryPage: React.FC = () => {
           </div>
         </header>
 
-        {/* ── Form Section ───────────────────────────────────── */}
+        {/* ── Form Section + plain-English help panel ─────────── */}
         {activeTab === 'register' && (
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-6 items-start">
           <form onSubmit={handleSaveClaim} className="space-y-6">
-            
+
             {/* SECTION 1: CLAIM INFORMATION */}
             <div className="mis-card p-6 sm:p-8">
               <div className="border-b pb-3 mb-5" style={{ borderColor: 'var(--border)' }}>
@@ -690,6 +758,9 @@ const IEPFDataEntryPage: React.FC = () => {
             </div>
 
           </form>
+
+          {renderHelpPanel()}
+          </div>
         )}
 
         {/* ── List Section ───────────────────────────────────── */}

@@ -8,6 +8,69 @@ import { authService } from '../../services/auth.service';
 import ConfirmModal from '../../components/common/ConfirmModal';
 import { INITIAL_CONFIRM_STATE, type ConfirmDialogState } from '../../types/confirm.types';
 
+interface SheetHelpConfig {
+  why: string;
+  fields: { label: string; note: string }[];
+  remember: string;
+}
+
+// Plain-English explanations shown next to each data entry form, written for
+// operations staff (not developers) — what this sheet is for and why each
+// field matters. Keeps the same wording style across every department.
+const SHEET_HELP: Record<string, SheetHelpConfig> = {
+  payin_payout: {
+    why: 'Every trade a client makes must settle — shares and funds actually change hands on the exchange\'s settlement date. This sheet tracks that daily pay-in/pay-out obligation per client so a shortage is caught before it becomes an exchange penalty.',
+    fields: [
+      { label: 'Settlement Date', note: 'The exchange settlement date this obligation is for (usually the trade date plus one working day).' },
+      { label: 'Client Name', note: 'Selected via the KYC-verified client search so it always matches a real, verified client instead of a typed name that could be wrong.' },
+      { label: 'Stock Symbol', note: 'Which security this settlement obligation is for.' },
+      { label: 'Buy / Sell', note: 'Buy = the client needs to pay in funds and will receive shares. Sell = the client needs to deliver shares and will receive funds.' },
+      { label: 'Quantity', note: 'How many shares are due to be delivered or received.' },
+      { label: 'Status', note: 'Completed = settled in full. Pending = still outstanding. Shortage = the client could not deliver/receive the full quantity.' },
+      { label: 'Shortage Quantity', note: 'How many shares are short — must be 0 when status is Completed, and greater than 0 when status is Shortage.' },
+    ],
+    remember: 'A Shortage that isn\'t resolved before the exchange\'s auction deadline can trigger a real penalty — treat Shortage status as urgent, not routine.',
+  },
+  client_requests: {
+    why: 'Clients raise settlement-related service requests — demat transfers, pledge releases, account closures, bank detail updates — that need to be tracked to resolution instead of handled informally and forgotten.',
+    fields: [
+      { label: 'Request ID (Ticket #)', note: 'A unique reference for this ticket.' },
+      { label: 'Client Name', note: 'Selected via the KYC-verified client search so it always matches a real, verified client.' },
+      { label: 'Request Type', note: 'What kind of request this is — Demat Transfer, Pledge Release, Account Closure, Bank Detail Update, Rematerialization, or Other.' },
+      { label: 'Date Received', note: 'When the client actually made the request — this drives the "days pending" shown in the list, so keep it accurate.' },
+      { label: 'Status', note: 'Received / In Process = being worked. Completed = done. Pending = stuck, needs attention.' },
+      { label: 'Remarks / Action Logs', note: 'Notes on how this request is being handled.' },
+    ],
+    remember: 'Always use the KYC-verified client search — a mismatched client name on a Demat Transfer or Bank Detail Update request can send the wrong client\'s information to the wrong place.',
+  },
+  ipo_allocation: {
+    why: 'When a client applies for an IPO, what they actually get allotted by the registrar often differs from what they applied for. This sheet tracks that outcome so refunds and client communication after the IPO closes are accurate.',
+    fields: [
+      { label: 'Application Number', note: 'The client\'s unique IPO application reference — must be unique in the system, so double-check it before saving.' },
+      { label: 'Client Name', note: 'Selected via the KYC-verified client search.' },
+      { label: 'IPO Name', note: 'Which IPO this application is for.' },
+      { label: 'Category', note: 'Retail, HNI, QIB, or Employee — this determines which allotment rules apply.' },
+      { label: 'Applied Qty', note: 'How many shares the client applied for.' },
+      { label: 'Status', note: 'Applied = submitted, awaiting allotment. Allotted = got the full quantity. Partially Allotted = got some but not all. Refunded = got no shares, application money refunded.' },
+      { label: 'Allotted Qty', note: 'How many shares were actually allotted — automatically 0 for Applied/Refunded, equal to Applied Qty for Allotted, and strictly between 0 and Applied Qty for Partially Allotted.' },
+    ],
+    remember: 'Allotted Qty must follow the status rules exactly — getting Allotted vs Partially Allotted wrong misstates exactly what the client is owed in refund.',
+  },
+  corporate_actions: {
+    why: 'When a company declares a dividend, bonus, split, or rights issue, only shareholders who held the stock on the exact Record Date qualify. This sheet tracks each client\'s eligibility and entitlement so they actually receive what they\'re owed.',
+    fields: [
+      { label: 'Client Name', note: 'Selected via the KYC-verified client search.' },
+      { label: 'Stock Symbol', note: 'Which security this corporate action applies to.' },
+      { label: 'Corporate Action', note: 'Dividend, Bonus, Stock Split, or Rights Issue.' },
+      { label: 'Record Date', note: 'The date used to determine eligibility — the client must have held the shares on this exact date to qualify, not today\'s date.' },
+      { label: 'Quantity Held', note: 'How many shares the client held as of the Record Date.' },
+      { label: 'Eligible?', note: 'Yes = the client qualifies for this action. No = they don\'t (e.g. bought the shares after the Record Date) — Entitlement is automatically 0 when Not Eligible.' },
+      { label: 'Entitlement Amt/Qty', note: 'What the client is actually owed — a cash amount for Dividends, or additional shares for Bonus/Stock Split/Rights Issue.' },
+    ],
+    remember: 'Record Date is what determines eligibility, not today\'s date — always double-check the client actually held shares on that exact date before marking them Eligible.',
+  },
+};
+
 const INITIAL_PAYIN_STATE = {
   settlement_date: format(new Date(), 'yyyy-MM-dd'),
   client_id: '',
@@ -428,6 +491,57 @@ const SettlementsDataEntryPage: React.FC = () => {
     setActiveTab('register');
   };
 
+  // Plain-English "why are we collecting this" panel shown beside the entry
+  // form — same content for every employee, sheet by sheet.
+  const renderHelpPanel = () => {
+    const help = SHEET_HELP[sheetTab];
+    if (!help) return null;
+
+    return (
+      <div
+        className="border rounded-xl p-5 shadow-xs space-y-4 lg:sticky lg:top-4"
+        style={{ background: 'var(--panel-inset-soft)', borderColor: 'var(--border)' }}
+      >
+        <div>
+          <h3 className="text-sm font-bold flex items-center gap-1.5 mb-1.5" style={{ color: 'var(--text-primary)' }}>
+            💡 Why this sheet exists
+          </h3>
+          <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+            {help.why}
+          </p>
+        </div>
+
+        <hr style={{ borderColor: 'var(--border)' }} />
+
+        <div>
+          <h3 className="text-sm font-bold mb-2.5" style={{ color: 'var(--text-primary)' }}>
+            📖 What each field means
+          </h3>
+          <div className="space-y-3">
+            {help.fields.map((f) => (
+              <div key={f.label}>
+                <div className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>{f.label}</div>
+                <div className="text-[11px] leading-relaxed mt-0.5" style={{ color: 'var(--text-secondary)' }}>{f.note}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div
+          className="p-3 rounded-lg border-l-4"
+          style={{ background: 'var(--bg-card)', borderColor: 'var(--accent)' }}
+        >
+          <div className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--accent)' }}>
+            ⚠️ Remember
+          </div>
+          <p className="text-[11px] leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+            {help.remember}
+          </p>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <DashboardLayout>
       <div className="mis-page mis-animate-in">
@@ -524,8 +638,9 @@ const SettlementsDataEntryPage: React.FC = () => {
         {sheetTab === 'payin_payout' && (
           <div>
             {activeTab === 'register' ? (
-              /* Add/Edit Row Form */
-              <div className="mis-card p-6 max-w-2xl mx-auto">
+              /* Add/Edit Row Form + plain-English help panel */
+              <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-6 items-start max-w-6xl mx-auto">
+              <div className="mis-card p-6">
                 <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-6">
                   {editingId ? '✏️ Edit Pay-in / Pay-out Row' : '📋 Create New Pay-in / Pay-out Row'}
                 </h2>
@@ -677,6 +792,9 @@ const SettlementsDataEntryPage: React.FC = () => {
                     </button>
                   </div>
                 </form>
+              </div>
+
+              {renderHelpPanel()}
               </div>
             ) : (
               /* View Sheet Grid Tab */
@@ -856,8 +974,9 @@ const SettlementsDataEntryPage: React.FC = () => {
         {sheetTab === 'client_requests' && (
           <div>
             {activeTab === 'register' ? (
-              /* Add/Edit Ticket Form */
-              <div className="mis-card p-6 max-w-2xl mx-auto">
+              /* Add/Edit Ticket Form + plain-English help panel */
+              <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-6 items-start max-w-6xl mx-auto">
+              <div className="mis-card p-6">
                 <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-6">
                   {editingId ? '✏️ Edit Request Ticket' : '📋 Create New Request Ticket'}
                 </h2>
@@ -979,6 +1098,9 @@ const SettlementsDataEntryPage: React.FC = () => {
                     </button>
                   </div>
                 </form>
+              </div>
+
+              {renderHelpPanel()}
               </div>
             ) : (
               /* View Client Requests Sheet Grid */
@@ -1135,8 +1257,9 @@ const SettlementsDataEntryPage: React.FC = () => {
         {sheetTab === 'ipo_allocation' && (
           <div>
             {activeTab === 'register' ? (
-              /* Add/Edit IPO Row Form */
-              <div className="mis-card p-6 max-w-2xl mx-auto">
+              /* Add/Edit IPO Row Form + plain-English help panel */
+              <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-6 items-start max-w-6xl mx-auto">
+              <div className="mis-card p-6">
                 <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-6">
                   {editingId ? '✏️ Edit IPO Allocation' : '📋 Create New IPO Allocation'}
                 </h2>
@@ -1313,6 +1436,9 @@ const SettlementsDataEntryPage: React.FC = () => {
                   </div>
                 </form>
               </div>
+
+              {renderHelpPanel()}
+              </div>
             ) : (
               /* View IPO Allocations Sheet Grid */
               <div className="mis-card p-5">
@@ -1474,8 +1600,9 @@ const SettlementsDataEntryPage: React.FC = () => {
         {sheetTab === 'corporate_actions' && (
           <div>
             {activeTab === 'register' ? (
-              /* Add/Edit Corporate Action Form */
-              <div className="mis-card p-6 max-w-2xl mx-auto">
+              /* Add/Edit Corporate Action Form + plain-English help panel */
+              <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-6 items-start max-w-6xl mx-auto">
+              <div className="mis-card p-6">
                 <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-6">
                   {editingId ? '✏️ Edit Corporate Action' : '📋 Create New Corporate Action'}
                 </h2>
@@ -1636,6 +1763,9 @@ const SettlementsDataEntryPage: React.FC = () => {
                     </button>
                   </div>
                 </form>
+              </div>
+
+              {renderHelpPanel()}
               </div>
             ) : (
               /* View Corporate Actions Sheet Grid */

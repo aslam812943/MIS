@@ -5,7 +5,141 @@ import { itService } from '../../services/it.service';
 import { orgService } from '../../services/org.service';
 import { authService } from '../../services/auth.service';
 
+interface SheetHelpConfig {
+  why: string;
+  fields: { label: string; note: string }[];
+  remember: string;
+}
 
+// Plain-English explanations shown next to each data entry form, written for
+// operations staff (not developers) — what this sheet is for and why each
+// field matters. Keeps the same wording style across every department.
+const SHEET_HELP: Record<string, SheetHelpConfig> = {
+  'audits': {
+    why: 'SEBI requires the firm to run periodic cybersecurity audits — internal, external, or technical (VAPT). This sheet tracks every audit cycle from scheduling through to submission, so a regulatory deadline never gets missed by accident.',
+    fields: [
+      { label: 'Audit Name/Cycle', note: 'A clear name identifying this audit round (e.g. "SEBI Cyber Audit FY2025-26").' },
+      { label: 'Audit Type', note: 'Internal = our own review. CERT-In Empanelled External / SEBI-Mandated Cyber Audit = a regulator-driven audit by an approved external auditor. VAPT = a technical Vulnerability Assessment & Penetration Test.' },
+      { label: 'TOR Document File', note: 'The Terms of Reference — the signed/approved document defining exactly what this audit will cover.' },
+      { label: 'Auditor Name/Firm', note: 'Who is actually conducting the audit.' },
+      { label: 'Scheduled / Start / End Date', note: 'When the audit is planned, and when it actually started and finished.' },
+      { label: 'Submission Deadline', note: 'The regulatory deadline for submitting the audit report. This is the date that actually matters — missing it is a compliance breach, not just a delay.' },
+      { label: 'Actual Submission Date', note: 'When the report was actually sent in.' },
+      { label: 'Status', note: 'Scheduled = planned. In Progress = underway. Report Received = auditor delivered results. Submitted = sent to the regulator. Overdue = past the submission deadline — needs urgent attention.' },
+    ],
+    remember: 'The Submission Deadline is a regulatory date, not an internal target — treat any audit approaching Overdue as urgent, not routine.',
+  },
+  'audit-findings': {
+    why: 'Every audit turns up findings — gaps that need fixing. This sheet tracks each one to actual closure with an owner and a deadline, because "was last audit\'s findings fixed?" is exactly what the next audit checks first.',
+    fields: [
+      { label: 'Linked Audit', note: 'Which audit cycle this finding came from — always link it, a finding with no audit context can\'t be traced back to what triggered it.' },
+      { label: 'Finding ID', note: 'The reference code the auditor gave this specific finding.' },
+      { label: 'Finding Description', note: 'Exactly what the auditor found wrong — copy their wording precisely, don\'t paraphrase.' },
+      { label: 'Compliance Domain', note: 'Which area this falls under — Governance, Infrastructure, Data Security, Network Security, Access Control, or Incident Management.' },
+      { label: 'Severity', note: 'Critical/High/Medium/Low — how serious this gap is. Critical findings should always be fixed first.' },
+      { label: 'Recommended Action', note: 'What the auditor recommended doing to close this gap.' },
+      { label: 'Responsible Person', note: 'Who actually owns fixing this.' },
+      { label: 'Target Date / Actual Implementation Date', note: 'The deadline for fixing it, and when it was actually fixed.' },
+      { label: 'Status', note: 'Open = not started. In Progress = being worked. Implemented = fix applied. Closed = fully verified. Overdue = past target date, still unresolved.' },
+      { label: 'Alert Lead Time (Days)', note: 'How many days before the target date the system should start warning that this finding is coming due.' },
+    ],
+    remember: 'Never leave a Critical finding sitting as Open past its target date — this is precisely what a regulator checks first on the next audit cycle.',
+  },
+  'vendors': {
+    why: 'Every hardware, software, network, cloud, and security vendor the firm depends on is tracked here — especially their AMC (Annual Maintenance Contract) renewal date. Missing a renewal date can mean a critical system loses support with zero warning.',
+    fields: [
+      { label: 'Vendor Name', note: 'The company\'s official name — each vendor should only be entered once.' },
+      { label: 'Category', note: 'Hardware, Software, Network & ISP, Cloud, Security, or AMC Service — what kind of vendor this is.' },
+      { label: 'POC Name / Email / Phone', note: 'The vendor\'s point of contact — who to actually call when something breaks.' },
+      { label: 'Backup Contacts', note: 'A secondary contact in case the main POC is unreachable.' },
+      { label: 'Escalation/Remarks', note: 'How to escalate issues with this vendor, or any other useful context.' },
+      { label: 'AMC Last Paid Date / AMC Due Date', note: 'When the maintenance contract was last renewed, and when it\'s next due — this is the single most important date on this sheet.' },
+      { label: 'Lead Time (Days)', note: 'How many days before the AMC due date to start getting reminded.' },
+      { label: 'Contract Value', note: 'The AMC/contract amount in INR.' },
+      { label: 'Status', note: 'Active = currently supporting us. Under Renewal = renewal in progress. Expired = contract lapsed. Terminated = relationship ended.' },
+    ],
+    remember: 'Set the AMC Due Date and Lead Time correctly — an expired AMC on a critical vendor means no support if something breaks, with no warning at all.',
+  },
+  'assets': {
+    why: 'Every piece of IT hardware and software licence the firm owns is tracked here — not just what it is, but its full lifecycle: cost, depreciation, warranty, and whether it\'s due for replacement.',
+    fields: [
+      { label: 'Asset Barcode / ID', note: 'The unique tag physically on this asset — must be unique, this is how it\'s tracked and located.' },
+      { label: 'Asset Type', note: 'Desktop, Laptop, Server, Printer, Network Device, or Software License.' },
+      { label: 'Make / Model / Serial Number', note: 'Exactly as printed on the device — needed for warranty claims and insurance.' },
+      { label: 'Purchase Date / Purchase Value', note: 'When it was bought and for how much — this drives the automatic depreciation (book value) shown in the list view.' },
+      { label: 'Vendor Support Contract', note: 'Which vendor supports this asset, if any — link it so AMC coverage is traceable back to a vendor record.' },
+      { label: 'Assigned To / Physical Location', note: 'Who currently has it, and where it physically is.' },
+      { label: 'Useful Life (Years)', note: 'How many years this asset is expected to stay usable — this is what drives the automatic "due for upgrade" flag once that time has passed.' },
+      { label: 'Warranty Start / End', note: 'The manufacturer/vendor warranty period.' },
+      { label: 'Under vendor AMC support?', note: 'Tick only if this specific asset is actively covered by a vendor AMC.' },
+      { label: 'Criticality', note: 'Critical = business stops without it (e.g. a trading server). Non-Critical = inconvenient but not business-stopping if it fails.' },
+      { label: 'Status', note: 'Active = in use. Under Repair = temporarily out. Retired = no longer used but not disposed. Disposed = physically gone.' },
+    ],
+    remember: 'Purchase Date and Useful Life directly drive the automatic book value and "due for upgrade" numbers shown in the list — get them wrong and every downstream number is wrong too.',
+  },
+  'diagrams': {
+    why: 'Network topology, server architecture, and data center layout diagrams are what regulators, auditors, and whoever is responding to an incident at 2am actually rely on to understand our infrastructure quickly. An outdated diagram is worse than no diagram.',
+    fields: [
+      { label: 'Diagram Name', note: 'A clear, searchable name for this diagram.' },
+      { label: 'Topology Type', note: 'Network Topology, Server Architecture, or Data Center Layout.' },
+      { label: 'Version Number', note: 'Increment this every time the diagram changes.' },
+      { label: 'Upload Diagram File', note: 'The actual diagram file.' },
+      { label: 'Revision Notes', note: 'What changed since the last version — helps anyone reviewing history understand why it was updated.' },
+    ],
+    remember: 'Always bump the Version Number and upload a fresh file when the infrastructure changes — an outdated diagram can actively mislead someone during a live incident.',
+  },
+  'cybersecurity-compliance': {
+    why: 'SEBI\'s Cybersecurity and Cyber Resilience Framework (CSCRF) requires specific controls across governance, infrastructure, data security, network security, access control, and incident management. This sheet tracks each control and its review cycle so nothing silently lapses.',
+    fields: [
+      { label: 'Domain', note: 'Which CSCRF area this control belongs to — Governance, Infrastructure, Data Security, Network Security, Access Control, or Incident Management.' },
+      { label: 'Control Requirement Description', note: 'What this control actually requires us to do or have in place.' },
+      { label: 'CSCRF / ISO Reference Clause', note: 'The exact regulatory/framework clause this maps to — needed when an auditor asks which requirement this satisfies.' },
+      { label: 'Last Assessed Date', note: 'When this control was last checked.' },
+      { label: 'Assessment Status', note: 'Compliant = in place and working. Non-Compliant = it isn\'t. Due for Review = the review window has come around again. In Remediation = actively being fixed.' },
+      { label: 'Evidence Document File', note: 'Proof this control is actually in place (screenshot, policy doc, config export) — "we did it" without evidence doesn\'t satisfy an audit.' },
+      { label: 'Responsible Officer', note: 'Who owns this control.' },
+      { label: 'Next Review Date', note: 'When this control must be checked again — SEBI requires periodic re-assessment, not a one-time tick.' },
+    ],
+    remember: 'Never mark a control Compliant without an actual Evidence Document attached — "trust me" doesn\'t hold up in a SEBI inspection.',
+  },
+  'tickets': {
+    why: 'Every day-to-day IT problem a staff member raises is logged here and tracked against a service standard (SLA), so issues get resolved on a known timeline instead of being handled informally and forgotten.',
+    fields: [
+      { label: 'Ticket Reference Number', note: 'A unique reference for this support request.' },
+      { label: 'Requester (User/Branch)', note: 'Who raised the issue and from where.' },
+      { label: 'Issue Description', note: 'What\'s actually wrong, with enough detail that whoever picks it up doesn\'t have to ask again.' },
+      { label: 'Assigned Executive', note: 'Who is handling this ticket.' },
+      { label: 'Date Opened / Date Closed', note: 'When it was raised, and when it was fully resolved.' },
+      { label: 'Ticket Status', note: 'Open = new. In Progress = being worked. Resolved = fixed, pending confirmation. Closed = fully done.' },
+      { label: 'SLA Target (Hours)', note: 'How many hours this type of issue should be resolved within, per our internal service standard.' },
+      { label: 'Met SLA Guidelines?', note: 'Tick only if it was actually resolved within the SLA target hours — this feeds the SLA Compliance % shown on the dashboard, so keep it honest.' },
+    ],
+    remember: 'Only tick "Met SLA Guidelines" if it\'s actually true — this number feeds directly into the SLA Compliance % that management sees on the dashboard.',
+  },
+  'incidents': {
+    why: 'A real security or system incident is far more serious than a helpdesk ticket — it needs a root cause, a fix, and honest severity classification, because Critical incidents may carry a regulatory notification obligation to SEBI/CERT-In within a fixed time window.',
+    fields: [
+      { label: 'Incident Code', note: 'A unique reference number for this incident.' },
+      { label: 'Incident Title', note: 'A short, clear name for what happened.' },
+      { label: 'Event Description', note: 'What actually happened, stated as factually as possible.' },
+      { label: 'Severity Rating', note: 'Critical/High/Medium/Low — classify accurately, not conservatively. Under-rating a serious incident can mean missing a mandatory regulatory notification window.' },
+      { label: 'Root Cause Analysis (RCA)', note: 'Why it actually happened, not just what happened — this is what stops it recurring.' },
+      { label: 'Remediation Steps Taken', note: 'What was actually done to fix it and prevent a repeat.' },
+      { label: 'Incident State', note: 'Identified = just discovered. Investigating = root cause being worked out. Mitigated = immediate risk contained. Resolved = fully closed out.' },
+      { label: 'Discovery Date / Resolution Date', note: 'When it was found, and when it was fully resolved.' },
+    ],
+    remember: 'Classify severity honestly, not conservatively — under-rating a Critical incident can mean missing a mandatory SEBI/CERT-In notification window.',
+  },
+  'projects': {
+    why: 'New IT deployments, upgrades, and migrations are tracked here from planning through completion, so infrastructure work has visible ownership and status instead of happening informally in the background.',
+    fields: [
+      { label: 'Project Name / Description', note: 'A clear name for this initiative, and what it\'s actually trying to achieve.' },
+      { label: 'Start Date / Target End Date / Actual End Date', note: 'When it began, when it was supposed to finish, and when it actually did.' },
+      { label: 'Status', note: 'Planning = not started yet. In Progress = underway. On Hold = paused. Completed = finished. Cancelled = called off.' },
+    ],
+    remember: 'Keep Status current as the project actually progresses — a stale "Planning" status on work that\'s really underway hides real progress from anyone checking in.',
+  },
+};
 
 const ITDataEntryPage: React.FC = () => {
   const currentUser = authService.getCurrentUser();
@@ -482,6 +616,57 @@ const ITDataEntryPage: React.FC = () => {
     }
   };
 
+  // Plain-English "why are we collecting this" panel shown beside the entry
+  // form — same content for every employee, sheet by sheet.
+  const renderHelpPanel = () => {
+    const help = SHEET_HELP[sheetTab];
+    if (!help) return null;
+
+    return (
+      <div
+        className="border rounded-xl p-5 shadow-xs space-y-4 lg:sticky lg:top-4"
+        style={{ background: 'var(--panel-inset-soft)', borderColor: 'var(--border)' }}
+      >
+        <div>
+          <h3 className="text-sm font-bold flex items-center gap-1.5 mb-1.5" style={{ color: 'var(--text-primary)' }}>
+            💡 Why this sheet exists
+          </h3>
+          <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+            {help.why}
+          </p>
+        </div>
+
+        <hr style={{ borderColor: 'var(--border)' }} />
+
+        <div>
+          <h3 className="text-sm font-bold mb-2.5" style={{ color: 'var(--text-primary)' }}>
+            📖 What each field means
+          </h3>
+          <div className="space-y-3">
+            {help.fields.map((f) => (
+              <div key={f.label}>
+                <div className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>{f.label}</div>
+                <div className="text-[11px] leading-relaxed mt-0.5" style={{ color: 'var(--text-secondary)' }}>{f.note}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div
+          className="p-3 rounded-lg border-l-4"
+          style={{ background: 'var(--bg-card)', borderColor: 'var(--accent)' }}
+        >
+          <div className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--accent)' }}>
+            ⚠️ Remember
+          </div>
+          <p className="text-[11px] leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+            {help.remember}
+          </p>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <DashboardLayout>
       <div className="mis-page mis-animate-in max-w-7xl mx-auto space-y-8">
@@ -713,13 +898,14 @@ const ITDataEntryPage: React.FC = () => {
             )}
           </div>
         ) : (
-          
-          /* Data Entry Form Card */
-          <div className="mis-card p-6 max-w-2xl mx-auto">
+
+          /* Data Entry Form Card + plain-English help panel */
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-6 items-start max-w-6xl mx-auto">
+          <div className="mis-card p-6">
             <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-6 flex items-center gap-1.5 border-b pb-3" style={{ borderColor: 'var(--border)' }}>
               📋 {editingId ? '✏️ Modify Record Row' : '➕ Create New Record Row'}
             </h2>
-            
+
             <form onSubmit={handleSubmit} noValidate className="space-y-5 text-left">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 
@@ -906,6 +1092,9 @@ const ITDataEntryPage: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+
+          {renderHelpPanel()}
           </div>
         )}
 
