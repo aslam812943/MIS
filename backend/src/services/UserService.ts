@@ -156,20 +156,44 @@ export class UserService {
     const authUser = authData.user;
 
     try {
-      // 2. Create profile in 'profiles' table
-      const profile = await this.userRepository.create({
-        id: authUser.id,
-        email: sanitizedEmail,
-        role: role as UserRole,
-        full_name: sanitizedName,
-        phone_number: userData.phone_number?.trim(),
-        branch_id: normalizedBranchId,
-        department_id: normalizedDepartmentId,
-        allowed_modules,
-        status: 'active',
-        employee_id: employeeId,
-        joining_date: userData.joining_date,
-      });
+      // 2. Create profile in 'profiles' table. Auto-generated employee_ids
+      // are computed by reading the current list and picking the next free
+      // number — inherently racy if two create requests overlap (e.g. a
+      // double-click, or a retry fired while the first attempt was still in
+      // flight), since both can compute the same "next" id before either
+      // has actually saved it. Retry with a bumped id specifically on that
+      // collision instead of failing the whole signup.
+      const MAX_EMPLOYEE_ID_ATTEMPTS = 5;
+      let profile;
+      for (let attempt = 1; ; attempt++) {
+        try {
+          profile = await this.userRepository.create({
+            id: authUser.id,
+            email: sanitizedEmail,
+            role: role as UserRole,
+            full_name: sanitizedName,
+            phone_number: userData.phone_number?.trim(),
+            branch_id: normalizedBranchId,
+            department_id: normalizedDepartmentId,
+            allowed_modules,
+            status: 'active',
+            employee_id: employeeId,
+            joining_date: userData.joining_date,
+          });
+          break;
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : '';
+          const isEmployeeIdCollision = msg.includes('duplicate key') && msg.includes('employee_id');
+          if (!isEmployeeIdCollision || attempt >= MAX_EMPLOYEE_ID_ATTEMPTS) {
+            if (isEmployeeIdCollision) {
+              throw new Error('Could not generate a unique employee ID right now — please try again.');
+            }
+            throw err;
+          }
+          const numPart: number = parseInt(employeeId!.replace(/^EMP/, ''), 10) || 0;
+          employeeId = `EMP${String(numPart + 1).padStart(3, '0')}`;
+        }
+      }
 
       // 3. Send welcome email
       await this.emailService.sendWelcomeEmail(sanitizedEmail, sanitizedName || sanitizedEmail, password);
@@ -461,18 +485,20 @@ export class UserService {
       return resignD >= startD && resignD <= endD;
     }).length;
 
-    // 4. Branch breakdown
+    // 4. Branch breakdown — users with no branch assigned (e.g. org-wide
+    // roles like admin/CEO) are excluded rather than lumped into an
+    // "Unassigned" bucket, which isn't meaningful on a per-branch chart.
     const branchBreakdown: Record<string, number> = {};
     activeEmployeesAtEnd.forEach(u => {
-      const bName = u.branch_name || 'Unassigned';
-      branchBreakdown[bName] = (branchBreakdown[bName] || 0) + 1;
+      if (!u.branch_name) return;
+      branchBreakdown[u.branch_name] = (branchBreakdown[u.branch_name] || 0) + 1;
     });
 
-    // 5. Department breakdown
+    // 5. Department breakdown — same exclusion for no department assigned.
     const deptBreakdown: Record<string, number> = {};
     activeEmployeesAtEnd.forEach(u => {
-      const dName = u.department_name || 'Unassigned';
-      deptBreakdown[dName] = (deptBreakdown[dName] || 0) + 1;
+      if (!u.department_name) return;
+      deptBreakdown[u.department_name] = (deptBreakdown[u.department_name] || 0) + 1;
     });
 
     // 6. Growth Chart

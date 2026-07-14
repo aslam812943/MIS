@@ -35,7 +35,8 @@ export class UserController {
         msg.includes('last remaining administrator') ||
         msg.includes('already been registered') ||
         msg.includes('already exists') ||
-        msg.includes('already registered')
+        msg.includes('already registered') ||
+        msg.includes('could not generate a unique')
       ) {
         return HttpStatus.BAD_REQUEST;
       }

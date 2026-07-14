@@ -35,21 +35,15 @@ const AdminPanelPage: React.FC = () => {
   const [users, setUsers] = useState<any[]>([]);
   const [newBranchName, setNewBranchName] = useState('');
   const [newDeptName, setNewDeptName] = useState('');
-  const [newModuleName, setNewModuleName] = useState('');
   const [loading, setLoading] = useState(false);
 
   // Editing state
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
-  const [editingFields, setEditingFields] = useState<{ name: string; type: 'text' | 'number' | 'date' }[]>([]);
-
-  // Module fields state
-  const [newModuleFields, setNewModuleFields] = useState<{ name: string; type: 'text' | 'number' | 'date' }[]>([]);
 
   // User Management state
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [isEditingUser, setIsEditingUser] = useState(false);
-  const [userTab, setUserTab] = useState<'details' | 'modules'>('details');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterBranchId, setFilterBranchId] = useState('');
   const [filterDeptId, setFilterDeptId] = useState('');
@@ -271,89 +265,6 @@ const AdminPanelPage: React.FC = () => {
     });
   };
 
-  const handleAddModule = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newModuleName.trim()) {
-      toast.error('Module name cannot be empty.');
-      return;
-    }
-    setLoading(true);
-    const toastId = toast.loading('Creating module...');
-    try {
-      await orgService.addModule(newModuleName, newModuleFields);
-      toast.success(`Module "${newModuleName.trim()}" created successfully.`, { id: toastId });
-      setNewModuleName('');
-      setNewModuleFields([]);
-      fetchData();
-    } catch (error: unknown) {
-      let message = 'Failed to add module.';
-      if (axios.isAxiosError(error) && error.response?.data?.message) {
-        message = error.response.data.message;
-      } else if (error instanceof Error) {
-        message = error.message;
-      }
-      toast.error(message, { id: toastId });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleUpdateModule = async (id: string) => {
-    if (!editingName.trim()) {
-      toast.error('Name cannot be empty.');
-      return;
-    }
-    setLoading(true);
-    const toastId = toast.loading('Saving module configuration...');
-    try {
-      await orgService.updateModule(id, editingName, editingFields);
-      toast.success(`Module "${editingName.trim()}" updated successfully.`, { id: toastId });
-      setEditingId(null);
-      setEditingFields([]);
-      fetchData();
-    } catch (error: unknown) {
-      let message = 'Failed to update module.';
-      if (axios.isAxiosError(error) && error.response?.data?.message) {
-        message = error.response.data.message;
-      } else if (error instanceof Error) {
-        message = error.message;
-      }
-      toast.error(message, { id: toastId });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDeleteModule = (mod: Module) => {
-    setConfirmModal({
-      isOpen: true,
-      title: 'Delete Module',
-      message: `Delete module "${mod.name}"? All field configurations will be removed. This cannot be undone.`,
-      confirmLabel: 'Delete',
-      cancelLabel: 'Cancel',
-      isDanger: true,
-      onConfirm: async () => {
-        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
-        const toastId = toast.loading('Deleting module...');
-        setLoading(true);
-        try {
-          await orgService.deleteModule(mod.id);
-          fetchData();
-          toast.success(`Module "${mod.name}" deleted successfully.`, { id: toastId });
-        } catch (error: unknown) {
-          let message = 'Failed to delete module.';
-          if (axios.isAxiosError(error) && error.response?.data?.message) {
-            message = error.response.data.message;
-          } else if (error instanceof Error) {
-            message = error.message;
-          }
-          toast.error(message, { id: toastId });
-        } finally {
-          setLoading(false);
-        }
-      },
-    });
-  };
 
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -569,23 +480,6 @@ const AdminPanelPage: React.FC = () => {
     }
   };
 
-  const handleRemoveModuleField = (idx: number, fieldName: string) => {
-    const label = fieldName.trim() || 'this field';
-    setConfirmModal({
-      isOpen: true,
-      title: 'Remove Field',
-      message: `Remove "${label}" from the module configuration? You must save the module for this change to take effect.`,
-      confirmLabel: 'Remove',
-      cancelLabel: 'Cancel',
-      isDanger: true,
-      onConfirm: () => {
-        setEditingFields((prev) => prev.filter((_, i) => i !== idx));
-        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
-        toast.success(`Field "${label}" removed. Save configuration to apply.`);
-      },
-    });
-  };
-
   const filteredUsers = users.filter(u => {
     const query = searchQuery.toLowerCase().trim();
     const matchesSearch = !query || 
@@ -684,27 +578,12 @@ const AdminPanelPage: React.FC = () => {
                   <button type="submit" disabled={loading} className="mis-btn mis-btn-primary w-full justify-center">Create Dept</button>
                 </form>
               </div>
-
-              <div className="mis-card p-5 sm:p-6">
-                <h3 className="mis-label mb-4">Add Module</h3>
-                <form onSubmit={handleAddModule}>
-                  <input
-                    type="text"
-                    placeholder="Module name (e.g. Inventory)"
-                    className="mis-input w-full"
-                    value={newModuleName}
-                    onChange={(e) => setNewModuleName(e.target.value)}
-                    disabled={loading}
-                  />
-                  <button type="submit" disabled={loading} className="mis-btn mis-btn-primary w-full justify-center">Create Module</button>
-                </form>
-              </div>
             </div>
 
             {/* Main Data Section */}
             <div className="mis-card overflow-hidden">
               <div className="flex flex-wrap gap-1 p-3 border-b overflow-x-auto mis-panel-inset-soft" style={{ borderColor: 'var(--border)', background: 'rgba(0,0,0,0.25)' }}>
-                {['users', 'branches', 'departments', 'modules'].map(tab => (
+                {['users', 'branches', 'departments'].map(tab => (
                   <button
                     key={tab}
                     type="button"
@@ -848,120 +727,6 @@ const AdminPanelPage: React.FC = () => {
                   </ul>
                 )}
 
-                {listTab === 'modules' && (
-                  <ul className="list-none p-0 m-0">
-                    {modules.map(m => (
-                      <li key={m.id} className="mis-list-row flex-col items-stretch">
-                        <div className="flex flex-wrap justify-between items-center gap-3 w-full">
-                          <div>
-                            <span className="font-semibold text-lg block" style={{ color: 'var(--text-primary)' }}>{m.name}</span>
-                            <span className="mis-badge mis-badge-info mt-1">{m.fields?.length || 0} fields</span>
-                          </div>
-                          <div className="flex gap-2">
-                            <button
-                              type="button"
-                              className={`mis-btn mis-btn-sm ${editingId === m.id ? 'mis-btn-primary' : 'mis-btn-ghost'}`}
-                              onClick={() => {
-                                if (editingId === m.id) {
-                                  setEditingId(null);
-                                } else {
-                                  setEditingId(m.id);
-                                  setEditingName(m.name);
-                                  setEditingFields(m.fields || []);
-                                }
-                              }}
-                            >
-                              Configure
-                            </button>
-                            <button type="button" className="mis-icon-btn danger" onClick={() => handleDeleteModule(m)}>🗑️</button>
-                          </div>
-                        </div>
-
-                        {editingId === m.id && (
-                          <div className="mt-4 p-5 w-full rounded-[var(--radius-lg)] mis-panel-inset" style={{ background: 'rgba(0,0,0,0.35)', border: '1px solid var(--border)' }}>
-                            <div className="mb-5 mis-field">
-                              <label className="mis-label">Module Name</label>
-                              <input 
-                                className="mis-input w-full max-w-md"
-                                value={editingName} 
-                                onChange={(e) => setEditingName(e.target.value)}
-                                placeholder="Module Name"
-                              />
-                            </div>
-
-                            <div className="mb-5">
-                              <label className="mis-label mb-3 block">Input Fields</label>
-                              <div className="space-y-3">
-                                {editingFields.map((field, idx) => (
-                                  <div key={idx} className="flex flex-col sm:flex-row gap-3 items-end p-4 rounded-[var(--radius-md)]" style={{ background: 'var(--bg-hover)', border: '1px solid var(--border)' }}>
-                                    <div className="w-full sm:flex-[2] mis-field">
-                                      <span className="mis-label" style={{ fontSize: '0.65rem' }}>Label</span>
-                                      <input 
-                                        className="mis-input w-full py-2"
-                                        placeholder="e.g. Amount" 
-                                        value={field.name}
-                                        onChange={(e) => {
-                                          const updated = [...editingFields];
-                                          updated[idx].name = e.target.value;
-                                          setEditingFields(updated);
-                                        }}
-                                      />
-                                    </div>
-                                    <div className="w-full sm:flex-1 mis-field">
-                                      <span className="mis-label" style={{ fontSize: '0.65rem' }}>Type</span>
-                                      <select 
-                                        className="mis-input w-full py-2"
-                                        value={field.type}
-                                        onChange={(e) => {
-                                          const updated = [...editingFields];
-                                          updated[idx].type = e.target.value as any;
-                                          setEditingFields(updated);
-                                        }}
-                                      >
-                                        <option value="text">Text</option>
-                                        <option value="number">Number</option>
-                                        <option value="date">Date</option>
-                                      </select>
-                                    </div>
-                                    <button
-                                      type="button"
-                                      className="mis-icon-btn danger shrink-0"
-                                      onClick={() => handleRemoveModuleField(idx, field.name)}
-                                      aria-label={`Remove field ${field.name || idx + 1}`}
-                                    >
-                                      ✕
-                                    </button>
-                                  </div>
-                                ))}
-                              </div>
-                              <button
-                                type="button"
-                                className="mis-btn mis-btn-ghost mis-btn-sm mt-3"
-                                onClick={() => setEditingFields([...editingFields, { name: '', type: 'text' }])}
-                              >
-                                + Add Field
-                              </button>
-                            </div>
-
-                            <div className="flex flex-wrap justify-end gap-2 pt-4 divider" style={{ borderTop: '1px solid var(--border)' }}>
-                              <button type="button" className="mis-btn mis-btn-ghost" onClick={() => setEditingId(null)}>Cancel</button>
-                              <button type="button" className="mis-btn mis-btn-primary" onClick={() => handleUpdateModule(m.id)}>Save Configuration</button>
-                            </div>
-                          </div>
-                        )}
-                        {!editingId && m.fields && m.fields.length > 0 && (
-                          <div className="flex flex-wrap gap-1.5 mt-3 w-full">
-                            {m.fields.map((f, i) => (
-                              <span key={i} className="mis-chip">{f.name}</span>
-                            ))}
-                          </div>
-                        )}
-                      </li>
-                    ))}
-                    {modules.length === 0 && <li className="mis-empty">No modules found.</li>}
-                  </ul>
-                )}
-
               </div>
             </div>
           </div>
@@ -984,25 +749,8 @@ const AdminPanelPage: React.FC = () => {
               <button type="button" className="mis-icon-btn" onClick={() => { setIsUserModalOpen(false); setIsEditingUser(false); }} aria-label="Close">✕</button>
             </div>
 
-            <div className="mis-modal-tabs">
-              <button
-                type="button"
-                onClick={() => setUserTab('details')}
-                className={`mis-modal-tab ${userTab === 'details' ? 'active' : ''}`}
-              >
-                User Details
-              </button>
-              <button
-                type="button"
-                onClick={() => setUserTab('modules')}
-                className={`mis-modal-tab ${userTab === 'modules' ? 'active' : ''}`}
-              >
-                Module Access ({userData.allowed_modules.length}/{modules.length})
-              </button>
-            </div>
 
             <div className="mis-modal-body max-h-[60vh]">
-              {userTab === 'details' ? (
                 <div className="space-y-5">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="mis-field">
@@ -1131,44 +879,6 @@ const AdminPanelPage: React.FC = () => {
                     </div>
                   )}
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  <p className="mis-alert mis-alert-info m-0">
-                    Select which modules this user may access for data entry.
-                  </p>
-                  <div className="grid grid-cols-1 gap-2">
-                    {modules.map(m => (
-                      <label
-                        key={m.id}
-                        className={`flex items-center justify-between p-4 rounded-[var(--radius-md)] border cursor-pointer transition-all ${
-                          userData.allowed_modules.includes(m.id)
-                            ? 'mis-badge-info'
-                            : ''
-                        }`}
-                        style={
-                          userData.allowed_modules.includes(m.id)
-                            ? { background: 'var(--accent-bg)', borderColor: 'var(--border-accent)' }
-                            : { background: 'var(--bg-hover)', borderColor: 'var(--border)' }
-                        }
-                      >
-                        <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{m.name}</span>
-                        <input
-                          type="checkbox"
-                          className="w-4 h-4 cursor-pointer accent-[#06b6d4]"
-                          checked={userData.allowed_modules.includes(m.id)}
-                          onChange={(e) => {
-                            const updated = e.target.checked
-                              ? [...userData.allowed_modules, m.id]
-                              : userData.allowed_modules.filter(id => id !== m.id);
-                            setUserData({ ...userData, allowed_modules: updated });
-                          }}
-                        />
-                      </label>
-                    ))}
-                    {modules.length === 0 && <p className="mis-empty py-8">No modules available. Create modules first.</p>}
-                  </div>
-                </div>
-              )}
             </div>
 
             <div className="mis-modal-footer">

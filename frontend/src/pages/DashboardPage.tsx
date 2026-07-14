@@ -130,6 +130,14 @@ const DashboardPage: React.FC = () => {
   useEffect(() => {
     if (!hrData || dashboardTab !== 'hr') return;
 
+    // The page wrapper animates in (opacity/transform) via .mis-animate-in.
+    // Creating the charts synchronously on mount can measure the canvas
+    // before that layout has settled, silently sizing it to 0 — it then
+    // never redraws until something forces a fresh `new Chart()` (e.g.
+    // toggling the theme, which is in this effect's deps). Deferring to the
+    // next animation frame lets layout settle first, every time.
+    const rafId = requestAnimationFrame(() => {
+
     // Chart.js colors were previously hardcoded for the dark theme (pure
     // white ticks/legend/grid), which made axis numbers and legend text
     // invisible against a light-mode white background. Derive every color
@@ -294,7 +302,10 @@ const DashboardPage: React.FC = () => {
       }
     }
 
+    });
+
     return () => {
+      cancelAnimationFrame(rafId);
       if (growthChartInstance.current) growthChartInstance.current.destroy();
       if (branchChartInstance.current) branchChartInstance.current.destroy();
       if (deptChartInstance.current) deptChartInstance.current.destroy();
