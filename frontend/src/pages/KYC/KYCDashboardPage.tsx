@@ -262,7 +262,7 @@ const KYCDashboardPage: React.FC = () => {
     );
   }
 
-  const { kpis, compliance, newAccounts, registryUpdates } = stats || {
+  const { kpis, compliance, registryUpdates } = stats || {
     kpis: { totalOnboarded: 0, pendingVerifications: 0, processedModifications: 0, activeReactivations: 0, closedAccounts: 0, demiseReportsCount: 0 },
     compliance: { Compliant: 0, 'Non-Compliant': 0, Due: 0 },
     newAccounts: { Total: 0, Pending: 0, Verified: 0, Rejected: 0 },

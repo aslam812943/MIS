@@ -244,7 +244,6 @@ const DPDataEntryPage: React.FC = () => {
 
   // CSV Import state
   const [csvModalOpen, setCsvModalOpen] = useState(false);
-  const [csvFile, setCsvFile] = useState<File | null>(null);
   const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
   const [csvRows, setCsvRows] = useState<any[]>([]);
   const [csvMappings, setCsvMappings] = useState<{ [key: string]: string }>({});
@@ -480,7 +479,6 @@ const DPDataEntryPage: React.FC = () => {
   const handleCsvFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
     const file = e.target.files[0];
-    setCsvFile(file);
 
     const reader = new FileReader();
     reader.onload = (event) => {
@@ -1187,7 +1185,7 @@ const DPDataEntryPage: React.FC = () => {
                           <tbody>
                             {csvRows.slice(0, 3).map((row, idx) => (
                               <tr key={idx} className="border-b border-slate-900 last:border-0">
-                                {row.slice(0, 4).map((col, i) => <td key={i} className="p-2 text-slate-300">{col}</td>)}
+                                {row.slice(0, 4).map((col: string, i: number) => <td key={i} className="p-2 text-slate-300">{col}</td>)}
                               </tr>
                             ))}
                           </tbody>

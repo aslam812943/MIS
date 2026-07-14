@@ -712,8 +712,8 @@ const KYCDataEntryPage: React.FC = () => {
           if (csvColName) {
             const colIndex = csvHeaders.indexOf(csvColName);
             if (colIndex !== -1) {
-              let value = row[colIndex] || '';
-              
+              let value: string | boolean = row[colIndex] || '';
+
               if (['pan_copy', 'aadhaar_copy', 'bank_proof', 'photograph', 'signature'].includes(field.key)) {
                 value = ['true', 'yes', '1', 'checked'].includes(value.toLowerCase());
               }
