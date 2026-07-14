@@ -7,6 +7,7 @@ export const ROUTES = {
   DASHBOARD: '/dashboard',
   ADMIN_PANEL: '/admin-panel',
   PROFILE: '/profile',
+  NOTIFICATIONS: '/notifications',
   DATA_ENTRY: '/data-entry',
   VERIFY_ENTRIES: '/verify-entries',
   IEPF_DATA_ENTRY: '/iepf-entry',

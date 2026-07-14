@@ -296,6 +296,21 @@ const ITDataEntryPage: React.FC = () => {
       }
     }
 
+    // 4b. Fields that are meaningless at zero
+    const strictlyPositiveFields = ['useful_life_years', 'sla_target_hours'];
+    for (const f of strictlyPositiveFields) {
+      if (formData[f] !== undefined && formData[f] !== null && formData[f] !== '' && Number(formData[f]) <= 0) {
+        toast.error(`${f.replace(/_/g, ' ').toUpperCase()} must be greater than zero.`);
+        return false;
+      }
+    }
+
+    // 4c. POC phone format (10-digit)
+    if (formData.poc_phone && !/^\d{10}$/.test(String(formData.poc_phone).trim())) {
+      toast.error('POC phone must be exactly 10 digits.');
+      return false;
+    }
+
     // 5. Calendar date assertions
     const dateFields = [
       'scheduled_date', 'start_date', 'end_date', 'submission_deadline', 'actual_submission_date',
@@ -526,7 +541,7 @@ const ITDataEntryPage: React.FC = () => {
           { name: 'category', label: 'Category', type: 'select', options: ['Hardware', 'Software', 'Network & ISP', 'Cloud', 'Security', 'AMC Service'], required: true },
           { name: 'poc_name', label: 'POC Name', type: 'text', required: true },
           { name: 'poc_email', label: 'POC Email', type: 'email', required: true },
-          { name: 'poc_phone', label: 'POC Phone', type: 'text', required: true },
+          { name: 'poc_phone', label: 'POC Phone', type: 'tel', required: true },
           { name: 'other_members', label: 'Backup Contacts', type: 'text' },
           { name: 'remarks', label: 'Escalation/Remarks', type: 'textarea' },
           { name: 'amc_last_paid_date', label: 'AMC Last Paid Date', type: 'date' },
@@ -707,14 +722,14 @@ const ITDataEntryPage: React.FC = () => {
           </div>
         </header>
 
-        {/* 9 Sheet Tab Bar */}
+        {/* Sheet Tab Bar */}
         <div className="mis-module-tabs flex-wrap mb-4">
           {[
             { id: 'audits', label: 'Audits' },
             { id: 'audit-findings', label: 'Audit Findings' },
             { id: 'vendors', label: 'Vendors' },
             { id: 'assets', label: 'Assets' },
-            { id: 'diagrams', label: 'Topology Diagrams' },
+            // 'diagrams' (Topology Diagrams) is temporarily hidden — will be added back later.
             { id: 'cybersecurity-compliance', label: 'Compliance Control' },
             { id: 'tickets', label: 'Support Tickets' },
             { id: 'incidents', label: 'Incidents & RCA' },
@@ -902,7 +917,7 @@ const ITDataEntryPage: React.FC = () => {
           /* Data Entry Form Card + plain-English help panel */
           <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-6 items-start max-w-6xl mx-auto">
           <div className="mis-card p-6">
-            <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-6 flex items-center gap-1.5 border-b pb-3" style={{ borderColor: 'var(--border)' }}>
+            <h2 className="text-lg font-bold mb-6 flex items-center gap-1.5 border-b pb-3" style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
               📋 {editingId ? '✏️ Modify Record Row' : '➕ Create New Record Row'}
             </h2>
 
@@ -1006,7 +1021,7 @@ const ITDataEntryPage: React.FC = () => {
                           checked={!!formData[f.name]}
                           onChange={e => setFormData({ ...formData, [f.name]: e.target.checked })}
                         />
-                        <label htmlFor={f.name} className="text-xs font-semibold text-slate-300">
+                        <label htmlFor={f.name} className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>
                           {f.label}
                         </label>
                       </div>
@@ -1024,6 +1039,8 @@ const ITDataEntryPage: React.FC = () => {
                         value={formData[f.name] || ''}
                         onChange={e => setFormData({ ...formData, [f.name]: f.type === 'number' ? Number(e.target.value) : e.target.value })}
                         required={f.required}
+                        min={f.type === 'number' ? 0 : undefined}
+                        maxLength={f.type === 'text' ? 255 : undefined}
                       />
                     </div>
                   );
@@ -1038,7 +1055,7 @@ const ITDataEntryPage: React.FC = () => {
                     <div className="grid grid-cols-3 gap-4 text-sm">
                       <div>
                         <span className="block text-[10px] text-gray-400">Years Elapsed:</span>
-                        <span className="text-white font-bold">{deprEst.yearsElapsed} Years</span>
+                        <span className="font-bold" style={{ color: 'var(--text-primary)' }}>{deprEst.yearsElapsed} Years</span>
                       </div>
                       <div>
                         <span className="block text-[10px] text-gray-400">Estimated Book Value:</span>

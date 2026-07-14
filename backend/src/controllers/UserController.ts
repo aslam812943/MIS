@@ -10,6 +10,60 @@ export class UserController {
   constructor(private userService: UserService) {}
 
   /**
+   * Maps a caught error to the correct HTTP status. Everything here is a
+   * known, user-facing validation/authorization message that UserService
+   * throws deliberately (e.g. "Access denied...", "Invalid email address
+   * format.") — anything that doesn't match is an unexpected failure and
+   * falls through to 500.
+   */
+  private getErrorStatus(error: unknown): number {
+    if (error instanceof Error) {
+      // Case-insensitive: a thrown message like "One or more selected
+      // modules are invalid." (lowercase "invalid") previously slipped past
+      // a case-sensitive check for 'Invalid' and fell through to a generic
+      // 500, hiding the real, safe-to-show reason from the admin.
+      const msg = error.message.toLowerCase();
+      if (msg.includes('access denied') || msg.includes('cannot delete your own') || msg.includes('cannot block or resign your own')) {
+        return HttpStatus.FORBIDDEN;
+      }
+      if (
+        msg.includes('invalid') ||
+        msg.includes('required') ||
+        msg.includes('cannot exceed') ||
+        msg.includes('must be') ||
+        msg.includes('not found') ||
+        msg.includes('last remaining administrator') ||
+        msg.includes('already been registered') ||
+        msg.includes('already exists') ||
+        msg.includes('already registered')
+      ) {
+        return HttpStatus.BAD_REQUEST;
+      }
+    }
+    return HttpStatus.INTERNAL_SERVER_ERROR;
+  }
+
+  /**
+   * Recognized validation/authorization errors (400/403) carry a specific
+   * message that's safe to show the user. Anything that falls through to
+   * 500 is an unexpected failure — usually a raw Postgres/Supabase Auth
+   * error — which used to be forwarded to the client verbatim. Those are
+   * now logged server-side and replaced with a generic message.
+   */
+  private respondError(res: Response, error: unknown, fallbackMessage: string): void {
+    const status = this.getErrorStatus(error);
+    const rawMessage = error instanceof Error ? error.message : fallbackMessage;
+
+    if (status === HttpStatus.INTERNAL_SERVER_ERROR) {
+      console.error('[UserController]', rawMessage);
+      res.status(status).json({ message: fallbackMessage });
+      return;
+    }
+
+    res.status(status).json({ message: rawMessage });
+  }
+
+  /**
    * Creates a new user.
    */
   createUser = async (req: Request, res: Response): Promise<void> => {
@@ -22,8 +76,7 @@ export class UserController {
 
       res.status(HttpStatus.CREATED).json(user);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to create user';
-      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ message });
+      this.respondError(res, error, 'Failed to create user.');
     }
   };
 
@@ -35,8 +88,7 @@ export class UserController {
       const users = await this.userService.getAllUsers();
       res.status(HttpStatus.OK).json(users);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to fetch users';
-      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ message });
+      this.respondError(res, error, 'Failed to fetch users.');
     }
   };
 
@@ -46,17 +98,17 @@ export class UserController {
   deleteUser = async (req: Request, res: Response): Promise<void> => {
     try {
       const id = req.params.id as string;
+      const requestingUser = (req as any).user;
 
       const oldUser = await this.userService.getUserById(id);
-      await this.userService.deleteUser(id);
+      await this.userService.deleteUser(id, requestingUser);
 
       // Audit Log
       logAudit(req, 'DELETE', 'profiles', id, oldUser, null);
 
       res.status(HttpStatus.OK).json({ message: 'User deleted successfully' });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to delete user';
-      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ message });
+      this.respondError(res, error, 'Failed to delete user.');
     }
   };
 
@@ -76,8 +128,7 @@ export class UserController {
 
       res.status(HttpStatus.OK).json(user);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to update user';
-      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ message });
+      this.respondError(res, error, 'Failed to update user.');
     }
   };
 
@@ -98,8 +149,7 @@ export class UserController {
 
       res.status(HttpStatus.OK).json(user);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to update user status';
-      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ message });
+      this.respondError(res, error, 'Failed to update user status.');
     }
   };
 
@@ -116,8 +166,7 @@ export class UserController {
       });
       res.status(HttpStatus.OK).json(data);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to fetch HR dashboard metrics';
-      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ message });
+      this.respondError(res, error, 'Failed to fetch HR dashboard metrics.');
     }
   };
 }

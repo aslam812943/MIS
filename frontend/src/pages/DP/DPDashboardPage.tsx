@@ -5,6 +5,7 @@ import DashboardLayout from '../../components/layout/DashboardLayout';
 import { dpService } from '../../services/dp.service';
 import { orgService } from '../../services/org.service';
 import { authService } from '../../services/auth.service';
+import { useTheme } from '../../context/ThemeContext';
 
 Chart.register(...registerables);
 
@@ -48,6 +49,7 @@ const IconAudit = () => (
 
 const DPDashboardPage: React.FC = () => {
   const currentUser = authService.getCurrentUser();
+  const { theme } = useTheme();
   const isAdmin = currentUser?.role === 'admin';
   const hasMultiBranchAccess = isAdmin || ['ceo', 'managing_director', 'director', 'executive', 'hod'].includes(currentUser?.role || '');
   const userBranchId = currentUser?.branch_id || '';
@@ -112,6 +114,14 @@ const DPDashboardPage: React.FC = () => {
   useEffect(() => {
     if (!stats) return;
 
+    // Chart tick/legend/grid colors were previously hardcoded for the dark
+    // theme, which made axis numbers invisible against a light-mode white
+    // background. Derive them from the active theme instead.
+    const isDark = theme === 'dark';
+    const tickColor = isDark ? '#94a3b8' : '#475569';
+    const gridColor = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(15, 23, 42, 0.08)';
+    const legendColor = isDark ? '#cbd5e1' : '#334155';
+
     // 1. Line Chart: Account Openings
     if (openingsCanvasRef.current) {
       if (openingsChartInstance.current) openingsChartInstance.current.destroy();
@@ -137,8 +147,8 @@ const DPDashboardPage: React.FC = () => {
             maintainAspectRatio: false,
             plugins: { legend: { display: false } },
             scales: {
-              y: { grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#94a3b8', stepSize: 1 } },
-              x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
+              y: { grid: { color: gridColor }, ticks: { color: tickColor, stepSize: 1 } },
+              x: { grid: { display: false }, ticks: { color: tickColor } }
             }
           }
         });
@@ -167,7 +177,7 @@ const DPDashboardPage: React.FC = () => {
             plugins: {
               legend: {
                 position: 'bottom',
-                labels: { color: '#cbd5e1', font: { size: 11 }, boxWidth: 12 }
+                labels: { color: legendColor, font: { size: 11 }, boxWidth: 12 }
               }
             },
             cutout: '65%'
@@ -196,15 +206,15 @@ const DPDashboardPage: React.FC = () => {
             maintainAspectRatio: false,
             plugins: { legend: { display: false } },
             scales: {
-              y: { grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#94a3b8', stepSize: 1 } },
-              x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
+              y: { grid: { color: gridColor }, ticks: { color: tickColor, stepSize: 1 } },
+              x: { grid: { display: false }, ticks: { color: tickColor } }
             }
           }
         });
       }
     }
 
-  }, [stats]);
+  }, [stats, theme]);
 
   return (
     <DashboardLayout>
@@ -288,7 +298,7 @@ const DPDashboardPage: React.FC = () => {
                   <span className="mis-stat-label text-xs uppercase tracking-wider font-semibold">Total DP Accounts</span>
                   <span className="text-cyan-500 opacity-85"><IconAccount /></span>
                 </div>
-                <div className="mis-stat-value text-white text-3xl font-bold text-left">{stats.kpis.totalAccounts}</div>
+                <div className="mis-stat-value text-3xl font-bold text-left">{stats.kpis.totalAccounts}</div>
                 <p className="text-[10px] mt-1 text-left animate-pulse text-cyan-400">Total processed</p>
               </div>
 
@@ -297,8 +307,8 @@ const DPDashboardPage: React.FC = () => {
                   <span className="mis-stat-label text-xs uppercase tracking-wider font-semibold">Pending Modifications</span>
                   <span className="text-amber-500 opacity-85"><IconModification /></span>
                 </div>
-                <div className="mis-stat-value text-white text-3xl font-bold text-left">{stats.kpis.pendingModifications}</div>
-                <p className="text-[10px] mt-1 text-left text-slate-400">Requires processing</p>
+                <div className="mis-stat-value text-3xl font-bold text-left">{stats.kpis.pendingModifications}</div>
+                <p className="text-[10px] mt-1 text-left" style={{ color: 'var(--text-secondary)' }}>Requires processing</p>
               </div>
 
               <div className="mis-stat-card border-l-4 border-emerald-500">
@@ -306,8 +316,8 @@ const DPDashboardPage: React.FC = () => {
                   <span className="mis-stat-label text-xs uppercase tracking-wider font-semibold">Completed Demats</span>
                   <span className="text-emerald-500 opacity-85"><IconDemat /></span>
                 </div>
-                <div className="mis-stat-value text-white text-3xl font-bold text-left">{stats.kpis.completedDemats}</div>
-                <p className="text-[10px] mt-1 text-left text-slate-400">Confirmed by RTA</p>
+                <div className="mis-stat-value text-3xl font-bold text-left">{stats.kpis.completedDemats}</div>
+                <p className="text-[10px] mt-1 text-left" style={{ color: 'var(--text-secondary)' }}>Confirmed by RTA</p>
               </div>
 
               <div className="mis-stat-card border-l-4 border-purple-500">
@@ -315,8 +325,8 @@ const DPDashboardPage: React.FC = () => {
                   <span className="mis-stat-label text-xs uppercase tracking-wider font-semibold">Active Queries</span>
                   <span className="text-purple-500 opacity-85"><IconQuery /></span>
                 </div>
-                <div className="mis-stat-value text-white text-3xl font-bold text-left">{stats.kpis.activeQueries}</div>
-                <p className="text-[10px] mt-1 text-left text-slate-400">Open support tickets</p>
+                <div className="mis-stat-value text-3xl font-bold text-left">{stats.kpis.activeQueries}</div>
+                <p className="text-[10px] mt-1 text-left" style={{ color: 'var(--text-secondary)' }}>Open support tickets</p>
               </div>
 
               <div className="mis-stat-card border-l-4 border-red-500">
@@ -324,8 +334,8 @@ const DPDashboardPage: React.FC = () => {
                   <span className="mis-stat-label text-xs uppercase tracking-wider font-semibold">Open Audits</span>
                   <span className="text-red-500 opacity-85"><IconAudit /></span>
                 </div>
-                <div className="mis-stat-value text-white text-3xl font-bold text-left">{stats.kpis.openAudits}</div>
-                <p className="text-[10px] mt-1 text-left text-slate-400">Action pending</p>
+                <div className="mis-stat-value text-3xl font-bold text-left">{stats.kpis.openAudits}</div>
+                <p className="text-[10px] mt-1 text-left" style={{ color: 'var(--text-secondary)' }}>Action pending</p>
               </div>
 
             </section>
@@ -335,7 +345,7 @@ const DPDashboardPage: React.FC = () => {
               
               {/* Line trend chart */}
               <div className="mis-card p-5 lg:col-span-2">
-                <h3 className="text-sm font-bold text-slate-100 mb-4 text-left border-b pb-2" style={{ borderColor: 'var(--border)' }}>
+                <h3 className="text-sm font-bold mb-4 text-left border-b pb-2" style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
                   📈 Monthly Account Openings Trend
                 </h3>
                 <div className="h-64 relative">
@@ -345,7 +355,7 @@ const DPDashboardPage: React.FC = () => {
 
               {/* Donut chart */}
               <div className="mis-card p-5">
-                <h3 className="text-sm font-bold text-slate-100 mb-4 text-left border-b pb-2" style={{ borderColor: 'var(--border)' }}>
+                <h3 className="text-sm font-bold mb-4 text-left border-b pb-2" style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
                   🍩 DIS CDAS Scan Upload Status
                 </h3>
                 <div className="h-64 relative">
@@ -355,7 +365,7 @@ const DPDashboardPage: React.FC = () => {
 
               {/* Bar distribution chart */}
               <div className="mis-card p-5 lg:col-span-3">
-                <h3 className="text-sm font-bold text-slate-100 mb-4 text-left border-b pb-2" style={{ borderColor: 'var(--border)' }}>
+                <h3 className="text-sm font-bold mb-4 text-left border-b pb-2" style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
                   📊 Client Support Queries by Category
                 </h3>
                 <div className="h-64 relative">

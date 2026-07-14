@@ -825,7 +825,7 @@ const DPDataEntryPage: React.FC = () => {
           /* Data Input Form Card + plain-English help panel */
           <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-6 items-start max-w-6xl mx-auto">
           <div className="mis-card p-6">
-            <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-6 flex items-center gap-1.5 border-b pb-3" style={{ borderColor: 'var(--border)' }}>
+            <h2 className="text-lg font-bold mb-6 flex items-center gap-1.5 border-b pb-3" style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
               📋 {editingId ? '✏️ Modify Record Row' : '➕ Create New Record Row'}
             </h2>
 
@@ -900,7 +900,7 @@ const DPDataEntryPage: React.FC = () => {
                           onChange={(e) => setFormData((prev: any) => ({ ...prev, [field.key]: e.target.checked }))}
                           className="h-4.5 w-4.5 rounded border-slate-700 bg-slate-800 text-teal-600 focus:ring-teal-500"
                         />
-                        <label htmlFor={field.key} className="text-xs font-semibold text-slate-300">
+                        <label htmlFor={field.key} className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>
                           {field.label}
                         </label>
                       </div>
@@ -1072,10 +1072,10 @@ const DPDataEntryPage: React.FC = () => {
                         </td>
                         {isClientSheet() && (
                           <>
-                            <td className="font-bold text-slate-200">
+                            <td className="font-bold" style={{ color: 'var(--text-primary)' }}>
                               {row.kyc_new_account?.applicant_name || 'N/A'}
                             </td>
-                            <td className="text-slate-400 font-mono text-[11px]">
+                            <td className="font-mono text-[11px]" style={{ color: 'var(--text-secondary)' }}>
                               {row.kyc_new_account?.pan || 'N/A'}
                             </td>
                           </>
@@ -1084,7 +1084,7 @@ const DPDataEntryPage: React.FC = () => {
                           if (field.type === 'checkbox') return null;
                           const val = row[field.key];
                           if (field.type === 'date' && val) {
-                            return <td key={field.key} className="text-slate-400">{new Date(val).toLocaleDateString()}</td>;
+                            return <td key={field.key} style={{ color: 'var(--text-secondary)' }}>{new Date(val).toLocaleDateString()}</td>;
                           }
                           if (field.key === 'status' || field.key === 'scan_upload_status') {
                             let color = 'bg-slate-800 text-slate-400';
@@ -1103,7 +1103,7 @@ const DPDataEntryPage: React.FC = () => {
                               </td>
                             );
                           }
-                          return <td key={field.key} className="text-slate-300 truncate max-w-xs">{val ?? 'N/A'}</td>;
+                          return <td key={field.key} className="truncate max-w-xs" style={{ color: 'var(--text-primary)' }}>{val ?? 'N/A'}</td>;
                         })}
                         <td className="text-right">
                           <div className="flex justify-end gap-1.5">

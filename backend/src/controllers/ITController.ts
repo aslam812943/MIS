@@ -17,7 +17,8 @@ export class ITController {
         msg.includes('required') ||
         msg.includes('Required') ||
         msg.includes('cannot exceed') ||
-        msg.includes('must be')
+        msg.includes('must be') ||
+        msg.includes('already exists')
       ) {
         return HttpStatus.BAD_REQUEST;
       }

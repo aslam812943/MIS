@@ -3,6 +3,33 @@ import type { IUserRepository } from '../repositories/interfaces/IUserRepository
 import type { EmailService } from './EmailService.js';
 import { type User, UserRole } from '../models/user.model.js';
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_REGEX = /^\d{10}$/;
+const MIN_PASSWORD_LENGTH = 4;
+const VALID_ROLES = Object.values(UserRole) as string[];
+
+// Roles that operate org-wide rather than belonging to one branch — the
+// same set the Admin Panel frontend treats as not needing a Department.
+// Only a full admin may create, edit, or change the status of an account in
+// this tier; the /users routes are otherwise reachable by 'hr' too
+// (requireAdminOrHR), and HR managing its own peers/leadership accounts
+// (including being able to silently set one to 'blocked') would be a
+// privilege-escalation-adjacent risk, not a normal HR function.
+const LEADERSHIP_ROLES = ['admin', 'ceo', 'managing_director', 'director', 'executive'];
+
+// Fields an HTTP caller may legitimately set on a user profile via
+// updateUser(). Everything else (id, created_at, updated_at, or any
+// unexpected key) is stripped before the update reaches the database —
+// req.body was previously passed straight through to a Supabase
+// `.update(body)` call, which sets every key present as a column, including
+// ones like `id` that should never be client-writable.
+const UPDATABLE_PROFILE_FIELDS: (keyof User)[] = [
+  'email', 'role', 'full_name', 'phone_number', 'avatar_url',
+  'branch_id', 'department_id', 'allowed_modules', 'status',
+  'employee_id', 'joining_date', 'resignation_date',
+  'resignation_reason', 'last_working_date',
+];
+
 /**
  * Service to manage users in the MIS system.
  */
@@ -24,9 +51,11 @@ export class UserService {
       throw new Error('SUPABASE_SERVICE_ROLE_KEY is required for user creation.');
     }
 
-    // SECURITY: Prevent non-admin users from creating Admin accounts
-    if (userData.role === 'admin' && (!requestingUser || requestingUser.role !== 'admin')) {
-      throw new Error('Access denied. Only administrators can create administrator accounts.');
+    // SECURITY: Prevent non-admin users from creating leadership-tier accounts
+    // (admin/CEO/MD/director/executive) — /users is reachable by HR too
+    // (requireAdminOrHR), and HR should not be able to grant org-wide access.
+    if (LEADERSHIP_ROLES.includes(userData.role as string) && (!requestingUser || requestingUser.role !== 'admin')) {
+      throw new Error('Access denied. Only administrators can create leadership-tier accounts.');
     }
 
     const { email, role, full_name, branch_id, department_id, allowed_modules, password } = userData;
@@ -35,9 +64,38 @@ export class UserService {
       throw new Error('Email, role, and password are required.');
     }
 
+    // VALIDATION: Email format
+    if (!EMAIL_REGEX.test(email.trim())) {
+      throw new Error('Invalid email address format.');
+    }
+
+    // VALIDATION: Role must be a real, known role — not just cast to the
+    // TypeScript type with no runtime check. The DB CHECK constraint would
+    // catch an invalid value too, but only after a raw, unfriendly error.
+    if (!VALID_ROLES.includes(role)) {
+      throw new Error(`Invalid role: ${role}`);
+    }
+
+    // VALIDATION: Password strength — Supabase Auth alone doesn't enforce a
+    // meaningful minimum, so this app previously accepted any non-empty
+    // password (including a single character) for accounts up to and
+    // including admin.
+    if (password.length < MIN_PASSWORD_LENGTH) {
+      throw new Error(`Password must be at least ${MIN_PASSWORD_LENGTH} characters long.`);
+    }
+
+    // VALIDATION: Phone number format, if provided
+    if (userData.phone_number && !PHONE_REGEX.test(userData.phone_number.trim())) {
+      throw new Error('Phone number must be exactly 10 digits.');
+    }
+
     // SANITIZATION: Trim whitespace
     const sanitizedEmail = email.trim().toLowerCase();
     const sanitizedName = full_name?.trim();
+
+    if (sanitizedName && sanitizedName.length > 255) {
+      throw new Error('Full name cannot exceed 255 characters.');
+    }
 
     // Auto-generate employee_id if not provided
     let employeeId = userData.employee_id?.trim();
@@ -67,6 +125,12 @@ export class UserService {
       if (!dept) throw new Error(`Invalid Department ID: ${department_id} does not exist.`);
     }
 
+    // Org-wide roles (CEO, admin, etc.) submit branch_id/department_id as ''
+    // when left unset — the DB columns are UUID, which rejects '' outright
+    // ("invalid input syntax for type uuid"), so normalize to null.
+    const normalizedBranchId = (branch_id || null) as string | undefined;
+    const normalizedDepartmentId = (department_id || null) as string | undefined;
+
     // VALIDATION: Check if Modules exist
     if (allowed_modules && allowed_modules.length > 0) {
       const { data: validModules } = await supabaseAdmin.from('modules').select('id').in('id', allowed_modules);
@@ -83,7 +147,10 @@ export class UserService {
     });
 
     if (authError) {
-      throw new Error(`Auth creation failed: ${authError.message}`);
+      if (authError.message.toLowerCase().includes('already been registered') || authError.message.toLowerCase().includes('already registered')) {
+        throw new Error(`A user with the email "${sanitizedEmail}" already exists.`);
+      }
+      throw new Error(`Account creation failed: ${authError.message}`);
     }
 
     const authUser = authData.user;
@@ -95,9 +162,9 @@ export class UserService {
         email: sanitizedEmail,
         role: role as UserRole,
         full_name: sanitizedName,
-        phone_number: userData.phone_number,
-        branch_id,
-        department_id,
+        phone_number: userData.phone_number?.trim(),
+        branch_id: normalizedBranchId,
+        department_id: normalizedDepartmentId,
         allowed_modules,
         status: 'active',
         employee_id: employeeId,
@@ -124,12 +191,33 @@ export class UserService {
 
   /**
    * Deletes a user from both Supabase Auth and the profiles table.
-   * 
+   *
+   * The /users/:id DELETE route is admin-only (requireAdmin, unlike the
+   * requireAdminOrHR-gated create/update/status routes), so a caller here is
+   * always already an admin — but the two checks below still guard against a
+   * real footgun: an admin deleting their own account, or deleting the last
+   * remaining admin, either of which can lock everyone out of user
+   * management with no one left able to undo it.
+   *
    * @param id User ID to delete.
+   * @param requestingUser The authenticated caller performing the deletion.
    */
-  async deleteUser(id: string): Promise<void> {
+  async deleteUser(id: string, requestingUser?: any): Promise<void> {
     if (!supabaseAdmin) {
       throw new Error('SUPABASE_SERVICE_ROLE_KEY is required for user deletion.');
+    }
+
+    if (requestingUser && requestingUser.id === id) {
+      throw new Error('You cannot delete your own account.');
+    }
+
+    const targetUser = await this.getUserById(id);
+    if (targetUser?.role === 'admin') {
+      const allUsers = await this.userRepository.findAll();
+      const remainingAdmins = allUsers.filter(u => u.role === 'admin' && u.id !== id);
+      if (remainingAdmins.length === 0) {
+        throw new Error('Cannot delete the last remaining administrator account.');
+      }
     }
 
     // 1. Delete from auth
@@ -155,19 +243,28 @@ export class UserService {
       throw new Error('User not found.');
     }
 
-    // SECURITY: Prevent non-admin users from modifying Admin profiles
-    if (targetUser.role === 'admin' && (!requestingUser || requestingUser.role !== 'admin')) {
-      throw new Error("Access denied. You cannot modify an administrator's profile.");
+    // SECURITY: Prevent non-admin users from modifying leadership-tier
+    // profiles (admin/CEO/MD/director/executive) — HR can reach this
+    // endpoint too (requireAdminOrHR), and shouldn't be able to edit or
+    // (via updateUserStatus) lock out leadership accounts.
+    if (LEADERSHIP_ROLES.includes(targetUser.role as string) && (!requestingUser || requestingUser.role !== 'admin')) {
+      throw new Error("Access denied. You cannot modify a leadership-tier account's profile.");
     }
 
     // SECURITY: Prevent non-admin users from elevating roles to admin or demoting roles
     if (userData.role && userData.role !== targetUser.role && (!requestingUser || requestingUser.role !== 'admin')) {
       throw new Error('Access denied. Only administrators can modify user roles.');
     }
+    if (userData.role !== undefined && !VALID_ROLES.includes(userData.role)) {
+      throw new Error(`Invalid role: ${userData.role}`);
+    }
 
     // 1. If email is being updated, update in Supabase Auth
     if (userData.email) {
       const sanitizedEmail = userData.email.trim().toLowerCase();
+      if (!EMAIL_REGEX.test(sanitizedEmail)) {
+        throw new Error('Invalid email address format.');
+      }
       const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(id, {
         email: sanitizedEmail,
         email_confirm: true
@@ -176,8 +273,34 @@ export class UserService {
       userData.email = sanitizedEmail;
     }
 
+    // 1b. If a new password was provided (edit form's "New Password
+    // (Optional)" field), apply it to Supabase Auth. `password` isn't a
+    // profiles-table column, so it never reaches the DB update below either
+    // way — this was previously silently ignored entirely, meaning the
+    // field in the UI didn't actually do anything.
+    const newPassword = (userData as any).password as string | undefined;
+    if (newPassword) {
+      if (newPassword.length < MIN_PASSWORD_LENGTH) {
+        throw new Error(`Password must be at least ${MIN_PASSWORD_LENGTH} characters long.`);
+      }
+      const { error: passwordError } = await supabaseAdmin.auth.admin.updateUserById(id, {
+        password: newPassword
+      });
+      if (passwordError) throw new Error(`Auth password update failed: ${passwordError.message}`);
+    }
+
     if (userData.full_name) {
       userData.full_name = userData.full_name.trim();
+      if (userData.full_name.length > 255) {
+        throw new Error('Full name cannot exceed 255 characters.');
+      }
+    }
+
+    if (userData.phone_number) {
+      userData.phone_number = userData.phone_number.trim();
+      if (!PHONE_REGEX.test(userData.phone_number)) {
+        throw new Error('Phone number must be exactly 10 digits.');
+      }
     }
 
     // VALIDATION: Re-verify Branch/Dept/Modules if they are being changed
@@ -189,15 +312,39 @@ export class UserService {
       const { data: dept } = await supabaseAdmin.from('departments').select('id').eq('id', userData.department_id).single();
       if (!dept) throw new Error('Invalid Department ID');
     }
+
+    // Org-wide roles submit branch_id/department_id as '' when cleared —
+    // the DB columns are UUID, which rejects '' outright, so normalize to null.
+    if (userData.branch_id !== undefined) {
+      userData.branch_id = (userData.branch_id || null) as string | undefined;
+    }
+    if (userData.department_id !== undefined) {
+      userData.department_id = (userData.department_id || null) as string | undefined;
+    }
     if (userData.allowed_modules && userData.allowed_modules.length > 0) {
       const { data: validModules } = await supabaseAdmin.from('modules').select('id').in('id', userData.allowed_modules);
-      if (!validModules || validModules.length !== userData.allowed_modules.length) {
-        throw new Error('One or more selected modules are invalid.');
+      const validIds = new Set((validModules || []).map((m: any) => m.id));
+      // Silently drop any id that no longer exists (e.g. the module was
+      // deleted after being assigned) instead of hard-failing the entire
+      // profile update — a stale reference the caller never touched
+      // shouldn't block an otherwise-valid edit to unrelated fields like
+      // branch or role.
+      userData.allowed_modules = userData.allowed_modules.filter((id) => validIds.has(id));
+    }
+
+    // 2. Update profile in database. req.body was previously passed through
+    // to this call unfiltered — a Supabase `.update(obj)` writes every key
+    // present as a column, so an unexpected key like `id` or `created_at`
+    // would have been written too. Whitelist to only the fields a profile
+    // update is actually meant to change.
+    const safeUpdate: Partial<User> = {};
+    for (const field of UPDATABLE_PROFILE_FIELDS) {
+      if (userData[field] !== undefined) {
+        (safeUpdate as any)[field] = userData[field];
       }
     }
 
-    // 2. Update profile in database
-    return this.userRepository.update(id, userData);
+    return this.userRepository.update(id, safeUpdate);
   }
 
   /**
@@ -208,14 +355,27 @@ export class UserService {
       throw new Error('SUPABASE_SERVICE_ROLE_KEY is required for status updates.');
     }
 
+    if (!['active', 'blocked', 'resigned'].includes(status)) {
+      throw new Error('Invalid status value.');
+    }
+
     const targetUser = await this.getUserById(id);
     if (!targetUser) {
       throw new Error('User not found.');
     }
 
-    // SECURITY: Prevent non-admin users from suspending or resigning admins
-    if (targetUser.role === 'admin' && (!requestingUser || requestingUser.role !== 'admin')) {
-      throw new Error("Access denied. You cannot modify an administrator's status.");
+    // SECURITY: Prevent non-admin users from suspending or resigning
+    // leadership-tier accounts (see LEADERSHIP_ROLES above) — this is what
+    // stops an HR account from being able to silently lock out the CEO.
+    if (LEADERSHIP_ROLES.includes(targetUser.role as string) && (!requestingUser || requestingUser.role !== 'admin')) {
+      throw new Error("Access denied. You cannot modify a leadership-tier account's status.");
+    }
+
+    // SECURITY: Prevent an account from blocking/resigning itself — an easy
+    // way to accidentally (or maliciously) lock yourself out with no one
+    // else able to undo it if you were the only admin.
+    if (requestingUser && requestingUser.id === id && status !== 'active') {
+      throw new Error('You cannot block or resign your own account.');
     }
 
     // 1. Update status in Supabase Auth (ban/unban)

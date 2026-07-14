@@ -5,6 +5,7 @@ import { iepfService } from '../../services/iepf.service';
 import { orgService } from '../../services/org.service';
 import { authService } from '../../services/auth.service';
 import DashboardLayout from '../../components/layout/DashboardLayout';
+import { useTheme } from '../../context/ThemeContext';
 
 Chart.register(...registerables);
 
@@ -44,6 +45,7 @@ const IconClock = () => (
 
 const IEPFDashboardPage: React.FC = () => {
   const currentUser = authService.getCurrentUser();
+  const { theme } = useTheme();
   const isAdmin = currentUser?.role === 'admin';
   const hasMultiBranchAccess = isAdmin || ['ceo', 'managing_director', 'director', 'executive', 'hod'].includes(currentUser?.role || '');
   const userBranchId = currentUser?.branch_id || '';
@@ -116,6 +118,13 @@ const IEPFDashboardPage: React.FC = () => {
   useEffect(() => {
     if (!dashboardData) return;
 
+    const isDark = theme === 'dark';
+    const tickColorStrong = isDark ? 'rgba(255, 255, 255, 0.7)' : 'rgba(15, 23, 42, 0.75)';
+    const tickColorSoft = isDark ? 'rgba(255, 255, 255, 0.5)' : 'rgba(15, 23, 42, 0.6)';
+    const gridColor = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(15, 23, 42, 0.08)';
+    const gridColorFaint = isDark ? 'rgba(255, 255, 255, 0.02)' : 'rgba(15, 23, 42, 0.04)';
+    const donutBorderColor = isDark ? 'rgba(255, 255, 255, 0.05)' : '#ffffff';
+
     // ── 1. DONUT CHART (CLAIM STATUS BREAKDOWN) ───────────────────
     if (donutCanvasRef.current) {
       if (donutChartInstance.current) {
@@ -136,7 +145,7 @@ const IEPFDashboardPage: React.FC = () => {
               data: counts,
               backgroundColor: ['#06b6d4', '#10b981', '#f59e0b', '#f43f5e'],
               borderWidth: 2,
-              borderColor: 'rgba(255, 255, 255, 0.05)'
+              borderColor: donutBorderColor
             }]
           },
           options: {
@@ -145,7 +154,7 @@ const IEPFDashboardPage: React.FC = () => {
             plugins: {
               legend: {
                 position: 'bottom',
-                labels: { color: 'rgba(255, 255, 255, 0.7)', font: { size: 11 } }
+                labels: { color: tickColorStrong, font: { size: 11 } }
               }
             }
           }
@@ -185,12 +194,12 @@ const IEPFDashboardPage: React.FC = () => {
             maintainAspectRatio: false,
             scales: {
               y: {
-                ticks: { color: 'rgba(255, 255, 255, 0.5)' },
-                grid: { color: 'rgba(255, 255, 255, 0.05)' }
+                ticks: { color: tickColorSoft },
+                grid: { color: gridColor }
               },
               x: {
-                ticks: { color: 'rgba(255, 255, 255, 0.5)' },
-                grid: { color: 'rgba(255, 255, 255, 0.02)' }
+                ticks: { color: tickColorSoft },
+                grid: { color: gridColorFaint }
               }
             },
             plugins: {
@@ -231,11 +240,11 @@ const IEPFDashboardPage: React.FC = () => {
             maintainAspectRatio: false,
             scales: {
               x: {
-                ticks: { color: 'rgba(255, 255, 255, 0.5)' },
-                grid: { color: 'rgba(255, 255, 255, 0.05)' }
+                ticks: { color: tickColorSoft },
+                grid: { color: gridColor }
               },
               y: {
-                ticks: { color: 'rgba(255, 255, 255, 0.7)', font: { size: 10 } },
+                ticks: { color: tickColorStrong, font: { size: 10 } },
                 grid: { display: false }
               }
             },
@@ -253,7 +262,7 @@ const IEPFDashboardPage: React.FC = () => {
       if (lineChartInstance.current) lineChartInstance.current.destroy();
       if (barChartInstance.current) barChartInstance.current.destroy();
     };
-  }, [dashboardData]);
+  }, [dashboardData, theme]);
 
   if (loading) {
     return (
@@ -339,7 +348,7 @@ const IEPFDashboardPage: React.FC = () => {
               <span className="mis-stat-label text-xs uppercase tracking-wider font-semibold">Total Active Claims</span>
               <span className="text-cyan-500 opacity-85"><IconActivity /></span>
             </div>
-            <div className="mis-stat-value text-white text-3xl font-bold">{kpis.activeClaims}</div>
+            <div className="mis-stat-value text-3xl font-bold">{kpis.activeClaims}</div>
             <p className="text-[10px] mt-1" style={{ color: 'var(--text-secondary)' }}>Processing files</p>
           </div>
 
@@ -348,7 +357,7 @@ const IEPFDashboardPage: React.FC = () => {
               <span className="mis-stat-label text-xs uppercase tracking-wider font-semibold">Closed Cases (Year)</span>
               <span className="text-emerald-500 opacity-85"><IconFolderCheck /></span>
             </div>
-            <div className="mis-stat-value text-white text-3xl font-bold">{kpis.closedThisYear}</div>
+            <div className="mis-stat-value text-3xl font-bold">{kpis.closedThisYear}</div>
             <p className="text-[10px] mt-1" style={{ color: 'var(--text-secondary)' }}>Resolved this year</p>
           </div>
 
@@ -357,7 +366,7 @@ const IEPFDashboardPage: React.FC = () => {
               <span className="mis-stat-label text-xs uppercase tracking-wider font-semibold">Pending Claims</span>
               <span className="text-amber-500 opacity-85"><IconAlertTriangle /></span>
             </div>
-            <div className="mis-stat-value text-white text-3xl font-bold">{kpis.pendingClaims}</div>
+            <div className="mis-stat-value text-3xl font-bold">{kpis.pendingClaims}</div>
             <p className="text-[10px] mt-1" style={{ color: 'var(--text-secondary)' }}>Held for documents/KYC</p>
           </div>
 
@@ -366,7 +375,7 @@ const IEPFDashboardPage: React.FC = () => {
               <span className="mis-stat-label text-xs uppercase tracking-wider font-semibold">Resolved (Month)</span>
               <span className="text-teal-500 opacity-85"><IconCalendar /></span>
             </div>
-            <div className="mis-stat-value text-white text-3xl font-bold">{kpis.closedThisMonth}</div>
+            <div className="mis-stat-value text-3xl font-bold">{kpis.closedThisMonth}</div>
             <p className="text-[10px] mt-1" style={{ color: 'var(--text-secondary)' }}>Completed this month</p>
           </div>
 
@@ -375,7 +384,7 @@ const IEPFDashboardPage: React.FC = () => {
               <span className="mis-stat-label text-xs uppercase tracking-wider font-semibold">Avg Resolution Time</span>
               <span className="text-purple-500 opacity-85"><IconClock /></span>
             </div>
-            <div className="mis-stat-value text-white text-3xl font-bold">
+            <div className="mis-stat-value text-3xl font-bold">
               {kpis.averageResolutionTime} <span className="text-sm font-normal" style={{ color: 'var(--text-secondary)' }}>Days</span>
             </div>
             <p className="text-[10px] mt-1" style={{ color: 'var(--text-secondary)' }}>Average closure latency</p>
@@ -441,7 +450,7 @@ const IEPFDashboardPage: React.FC = () => {
                 <tbody>
                   {activeClaims.map((claim) => (
                     <tr key={claim.id}>
-                      <td className="font-semibold text-white">{claim.claim_number}</td>
+                      <td className="font-semibold" style={{ color: 'var(--text-primary)' }}>{claim.claim_number}</td>
                       <td>
                         <div className="font-semibold">{claim.investor_name}</div>
                         <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>PAN: {claim.pan_number}</div>

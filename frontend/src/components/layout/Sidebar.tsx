@@ -1,7 +1,8 @@
-import React, { useLayoutEffect, useRef } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { ROUTES } from '../../constants/routes';
 import { authService } from '../../services/auth.service';
+import { notificationService } from '../../services/notification.service';
 import { useLayout } from './LayoutContext';
 import { useTheme } from '../../context/ThemeContext';
 
@@ -88,6 +89,13 @@ const IconIEPFDashboard = () => (
   </svg>
 );
 
+const IconBell = () => (
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9"/>
+    <path d="M13.73 21a2 2 0 01-3.46 0"/>
+  </svg>
+);
+
 /* ── Nav Item ─────────────────────────────────────────────── */
 interface NavItemProps {
   to: string;
@@ -135,6 +143,20 @@ const Sidebar: React.FC = () => {
 
   const { theme, toggleTheme } = useTheme();
   const user = authService.getCurrentUser();
+
+  const [unreadCount, setUnreadCount] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    const fetchUnread = () => {
+      notificationService.getUnreadCount()
+        .then((count) => { if (!cancelled) setUnreadCount(count); })
+        .catch(() => { /* silent — badge just stays at last known value */ });
+    };
+    fetchUnread();
+    const interval = setInterval(fetchUnread, 60000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, []);
+
   const isAdmin = user?.role === 'admin';
   const isHOD = user?.role === 'hod';
   const isEmployee = user?.role === 'employee';
@@ -153,6 +175,16 @@ const Sidebar: React.FC = () => {
 
   const isFinanceUser = user?.department_name?.toUpperCase() === 'FINANCE';
   const showFinanceDashboard = isAdmin || ['ceo', 'managing_director', 'director', 'executive'].includes(user?.role || '') || (isFinanceUser && isHOD);
+
+  const isSettlementsUser = user?.department_name?.toUpperCase() === 'SETTLEMENTS';
+
+  // Employees/HODs in one of the departments with a dedicated data-entry
+  // page (IEPF/Settlements/KYC/DP/IT/Finance) already have their real entry
+  // sheet in that department's nav section — the generic modules-based
+  // Data Entry page has nothing assigned for them and just shows an empty
+  // "No modules assigned" state. Only show it as a fallback for employees
+  // in departments without a dedicated page.
+  const hasDedicatedDeptEntry = isIEPFUser || isSettlementsUser || isKYCUser || isDPUser || isITUser || isFinanceUser;
 
   const closeOnMobile = () => setSidebarOpen(false);
 
@@ -184,14 +216,24 @@ const Sidebar: React.FC = () => {
       <nav className="mis-sidebar-nav" ref={navRef} onScroll={handleNavScroll}>
         <span className="mis-sidebar-section-label">Main</span>
 
+        {!isEmployee && (
+          <NavItem
+            to={ROUTES.DASHBOARD}
+            icon={<IconDashboard />}
+            label="Dashboard"
+            onClick={closeOnMobile}
+          />
+        )}
+
         <NavItem
-          to={ROUTES.DASHBOARD}
-          icon={<IconDashboard />}
-          label="Dashboard"
+          to={ROUTES.NOTIFICATIONS}
+          icon={<IconBell />}
+          label="Notifications"
+          badge={unreadCount > 0 ? String(unreadCount) : undefined}
           onClick={closeOnMobile}
         />
 
-        {(isEmployee || isHOD) && (
+        {(isEmployee || isHOD) && !hasDedicatedDeptEntry && (
           <NavItem
             to={ROUTES.DATA_ENTRY}
             icon={<IconDataEntry />}
@@ -200,7 +242,7 @@ const Sidebar: React.FC = () => {
           />
         )}
 
-        {isHOD && (
+        {isHOD && !hasDedicatedDeptEntry && (
           <NavItem
             to={ROUTES.VERIFY_ENTRIES}
             icon={<IconVerify />}

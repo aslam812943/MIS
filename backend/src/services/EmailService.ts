@@ -90,4 +90,58 @@ export class EmailService {
       throw new Error('Failed to send password reset email');
     }
   }
+
+  /**
+   * Sends a daily digest of new due/overdue notifications. One email per
+   * user per run, covering everything new — never one email per item.
+   */
+  async sendNotificationDigestEmail(
+    to: string,
+    name: string,
+    items: { department: string; type: 'due_soon' | 'overdue'; title: string; message: string }[]
+  ): Promise<void> {
+    const overdueCount = items.filter((i) => i.type === 'overdue').length;
+    const dueSoonCount = items.length - overdueCount;
+
+    const rowsHtml = items
+      .map((item) => {
+        const badgeColor = item.type === 'overdue' ? '#dc2626' : '#d97706';
+        const badgeLabel = item.type === 'overdue' ? 'OVERDUE' : 'DUE SOON';
+        return `
+          <div style="padding: 14px 16px; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 10px;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+              <span style="font-size: 10px; font-weight: 700; letter-spacing: 0.05em; color: #fff; background: ${badgeColor}; padding: 2px 8px; border-radius: 999px;">${badgeLabel}</span>
+              <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #64748b;">${item.department}</span>
+            </div>
+            <p style="margin: 4px 0 0; font-weight: 600; color: #1e293b;">${item.title}</p>
+            <p style="margin: 4px 0 0; font-size: 0.875rem; color: #475569;">${item.message}</p>
+          </div>
+        `;
+      })
+      .join('');
+
+    const mailOptions = {
+      from: `"MIS Notifications" <${process.env.SMTP_USER}>`,
+      to,
+      subject: `MIS: ${overdueCount > 0 ? `${overdueCount} overdue` : ''}${overdueCount > 0 && dueSoonCount > 0 ? ', ' : ''}${dueSoonCount > 0 ? `${dueSoonCount} due soon` : ''} item${items.length === 1 ? '' : 's'} need attention`,
+      html: `
+        <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
+          <h2 style="color: #4f46e5;">Hello ${name},</h2>
+          <p>The MIS system found ${items.length} item${items.length === 1 ? '' : 's'} across your departments that need attention:</p>
+          <div style="margin: 20px 0;">
+            ${rowsHtml}
+          </div>
+          <p>Log in to the MIS portal to review and update these records.</p>
+          <p style="color: #64748b; font-size: 0.875rem; margin-top: 40px;">This is an automated daily digest. Please do not reply.</p>
+        </div>
+      `,
+    };
+
+    try {
+      await this.transporter.sendMail(mailOptions);
+      console.log(`✅ Notification digest sent to ${to} (${items.length} items)`);
+    } catch (error) {
+      console.error(`❌ Failed to send notification digest to ${to}:`, error);
+    }
+  }
 }

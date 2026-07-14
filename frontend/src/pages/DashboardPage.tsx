@@ -3,6 +3,7 @@ import { Chart, registerables } from 'chart.js';
 import DashboardLayout from '../components/layout/DashboardLayout';
 import { orgService } from '../services/org.service';
 import { authService } from '../services/auth.service';
+import { useTheme } from '../context/ThemeContext';
 
 Chart.register(...registerables);
 
@@ -54,6 +55,7 @@ const IconUserMinus = () => (
 const DashboardPage: React.FC = () => {
   const user = authService.getCurrentUser();
   const showHRDashboard = user?.role === 'admin' || user?.role === 'hr';
+  const { theme } = useTheme();
 
   const [stats, setStats] = useState({ branches: 0, departments: 0, users: 0, modules: 0 });
   const [hrData, setHRData] = useState<any>(null);
@@ -93,32 +95,53 @@ const DashboardPage: React.FC = () => {
   };
 
   useEffect(() => {
-    setLoading(true);
-    Promise.all([
-      orgService.getBranches(),
-      orgService.getDepartments(),
-      orgService.getUsers(),
-      orgService.getModules()
-    ])
-      .then(([b, d, u, m]) => {
-        setStats({
-          branches: b.length,
-          departments: d.length,
-          users: u.length,
-          modules: m.length
-        });
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false));
+    // Only admins see the System Overview stats, and only admins have
+    // access to all four endpoints at once (getUsers 403s for everyone
+    // else) — so skip the fetch entirely for other roles instead of
+    // making a call that's guaranteed to fail and go unused.
+    if (user?.role === 'admin') {
+      setLoading(true);
+      Promise.all([
+        orgService.getBranches(),
+        orgService.getDepartments(),
+        orgService.getUsers(),
+        orgService.getModules()
+      ])
+        .then(([b, d, u, m]) => {
+          setStats({
+            branches: b.length,
+            departments: d.length,
+            users: u.length,
+            modules: m.length
+          });
+        })
+        .catch(console.error)
+        .finally(() => setLoading(false));
+    } else {
+      setLoading(false);
+    }
 
     if (showHRDashboard) {
       fetchHRData('6m');
     }
-  }, [showHRDashboard]);
+  }, [showHRDashboard, user?.role]);
 
   // Chart renderer useEffect
   useEffect(() => {
     if (!hrData || dashboardTab !== 'hr') return;
+
+    // Chart.js colors were previously hardcoded for the dark theme (pure
+    // white ticks/legend/grid), which made axis numbers and legend text
+    // invisible against a light-mode white background. Derive every color
+    // from the active theme instead.
+    const isDark = theme === 'dark';
+    const tickColor = isDark ? 'rgba(255, 255, 255, 0.65)' : 'rgba(17, 24, 39, 0.65)';
+    const gridColor = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(17, 24, 39, 0.08)';
+    const legendColor = isDark ? 'rgba(255, 255, 255, 0.75)' : 'rgba(17, 24, 39, 0.75)';
+    const tooltipBg = isDark ? 'rgba(9, 13, 22, 0.95)' : 'rgba(255, 255, 255, 0.98)';
+    const tooltipTitleColor = isDark ? '#ffffff' : '#111827';
+    const tooltipBorderColor = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(17, 24, 39, 0.1)';
+    const cardBgColor = isDark ? '#1e293b' : '#ffffff';
 
     // ── 1. GROWTH CHART (LINE) ───────────────────
     if (growthCanvasRef.current) {
@@ -129,7 +152,7 @@ const DashboardPage: React.FC = () => {
       if (ctx) {
         const labels = hrData.charts.growth.map((d: any) => d.month);
         const dataValues = hrData.charts.growth.map((d: any) => d.count);
-        
+
         // Generate a smooth theme-aligned gradient
         const gradient = ctx.createLinearGradient(0, 0, 0, 300);
         gradient.addColorStop(0, 'rgba(6, 182, 212, 0.3)');
@@ -148,7 +171,7 @@ const DashboardPage: React.FC = () => {
               fill: true,
               borderWidth: 3,
               pointBackgroundColor: '#06b6d4',
-              pointBorderColor: '#090d16',
+              pointBorderColor: cardBgColor,
               pointBorderWidth: 2,
               pointRadius: 5,
               pointHoverRadius: 7
@@ -160,19 +183,19 @@ const DashboardPage: React.FC = () => {
             plugins: {
               legend: { display: false },
               tooltip: {
-                backgroundColor: 'rgba(9, 13, 22, 0.95)',
-                titleColor: '#fff',
-                bodyColor: '#22d3ee',
-                borderColor: 'rgba(255, 255, 255, 0.08)',
+                backgroundColor: tooltipBg,
+                titleColor: tooltipTitleColor,
+                bodyColor: '#0891b2',
+                borderColor: tooltipBorderColor,
                 borderWidth: 1,
                 padding: 10
               }
             },
             scales: {
-              x: { grid: { display: false }, ticks: { color: 'rgba(255, 255, 255, 0.6)', font: { family: 'inherit' } } },
-              y: { 
-                grid: { color: 'rgba(255, 255, 255, 0.05)' }, 
-                ticks: { color: 'rgba(255, 255, 255, 0.6)', stepSize: 1, font: { family: 'inherit' } },
+              x: { grid: { display: false }, ticks: { color: tickColor, font: { family: 'inherit' } } },
+              y: {
+                grid: { color: gridColor },
+                ticks: { color: tickColor, stepSize: 1, font: { family: 'inherit' } },
                 beginAtZero: true
               }
             }
@@ -198,21 +221,21 @@ const DashboardPage: React.FC = () => {
               data: dataValues,
               backgroundColor: ['#06b6d4', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#3b82f6'],
               borderWidth: 2,
-              borderColor: '#090d16'
+              borderColor: cardBgColor
             }]
           },
           options: {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-              legend: { 
+              legend: {
                 position: 'bottom',
-                labels: { color: 'rgba(255, 255, 255, 0.7)', font: { size: 11, family: 'inherit' }, padding: 15 }
+                labels: { color: legendColor, font: { size: 11, family: 'inherit' }, padding: 15 }
               },
               tooltip: {
-                backgroundColor: 'rgba(9, 13, 22, 0.95)',
-                titleColor: '#fff',
-                borderColor: 'rgba(255, 255, 255, 0.08)',
+                backgroundColor: tooltipBg,
+                titleColor: tooltipTitleColor,
+                borderColor: tooltipBorderColor,
                 borderWidth: 1,
                 padding: 10
               }
@@ -251,18 +274,18 @@ const DashboardPage: React.FC = () => {
             plugins: {
               legend: { display: false },
               tooltip: {
-                backgroundColor: 'rgba(9, 13, 22, 0.95)',
-                titleColor: '#fff',
-                borderColor: 'rgba(255, 255, 255, 0.08)',
+                backgroundColor: tooltipBg,
+                titleColor: tooltipTitleColor,
+                borderColor: tooltipBorderColor,
                 borderWidth: 1,
                 padding: 10
               }
             },
             scales: {
-              x: { grid: { display: false }, ticks: { color: 'rgba(255, 255, 255, 0.6)', font: { family: 'inherit' } } },
-              y: { 
-                grid: { color: 'rgba(255, 255, 255, 0.05)' }, 
-                ticks: { color: 'rgba(255, 255, 255, 0.6)', stepSize: 1, font: { family: 'inherit' } },
+              x: { grid: { display: false }, ticks: { color: tickColor, font: { family: 'inherit' } } },
+              y: {
+                grid: { color: gridColor },
+                ticks: { color: tickColor, stepSize: 1, font: { family: 'inherit' } },
                 beginAtZero: true
               }
             }
@@ -276,7 +299,7 @@ const DashboardPage: React.FC = () => {
       if (branchChartInstance.current) branchChartInstance.current.destroy();
       if (deptChartInstance.current) deptChartInstance.current.destroy();
     };
-  }, [hrData, dashboardTab]);
+  }, [hrData, dashboardTab, theme]);
 
   return (
     <DashboardLayout>
@@ -469,8 +492,9 @@ const DashboardPage: React.FC = () => {
               </>
             )}
           </div>
-        ) : (
-          /* ── System Overview Tab ───────────────────────────────── */
+        ) : user?.role === 'admin' ? (
+          /* ── System Overview Tab (admin only — org-wide counts aren't
+             meaningful/available to other roles) ──────────────────── */
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 lg:gap-8">
             <div className="mis-card p-6 sm:p-8">
               <h2 className="mis-section-title">System Overview</h2>
@@ -516,7 +540,7 @@ const DashboardPage: React.FC = () => {
               </div>
             </div>
           </div>
-        )}
+        ) : null}
       </div>
     </DashboardLayout>
   );

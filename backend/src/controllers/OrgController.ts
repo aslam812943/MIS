@@ -10,6 +10,46 @@ export class OrgController {
   constructor(private orgService: OrgService) {}
 
   /**
+   * OrgService only ever throws deliberate, user-facing validation messages
+   * ("cannot be empty", "already exists", "cannot exceed...characters",
+   * "Cannot delete this branch/department/module..."). Anything that
+   * doesn't match one of those is an unexpected failure — usually a raw
+   * Postgres/Supabase error bubbling up through the repository's
+   * `throw new Error(error.message)` — which used to be forwarded to the
+   * client verbatim. Those are now logged server-side and replaced with a
+   * generic message instead of leaking internals.
+   */
+  private getErrorStatus(error: unknown): number {
+    if (error instanceof Error) {
+      const msg = error.message;
+      if (
+        msg.includes('cannot be empty') ||
+        msg.includes('already exists') ||
+        msg.includes('cannot exceed') ||
+        msg.includes('Cannot delete this branch') ||
+        msg.includes('Cannot delete this department') ||
+        msg.includes('Cannot delete this module')
+      ) {
+        return HttpStatus.BAD_REQUEST;
+      }
+    }
+    return HttpStatus.INTERNAL_SERVER_ERROR;
+  }
+
+  private respondError(res: Response, error: unknown, fallbackMessage: string): void {
+    const status = this.getErrorStatus(error);
+    const rawMessage = error instanceof Error ? error.message : fallbackMessage;
+
+    if (status === HttpStatus.INTERNAL_SERVER_ERROR) {
+      console.error('[OrgController]', rawMessage);
+      res.status(status).json({ message: fallbackMessage });
+      return;
+    }
+
+    res.status(status).json({ message: rawMessage });
+  }
+
+  /**
    * Adds a new branch.
    */
   addBranch = async (req: Request, res: Response): Promise<void> => {
@@ -22,8 +62,7 @@ export class OrgController {
 
       res.status(HttpStatus.CREATED).json(branch);
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Failed to add branch';
-      res.status(HttpStatus.BAD_REQUEST).json({ message });
+      this.respondError(res, error, 'Failed to add branch.');
     }
   };
 
@@ -35,8 +74,7 @@ export class OrgController {
       const branches = await this.orgService.getAllBranches();
       res.status(HttpStatus.OK).json(branches);
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Failed to fetch branches';
-      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ message });
+      this.respondError(res, error, 'Failed to fetch branches.');
     }
   };
 
@@ -53,8 +91,7 @@ export class OrgController {
 
       res.status(HttpStatus.CREATED).json(department);
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Failed to add department';
-      res.status(HttpStatus.BAD_REQUEST).json({ message });
+      this.respondError(res, error, 'Failed to add department.');
     }
   };
 
@@ -66,8 +103,7 @@ export class OrgController {
       const departments = await this.orgService.getAllDepartments();
       res.status(HttpStatus.OK).json(departments);
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Failed to fetch departments';
-      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ message });
+      this.respondError(res, error, 'Failed to fetch departments.');
     }
   };
 
@@ -84,8 +120,7 @@ export class OrgController {
 
       res.status(HttpStatus.CREATED).json(module);
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Failed to add module';
-      res.status(HttpStatus.BAD_REQUEST).json({ message });
+      this.respondError(res, error, 'Failed to add module.');
     }
   };
 
@@ -97,8 +132,7 @@ export class OrgController {
       const modules = await this.orgService.getAllModules();
       res.status(HttpStatus.OK).json(modules);
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Failed to fetch modules';
-      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ message });
+      this.respondError(res, error, 'Failed to fetch modules.');
     }
   };
 
@@ -118,8 +152,7 @@ export class OrgController {
 
       res.status(HttpStatus.OK).json(branch);
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Failed to update branch';
-      res.status(HttpStatus.BAD_REQUEST).json({ message });
+      this.respondError(res, error, 'Failed to update branch.');
     }
   };
 
@@ -138,8 +171,7 @@ export class OrgController {
 
       res.status(HttpStatus.NO_CONTENT).send();
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Failed to delete branch';
-      res.status(HttpStatus.BAD_REQUEST).json({ message });
+      this.respondError(res, error, 'Failed to delete branch.');
     }
   };
 
@@ -159,8 +191,7 @@ export class OrgController {
 
       res.status(HttpStatus.OK).json(department);
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Failed to update department';
-      res.status(HttpStatus.BAD_REQUEST).json({ message });
+      this.respondError(res, error, 'Failed to update department.');
     }
   };
 
@@ -179,8 +210,7 @@ export class OrgController {
 
       res.status(HttpStatus.NO_CONTENT).send();
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Failed to delete department';
-      res.status(HttpStatus.BAD_REQUEST).json({ message });
+      this.respondError(res, error, 'Failed to delete department.');
     }
   };
 
@@ -200,8 +230,7 @@ export class OrgController {
 
       res.status(HttpStatus.OK).json(module);
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Failed to update module';
-      res.status(HttpStatus.BAD_REQUEST).json({ message });
+      this.respondError(res, error, 'Failed to update module.');
     }
   };
 
@@ -220,8 +249,7 @@ export class OrgController {
 
       res.status(HttpStatus.NO_CONTENT).send();
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Failed to delete module';
-      res.status(HttpStatus.BAD_REQUEST).json({ message });
+      this.respondError(res, error, 'Failed to delete module.');
     }
   };
 }
