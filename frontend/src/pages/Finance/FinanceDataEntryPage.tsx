@@ -828,7 +828,7 @@ const FinanceDataEntryPage: React.FC = () => {
           /* Data Entry Form Card + plain-English help panel */
           <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-6 items-start max-w-6xl mx-auto">
           <div className="mis-card p-6">
-            <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-6 flex items-center gap-1.5 border-b pb-3" style={{ borderColor: 'var(--border)' }}>
+            <h2 className="text-lg font-bold mb-6 flex items-center gap-1.5 border-b pb-3" style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
               📋 {editingId ? '✏️ Modify Record Row' : '➕ Create New Record Row'}
             </h2>
 
@@ -897,7 +897,7 @@ const FinanceDataEntryPage: React.FC = () => {
                           checked={!!formData[f.name]}
                           onChange={e => setFormData({ ...formData, [f.name]: e.target.checked })}
                         />
-                        <label htmlFor={f.name} className="text-xs font-semibold text-slate-300">
+                        <label htmlFor={f.name} className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>
                           {f.label}
                         </label>
                       </div>
@@ -929,7 +929,7 @@ const FinanceDataEntryPage: React.FC = () => {
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
                       <div>
                         <span className="block text-[10px] text-gray-400">Total Revenue:</span>
-                        <span className="text-white font-bold">₹{pnlPreview.totalRevenue}</span>
+                        <span className="font-bold" style={{ color: 'var(--text-primary)' }}>₹{pnlPreview.totalRevenue}</span>
                       </div>
                       <div>
                         <span className="block text-[10px] text-gray-400">Net Profit:</span>

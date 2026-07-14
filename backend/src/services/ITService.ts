@@ -224,6 +224,25 @@ export class ITService {
       }
     }
 
+    // Fields that are meaningless at zero (an asset with 0 years useful
+    // life, or a ticket with a 0-hour SLA target, can't be acted on).
+    const strictlyPositiveFields = ['useful_life_years', 'sla_target_hours'];
+    for (const field of strictlyPositiveFields) {
+      if (payload[field] !== undefined && payload[field] !== null && payload[field] !== '') {
+        if (Number(payload[field]) <= 0) {
+          throw new Error(`Field ${field.replace(/_/g, ' ')} must be greater than zero.`);
+        }
+      }
+    }
+
+    // POC phone: 10-digit Indian mobile number, matching the same format
+    // used for staff phone numbers elsewhere in the app.
+    if (payload.poc_phone !== undefined && payload.poc_phone !== null && String(payload.poc_phone).trim() !== '') {
+      if (!/^\d{10}$/.test(String(payload.poc_phone).trim())) {
+        throw new Error('POC phone must be exactly 10 digits.');
+      }
+    }
+
     // Constraints validation. Status is sheet-specific (e.g. 'vendors' only
     // allows Active/Under Renewal/Expired/Terminated, not 'tickets'
     // Open/In Progress/etc) — validating against one merged list across all
@@ -253,6 +272,28 @@ export class ITService {
         throw new Error('Invalid severity rating.');
       }
     }
+  }
+
+  // Sheets whose table has a UNIQUE column, so an insert/update can raise a
+  // Postgres unique-violation. Maps each to the friendly field name shown
+  // in the error, instead of leaking a raw "duplicate key value violates
+  // unique constraint ..." message to the user.
+  private static readonly UNIQUE_FIELD_LABEL: { [key: string]: string } = {
+    'vendors': 'vendor name',
+    'assets': 'asset barcode/ID',
+  };
+
+  /**
+   * Translates a raw Postgres/PostgREST error into a clear, user-facing
+   * message for known failure shapes (duplicate key). Anything else is
+   * passed through with a generic prefix so it doesn't leak raw internals.
+   */
+  private friendlyDbError(sheet: string, rawMessage: string): string {
+    if (rawMessage.includes('duplicate key value violates unique constraint') || rawMessage.includes('already exists')) {
+      const label = ITService.UNIQUE_FIELD_LABEL[sheet] || 'value';
+      return `A record with this ${label} already exists.`;
+    }
+    return `Operation failed: ${rawMessage}`;
   }
 
   /**
@@ -370,6 +411,7 @@ export class ITService {
 
     delete (payload as any).it_vendors;
     delete (payload as any).it_audits;
+    delete (payload as any).book_value;
     delete (payload as any).id;
     delete (payload as any).created_at;
     delete (payload as any).updated_at;
@@ -377,7 +419,7 @@ export class ITService {
     this.validatePayload(sheet, payload);
 
     const { data: result, error } = await client.from(table).insert(payload).select().single();
-    if (error) throw new Error(`Insert failed: ${error.message}`);
+    if (error) throw new Error(this.friendlyDbError(sheet, error.message));
     return result;
   }
 
@@ -405,6 +447,7 @@ export class ITService {
     const payload = { ...updates };
     delete (payload as any).it_vendors;
     delete (payload as any).it_audits;
+    delete (payload as any).book_value;
     delete (payload as any).branch_id;
     delete (payload as any).created_by;
     delete (payload as any).id;
@@ -414,7 +457,7 @@ export class ITService {
     this.validatePayload(sheet, payload);
 
     const { data: result, error } = await client.from(table).update(payload).eq('id', id).select().single();
-    if (error) throw new Error(`Update failed: ${error.message}`);
+    if (error) throw new Error(this.friendlyDbError(sheet, error.message));
     return result;
   }
 
@@ -527,6 +570,7 @@ export class ITService {
 
       delete item.it_vendors;
       delete item.it_audits;
+      delete item.book_value;
       delete item.id;
       delete item.created_at;
       delete item.updated_at;
@@ -536,7 +580,7 @@ export class ITService {
     });
 
     const { data, error } = await client.from(table).insert(validatedRecords).select();
-    if (error) throw new Error(`Bulk insert failed: ${error.message}`);
+    if (error) throw new Error(this.friendlyDbError(sheet, error.message));
     return data;
   }
 

@@ -5,6 +5,7 @@ import DashboardLayout from '../../components/layout/DashboardLayout';
 import { settlementService } from '../../services/settlement.service';
 import { orgService } from '../../services/org.service';
 import { authService } from '../../services/auth.service';
+import { useTheme } from '../../context/ThemeContext';
 
 Chart.register(...registerables);
 
@@ -40,6 +41,7 @@ const IconCorporate = () => (
 
 const SettlementsDashboardPage: React.FC = () => {
   const currentUser = authService.getCurrentUser();
+  const { theme } = useTheme();
   const isAdmin = currentUser?.role === 'admin';
   const hasMultiBranchAccess = isAdmin || ['ceo', 'managing_director', 'director', 'executive', 'hod'].includes(currentUser?.role || '');
   const userBranchId = currentUser?.branch_id || '';
@@ -104,6 +106,13 @@ const SettlementsDashboardPage: React.FC = () => {
   useEffect(() => {
     if (!stats) return;
 
+    const isDark = theme === 'dark';
+    const tickColorStrong = isDark ? 'rgba(255, 255, 255, 0.7)' : 'rgba(15, 23, 42, 0.75)';
+    const tickColorSoft = isDark ? 'rgba(255, 255, 255, 0.5)' : 'rgba(15, 23, 42, 0.6)';
+    const gridColor = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(15, 23, 42, 0.08)';
+    const gridColorFaint = isDark ? 'rgba(255, 255, 255, 0.02)' : 'rgba(15, 23, 42, 0.04)';
+    const donutBorderColor = isDark ? 'rgba(255, 255, 255, 0.05)' : '#ffffff';
+
     // ── 1. DONUT CHART (PAY-IN/PAY-OUT STATUS BREAKDOWN) ──────────
     if (donutCanvasRef.current && stats.charts?.payinPayoutStatus) {
       if (donutChartInstance.current) {
@@ -124,7 +133,7 @@ const SettlementsDashboardPage: React.FC = () => {
               data: counts,
               backgroundColor: ['#10b981', '#f59e0b', '#ef4444'], // Completed, Pending, Shortage
               borderWidth: 2,
-              borderColor: 'rgba(255, 255, 255, 0.05)'
+              borderColor: donutBorderColor
             }]
           },
           options: {
@@ -133,7 +142,7 @@ const SettlementsDashboardPage: React.FC = () => {
             plugins: {
               legend: {
                 position: 'bottom',
-                labels: { color: 'rgba(255, 255, 255, 0.7)', font: { size: 11 } }
+                labels: { color: tickColorStrong, font: { size: 11 } }
               }
             }
           }
@@ -173,12 +182,12 @@ const SettlementsDashboardPage: React.FC = () => {
             maintainAspectRatio: false,
             scales: {
               y: {
-                ticks: { color: 'rgba(255, 255, 255, 0.5)' },
-                grid: { color: 'rgba(255, 255, 255, 0.05)' }
+                ticks: { color: tickColorSoft },
+                grid: { color: gridColor }
               },
               x: {
-                ticks: { color: 'rgba(255, 255, 255, 0.5)' },
-                grid: { color: 'rgba(255, 255, 255, 0.02)' }
+                ticks: { color: tickColorSoft },
+                grid: { color: gridColorFaint }
               }
             },
             plugins: {
@@ -219,11 +228,11 @@ const SettlementsDashboardPage: React.FC = () => {
             maintainAspectRatio: false,
             scales: {
               x: {
-                ticks: { color: 'rgba(255, 255, 255, 0.5)' },
-                grid: { color: 'rgba(255, 255, 255, 0.05)' }
+                ticks: { color: tickColorSoft },
+                grid: { color: gridColor }
               },
               y: {
-                ticks: { color: 'rgba(255, 255, 255, 0.7)', font: { size: 10 } },
+                ticks: { color: tickColorStrong, font: { size: 10 } },
                 grid: { display: false }
               }
             },
@@ -241,7 +250,7 @@ const SettlementsDashboardPage: React.FC = () => {
       if (lineChartInstance.current) lineChartInstance.current.destroy();
       if (barChartInstance.current) barChartInstance.current.destroy();
     };
-  }, [stats]);
+  }, [stats, theme]);
 
   if (loading) {
     return (
@@ -340,7 +349,7 @@ const SettlementsDashboardPage: React.FC = () => {
               <span className="mis-stat-label text-xs uppercase tracking-wider font-semibold">Securities Volume</span>
               <span className="text-teal-500 opacity-85"><IconSecurity /></span>
             </div>
-            <div className="mis-stat-value text-white text-3xl font-bold">
+            <div className="mis-stat-value text-3xl font-bold">
               {(payinPayout.totalBuyQty + payinPayout.totalSellQty).toLocaleString()}
             </div>
             <p className="text-[10px] mt-1" style={{ color: 'var(--text-secondary)' }}>
@@ -353,7 +362,7 @@ const SettlementsDashboardPage: React.FC = () => {
               <span className="mis-stat-label text-xs uppercase tracking-wider font-semibold">Service Tickets</span>
               <span className="text-amber-500 opacity-85"><IconTicket /></span>
             </div>
-            <div className="mis-stat-value text-white text-3xl font-bold">{clientRequests.totalRecords}</div>
+            <div className="mis-stat-value text-3xl font-bold">{clientRequests.totalRecords}</div>
             <p className="text-[10px] mt-1" style={{ color: 'var(--text-secondary)' }}>
               Open: {clientRequests.statusCounts.Received + clientRequests.statusCounts['In Process'] + clientRequests.statusCounts.Pending} | Solved: {clientRequests.statusCounts.Completed}
             </p>
@@ -364,7 +373,7 @@ const SettlementsDashboardPage: React.FC = () => {
               <span className="mis-stat-label text-xs uppercase tracking-wider font-semibold">IPO Allotment Rate</span>
               <span className="text-indigo-500 opacity-85"><IconIpo /></span>
             </div>
-            <div className="mis-stat-value text-white text-3xl font-bold">{ipoAllotmentRate}%</div>
+            <div className="mis-stat-value text-3xl font-bold">{ipoAllotmentRate}%</div>
             <p className="text-[10px] mt-1" style={{ color: 'var(--text-secondary)' }}>
               Allotted: {ipoAllocation.totalAllottedQty.toLocaleString()} / {ipoAllocation.totalAppliedQty.toLocaleString()}
             </p>
@@ -375,7 +384,7 @@ const SettlementsDashboardPage: React.FC = () => {
               <span className="mis-stat-label text-xs uppercase tracking-wider font-semibold">Corp Action Payout</span>
               <span className="text-purple-500 opacity-85"><IconCorporate /></span>
             </div>
-            <div className="mis-stat-value text-white text-3xl font-bold">
+            <div className="mis-stat-value text-3xl font-bold">
               {corporateActions.totalEntitlementAmt > 0 ? `₹${corporateActions.totalEntitlementAmt.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}` : '—'}
             </div>
             <p className="text-[10px] mt-1" style={{ color: 'var(--text-secondary)' }}>
@@ -532,29 +541,29 @@ const SettlementsDashboardPage: React.FC = () => {
             <div className="grid grid-cols-2 gap-4">
               <div className="p-3 bg-slate-50 dark:bg-slate-900/50 rounded-md border border-slate-200/40 dark:border-slate-800/50 flex justify-between items-center col-span-2">
                 <span className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>Eligibility Ratio</span>
-                <span className="font-bold text-sm text-slate-900 dark:text-slate-100">
+                <span className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>
                   {corporateActions.eligibleCounts.Yes} Eligible / {corporateActions.eligibleCounts.No} Ineligible
                 </span>
               </div>
 
               <div className="p-3 bg-slate-50 dark:bg-slate-900/50 rounded-md border border-slate-200/40 dark:border-slate-800/50">
                 <div className="text-[10px] uppercase font-bold text-slate-500">Dividends</div>
-                <div className="text-lg font-bold text-slate-900 dark:text-slate-100">{corporateActions.typeCounts.Dividend} items</div>
+                <div className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{corporateActions.typeCounts.Dividend} items</div>
               </div>
 
               <div className="p-3 bg-slate-50 dark:bg-slate-900/50 rounded-md border border-slate-200/40 dark:border-slate-800/50">
                 <div className="text-[10px] uppercase font-bold text-slate-500">Bonus Shares</div>
-                <div className="text-lg font-bold text-slate-900 dark:text-slate-100">{corporateActions.typeCounts.Bonus} items</div>
+                <div className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{corporateActions.typeCounts.Bonus} items</div>
               </div>
 
               <div className="p-3 bg-slate-50 dark:bg-slate-900/50 rounded-md border border-slate-200/40 dark:border-slate-800/50">
                 <div className="text-[10px] uppercase font-bold text-slate-500">Stock Splits</div>
-                <div className="text-lg font-bold text-slate-900 dark:text-slate-100">{corporateActions.typeCounts['Stock Split']} items</div>
+                <div className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{corporateActions.typeCounts['Stock Split']} items</div>
               </div>
 
               <div className="p-3 bg-slate-50 dark:bg-slate-900/50 rounded-md border border-slate-200/40 dark:border-slate-800/50">
                 <div className="text-[10px] uppercase font-bold text-slate-500">Rights Issue</div>
-                <div className="text-lg font-bold text-slate-900 dark:text-slate-100">{corporateActions.typeCounts['Rights Issue']} items</div>
+                <div className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{corporateActions.typeCounts['Rights Issue']} items</div>
               </div>
             </div>
           </div>

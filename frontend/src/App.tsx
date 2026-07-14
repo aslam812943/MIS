@@ -3,6 +3,7 @@ import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import AdminPanelPage from './pages/AdminPanelPage';
 import ProfilePage from './pages/ProfilePage';
+import NotificationsPage from './pages/NotificationsPage';
 import DataEntryPage from './pages/DataEntry/DataEntryPage';
 import VerifyEntriesPage from './pages/DataEntry/VerifyEntriesPage';
 import IEPFDataEntryPage from './pages/IEPF/IEPFDataEntryPage';
@@ -61,8 +62,17 @@ function App() {
           } 
         />
         
-        <Route 
-          path={ROUTES.DATA_ENTRY} 
+        <Route
+          path={ROUTES.NOTIFICATIONS}
+          element={
+            <ProtectedRoute>
+              <NotificationsPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path={ROUTES.DATA_ENTRY}
           element={
             <ProtectedRoute>
               <DataEntryPage />

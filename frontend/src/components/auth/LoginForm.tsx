@@ -99,7 +99,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ selectedRole, onForgotPassword })
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 focus:outline-none"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:opacity-70 focus:outline-none"
               style={{ background: 'none', border: 'none', padding: 0 }}
               aria-label={showPassword ? 'Hide password' : 'Show password'}
             >

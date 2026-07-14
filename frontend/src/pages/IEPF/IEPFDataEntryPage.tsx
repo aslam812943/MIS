@@ -849,7 +849,7 @@ const IEPFDataEntryPage: React.FC = () => {
                       return (
                         <tr key={claim.id}>
                           <td>
-                            <div className="font-semibold text-white">{claim.claim_number}</div>
+                            <div className="font-semibold" style={{ color: 'var(--text-primary)' }}>{claim.claim_number}</div>
                             <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>
                               Date: {claim.claim_date}
                             </div>

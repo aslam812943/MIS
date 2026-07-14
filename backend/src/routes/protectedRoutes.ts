@@ -30,6 +30,8 @@ import { ITService } from '../services/ITService.js';
 import { ITController } from '../controllers/ITController.js';
 import { FinanceService } from '../services/FinanceService.js';
 import { FinanceController } from '../controllers/FinanceController.js';
+import { NotificationService } from '../services/NotificationService.js';
+import { NotificationController } from '../controllers/NotificationController.js';
 import multer from 'multer';
 
 const router = Router();
@@ -70,6 +72,9 @@ const itService = new ITService();
 const itController = new ITController(itService);
 const financeService = new FinanceService();
 const financeController = new FinanceController(financeService);
+
+export const notificationService = new NotificationService(emailService);
+const notificationController = new NotificationController(notificationService);
 
 /**
 
@@ -246,5 +251,14 @@ router.delete('/finance/:sheet/:id', requireAuth, financeController.deleteEntry)
  * Audit Log endpoints
  */
 router.get('/audit-logs', requireAuth, requireAdmin, auditController.getAuditLogs);
+
+/**
+ * Notification endpoints
+ */
+router.get('/notifications', requireAuth, notificationController.getMyNotifications);
+router.get('/notifications/unread-count', requireAuth, notificationController.getUnreadCount);
+router.patch('/notifications/:id/read', requireAuth, notificationController.markAsRead);
+router.post('/notifications/mark-all-read', requireAuth, notificationController.markAllAsRead);
+router.post('/notifications/run-check', requireAuth, requireAdmin, notificationController.runCheck);
 
 export default router;

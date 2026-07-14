@@ -5,6 +5,7 @@ import DashboardLayout from '../../components/layout/DashboardLayout';
 import { itService } from '../../services/it.service';
 import { orgService } from '../../services/org.service';
 import { authService } from '../../services/auth.service';
+import { useTheme } from '../../context/ThemeContext';
 
 Chart.register(...registerables);
 
@@ -65,6 +66,7 @@ const IconProject = () => (
 
 const ITDashboardPage: React.FC = () => {
   const currentUser = authService.getCurrentUser();
+  const { theme } = useTheme();
   const isAdmin = currentUser?.role === 'admin';
   const hasMultiBranchAccess = isAdmin || ['ceo', 'managing_director', 'director', 'executive', 'hod'].includes(currentUser?.role || '');
 
@@ -126,6 +128,11 @@ const ITDashboardPage: React.FC = () => {
   useEffect(() => {
     if (!stats) return;
 
+    const isDark = theme === 'dark';
+    const tickColor = isDark ? '#94a3b8' : '#475569';
+    const gridColor = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(15, 23, 42, 0.08)';
+    const legendColor = isDark ? '#cbd5e1' : '#334155';
+
     // 1. Bar Chart: Asset Age Analysis (0-1 yr, 1-3 yr, 3-5 yr, 5+ yr)
     if (ageCanvasRef.current) {
       if (ageChartInstance.current) ageChartInstance.current.destroy();
@@ -148,8 +155,8 @@ const ITDashboardPage: React.FC = () => {
             maintainAspectRatio: false,
             plugins: { legend: { display: false } },
             scales: {
-              y: { grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#94a3b8', stepSize: 1 } },
-              x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
+              y: { grid: { color: gridColor }, ticks: { color: tickColor, stepSize: 1 } },
+              x: { grid: { display: false }, ticks: { color: tickColor } }
             }
           }
         });
@@ -178,7 +185,7 @@ const ITDashboardPage: React.FC = () => {
             plugins: {
               legend: {
                 position: 'bottom',
-                labels: { color: '#cbd5e1', font: { size: 10 }, boxWidth: 10 }
+                labels: { color: legendColor, font: { size: 10 }, boxWidth: 10 }
               }
             },
             cutout: '60%'
@@ -212,30 +219,30 @@ const ITDashboardPage: React.FC = () => {
             maintainAspectRatio: false,
             plugins: { legend: { display: false } },
             scales: {
-              y: { grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#94a3b8', stepSize: 1 } },
-              x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
+              y: { grid: { color: gridColor }, ticks: { color: tickColor, stepSize: 1 } },
+              x: { grid: { display: false }, ticks: { color: tickColor } }
             }
           }
         });
       }
     }
 
-  }, [stats]);
+  }, [stats, theme]);
 
   return (
     <DashboardLayout>
       <div className="mis-page mis-animate-in max-w-7xl mx-auto space-y-8">
-        
+
         {/* Header Section */}
-        <header 
+        <header
           className="flex flex-col lg:flex-row justify-between lg:items-center gap-6 p-6 border rounded-xl shadow-xs text-left"
           style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
         >
           <div>
-            <h1 className="text-2.5xl font-bold tracking-tight text-white">
+            <h1 className="text-2.5xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
               📊 IT Compliance & Asset Analytics
             </h1>
-            <p className="text-sm text-slate-400 mt-1">
+            <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
               Real-time monitoring of SEBI CSCRF audits, hardware warranties, system availability, and book value depreciation.
             </p>
           </div>
@@ -295,8 +302,8 @@ const ITDashboardPage: React.FC = () => {
                   <span className="mis-stat-label text-[10px] uppercase tracking-wider font-semibold">Total Users</span>
                   <span className="text-cyan-500 opacity-80"><IconUsers /></span>
                 </div>
-                <div className="mis-stat-value text-white text-2.5xl font-bold text-left">{stats.kpis.totalUsers}</div>
-                <p className="text-[9px] mt-1 text-left text-slate-400">Active personnel</p>
+                <div className="mis-stat-value text-2.5xl font-bold text-left">{stats.kpis.totalUsers}</div>
+                <p className="text-[9px] mt-1 text-left" style={{ color: 'var(--text-secondary)' }}>Active personnel</p>
               </div>
 
               <div className="mis-stat-card border-l-4 border-emerald-500">
@@ -304,8 +311,8 @@ const ITDashboardPage: React.FC = () => {
                   <span className="mis-stat-label text-[10px] uppercase tracking-wider font-semibold">Active Devices</span>
                   <span className="text-emerald-500 opacity-80"><IconDevice /></span>
                 </div>
-                <div className="mis-stat-value text-white text-2.5xl font-bold text-left">{stats.kpis.activeDevices}</div>
-                <p className="text-[9px] mt-1 text-left text-slate-400">Monitored assets</p>
+                <div className="mis-stat-value text-2.5xl font-bold text-left">{stats.kpis.activeDevices}</div>
+                <p className="text-[9px] mt-1 text-left" style={{ color: 'var(--text-secondary)' }}>Monitored assets</p>
               </div>
 
               <div className="mis-stat-card border-l-4 border-amber-500">
@@ -313,7 +320,7 @@ const ITDashboardPage: React.FC = () => {
                   <span className="mis-stat-label text-[10px] uppercase tracking-wider font-semibold">Open Tickets</span>
                   <span className="text-amber-500 opacity-80"><IconTicket /></span>
                 </div>
-                <div className="mis-stat-value text-white text-2.5xl font-bold text-left">{stats.kpis.openTickets}</div>
+                <div className="mis-stat-value text-2.5xl font-bold text-left">{stats.kpis.openTickets}</div>
                 <p className="text-[9px] mt-1 text-left text-amber-400 animate-pulse">Action pending</p>
               </div>
 
@@ -322,8 +329,8 @@ const ITDashboardPage: React.FC = () => {
                   <span className="mis-stat-label text-[10px] uppercase tracking-wider font-semibold">Critical Incidents</span>
                   <span className="text-red-500 opacity-80"><IconIncident /></span>
                 </div>
-                <div className="mis-stat-value text-white text-2.5xl font-bold text-left">{stats.kpis.criticalIncidents}</div>
-                <p className="text-[9px] mt-1 text-left text-slate-400">Unresolved CSCRF</p>
+                <div className="mis-stat-value text-2.5xl font-bold text-left">{stats.kpis.criticalIncidents}</div>
+                <p className="text-[9px] mt-1 text-left" style={{ color: 'var(--text-secondary)' }}>Unresolved CSCRF</p>
               </div>
 
               <div className="mis-stat-card border-l-4 border-blue-500">
@@ -331,8 +338,8 @@ const ITDashboardPage: React.FC = () => {
                   <span className="mis-stat-label text-[10px] uppercase tracking-wider font-semibold">System Uptime</span>
                   <span className="text-blue-500 opacity-80"><IconAvailability /></span>
                 </div>
-                <div className="mis-stat-value text-white text-2.5xl font-bold text-left">{stats.kpis.systemAvailability}%</div>
-                <p className="text-[9px] mt-1 text-left text-slate-400">Calculated average</p>
+                <div className="mis-stat-value text-2.5xl font-bold text-left">{stats.kpis.systemAvailability}%</div>
+                <p className="text-[9px] mt-1 text-left" style={{ color: 'var(--text-secondary)' }}>Calculated average</p>
               </div>
 
               <div className="mis-stat-card border-l-4 border-indigo-500">
@@ -340,8 +347,8 @@ const ITDashboardPage: React.FC = () => {
                   <span className="mis-stat-label text-[10px] uppercase tracking-wider font-semibold">SLA Met</span>
                   <span className="text-indigo-500 opacity-80"><IconCompliance /></span>
                 </div>
-                <div className="mis-stat-value text-white text-2.5xl font-bold text-left">{stats.kpis.slaCompliance}%</div>
-                <p className="text-[9px] mt-1 text-left text-slate-400">Compliance target</p>
+                <div className="mis-stat-value text-2.5xl font-bold text-left">{stats.kpis.slaCompliance}%</div>
+                <p className="text-[9px] mt-1 text-left" style={{ color: 'var(--text-secondary)' }}>Compliance target</p>
               </div>
 
               <div className="mis-stat-card border-l-4 border-purple-500">
@@ -349,8 +356,8 @@ const ITDashboardPage: React.FC = () => {
                   <span className="mis-stat-label text-[10px] uppercase tracking-wider font-semibold">Ongoing Projects</span>
                   <span className="text-purple-500 opacity-80"><IconProject /></span>
                 </div>
-                <div className="mis-stat-value text-white text-2.5xl font-bold text-left">{stats.kpis.ongoingProjects}</div>
-                <p className="text-[9px] mt-1 text-left text-slate-400">Delivery cycle</p>
+                <div className="mis-stat-value text-2.5xl font-bold text-left">{stats.kpis.ongoingProjects}</div>
+                <p className="text-[9px] mt-1 text-left" style={{ color: 'var(--text-secondary)' }}>Delivery cycle</p>
               </div>
 
             </section>
@@ -360,7 +367,7 @@ const ITDashboardPage: React.FC = () => {
               
               {/* Bar distribution chart: Asset useful age */}
               <div className="mis-card p-5 lg:col-span-2">
-                <h3 className="text-sm font-bold text-slate-100 mb-4 text-left border-b pb-2" style={{ borderColor: 'var(--border)' }}>
+                <h3 className="text-sm font-bold mb-4 text-left border-b pb-2" style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
                   📊 Useful Asset Life Age brackets
                 </h3>
                 <div className="h-64 relative">
@@ -370,7 +377,7 @@ const ITDashboardPage: React.FC = () => {
 
               {/* Donut chart: Categories */}
               <div className="mis-card p-5">
-                <h3 className="text-sm font-bold text-slate-100 mb-4 text-left border-b pb-2" style={{ borderColor: 'var(--border)' }}>
+                <h3 className="text-sm font-bold mb-4 text-left border-b pb-2" style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
                   🍩 Device Category Distribution
                 </h3>
                 <div className="h-64 relative">
@@ -380,7 +387,7 @@ const ITDashboardPage: React.FC = () => {
 
               {/* Line trend chart: Expiries */}
               <div className="mis-card p-5 lg:col-span-3">
-                <h3 className="text-sm font-bold text-slate-100 mb-4 text-left border-b pb-2" style={{ borderColor: 'var(--border)' }}>
+                <h3 className="text-sm font-bold mb-4 text-left border-b pb-2" style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
                   📈 Upcoming Hardware & Software Warranty Expiries (Next 12 Months)
                 </h3>
                 <div className="h-64 relative">

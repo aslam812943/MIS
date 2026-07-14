@@ -549,10 +549,10 @@ const SettlementsDataEntryPage: React.FC = () => {
         {/* Title / Toolbar */}
         <div className="mis-data-entry-toolbar mb-6">
           <div className="mis-data-entry-toolbar-title">
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
+            <h1 className="text-2xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
               Clearing & Settlements MIS Tracker
             </h1>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
+            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
               Departmental entry sheets and transaction tracker logs.
             </p>
           </div>
@@ -641,7 +641,7 @@ const SettlementsDataEntryPage: React.FC = () => {
               /* Add/Edit Row Form + plain-English help panel */
               <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-6 items-start max-w-6xl mx-auto">
               <div className="mis-card p-6">
-                <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-6">
+                <h2 className="text-lg font-bold mb-6" style={{ color: 'var(--text-primary)' }}>
                   {editingId ? '✏️ Edit Pay-in / Pay-out Row' : '📋 Create New Pay-in / Pay-out Row'}
                 </h2>
                 
@@ -845,7 +845,8 @@ const SettlementsDataEntryPage: React.FC = () => {
                 <div className="flex justify-end gap-2 mb-4">
                   <button
                     onClick={fetchRecords}
-                    className="px-3 py-1.5 text-xs font-semibold rounded-md border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+                    className="px-3 py-1.5 text-xs font-semibold rounded-md border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
+                    style={{ color: 'var(--text-primary)' }}
                   >
                     🔄 Refresh Grid Data
                   </button>
@@ -858,7 +859,7 @@ const SettlementsDataEntryPage: React.FC = () => {
                       <div className="mis-spinner" />
                     </div>
                   ) : records.length === 0 ? (
-                    <div className="mis-empty py-16 text-center text-slate-500 dark:text-slate-400">
+                    <div className="mis-empty py-16 text-center">
                       No Pay-in / Pay-out records found matching criteria.
                     </div>
                   ) : (
@@ -977,7 +978,7 @@ const SettlementsDataEntryPage: React.FC = () => {
               /* Add/Edit Ticket Form + plain-English help panel */
               <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-6 items-start max-w-6xl mx-auto">
               <div className="mis-card p-6">
-                <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-6">
+                <h2 className="text-lg font-bold mb-6" style={{ color: 'var(--text-primary)' }}>
                   {editingId ? '✏️ Edit Request Ticket' : '📋 Create New Request Ticket'}
                 </h2>
                 
@@ -1152,7 +1153,8 @@ const SettlementsDataEntryPage: React.FC = () => {
                 <div className="flex justify-end gap-2 mb-4">
                   <button
                     onClick={fetchRecords}
-                    className="px-3 py-1.5 text-xs font-semibold rounded-md border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+                    className="px-3 py-1.5 text-xs font-semibold rounded-md border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
+                    style={{ color: 'var(--text-primary)' }}
                   >
                     🔄 Refresh Grid Data
                   </button>
@@ -1165,7 +1167,7 @@ const SettlementsDataEntryPage: React.FC = () => {
                       <div className="mis-spinner" />
                     </div>
                   ) : records.length === 0 ? (
-                    <div className="mis-empty py-16 text-center text-slate-500 dark:text-slate-400">
+                    <div className="mis-empty py-16 text-center">
                       No Client Request tickets found matching criteria.
                     </div>
                   ) : (
@@ -1260,7 +1262,7 @@ const SettlementsDataEntryPage: React.FC = () => {
               /* Add/Edit IPO Row Form + plain-English help panel */
               <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-6 items-start max-w-6xl mx-auto">
               <div className="mis-card p-6">
-                <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-6">
+                <h2 className="text-lg font-bold mb-6" style={{ color: 'var(--text-primary)' }}>
                   {editingId ? '✏️ Edit IPO Allocation' : '📋 Create New IPO Allocation'}
                 </h2>
                 
@@ -1489,7 +1491,8 @@ const SettlementsDataEntryPage: React.FC = () => {
                 <div className="flex justify-end gap-2 mb-4">
                   <button
                     onClick={fetchRecords}
-                    className="px-3 py-1.5 text-xs font-semibold rounded-md border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+                    className="px-3 py-1.5 text-xs font-semibold rounded-md border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
+                    style={{ color: 'var(--text-primary)' }}
                   >
                     🔄 Refresh Grid Data
                   </button>
@@ -1502,7 +1505,7 @@ const SettlementsDataEntryPage: React.FC = () => {
                       <div className="mis-spinner" />
                     </div>
                   ) : records.length === 0 ? (
-                    <div className="mis-empty py-16 text-center text-slate-500 dark:text-slate-400">
+                    <div className="mis-empty py-16 text-center">
                       No IPO Allocation records found matching criteria.
                     </div>
                   ) : (
@@ -1603,7 +1606,7 @@ const SettlementsDataEntryPage: React.FC = () => {
               /* Add/Edit Corporate Action Form + plain-English help panel */
               <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-6 items-start max-w-6xl mx-auto">
               <div className="mis-card p-6">
-                <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-6">
+                <h2 className="text-lg font-bold mb-6" style={{ color: 'var(--text-primary)' }}>
                   {editingId ? '✏️ Edit Corporate Action' : '📋 Create New Corporate Action'}
                 </h2>
                 
@@ -1815,7 +1818,8 @@ const SettlementsDataEntryPage: React.FC = () => {
                 <div className="flex justify-end gap-2 mb-4">
                   <button
                     onClick={fetchRecords}
-                    className="px-3 py-1.5 text-xs font-semibold rounded-md border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+                    className="px-3 py-1.5 text-xs font-semibold rounded-md border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
+                    style={{ color: 'var(--text-primary)' }}
                   >
                     🔄 Refresh Grid Data
                   </button>
@@ -1828,7 +1832,7 @@ const SettlementsDataEntryPage: React.FC = () => {
                       <div className="mis-spinner" />
                     </div>
                   ) : records.length === 0 ? (
-                    <div className="mis-empty py-16 text-center text-slate-500 dark:text-slate-400">
+                    <div className="mis-empty py-16 text-center">
                       No Corporate Action records found matching criteria.
                     </div>
                   ) : (

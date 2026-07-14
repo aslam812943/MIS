@@ -3,6 +3,16 @@ import type { Branch, Department, Module } from '../models/org.model.js';
 import type { IBranchRepository, IDepartmentRepository, IModuleRepository } from './interfaces/IOrgRepository.js';
 
 /**
+ * Escapes ILIKE pattern metacharacters (% and _) so an exact, case-insensitive
+ * name match can't be widened into an unintended wildcard match — e.g. a
+ * branch literally named "Q1_2026" or "50% Complete" would otherwise have
+ * that character treated as "any character" / "any string".
+ */
+function escapeIlikePattern(value: string): string {
+  return value.replace(/[%_]/g, (char) => `\\${char}`);
+}
+
+/**
  * Supabase implementation for Branch repository.
  */
 export class SupabaseBranchRepository implements IBranchRepository {
@@ -22,7 +32,7 @@ export class SupabaseBranchRepository implements IBranchRepository {
 
   async findByName(name: string): Promise<Branch | null> {
     const client = supabaseAdmin || supabase;
-    const { data, error } = await client.from('branches').select('*').eq('name', name).single();
+    const { data, error } = await client.from('branches').select('*').ilike('name', escapeIlikePattern(name)).single();
     if (error || !data) return null;
     return data;
   }
@@ -68,7 +78,7 @@ export class SupabaseDepartmentRepository implements IDepartmentRepository {
 
   async findByName(name: string): Promise<Department | null> {
     const client = supabaseAdmin || supabase;
-    const { data, error } = await client.from('departments').select('*').eq('name', name).single();
+    const { data, error } = await client.from('departments').select('*').ilike('name', escapeIlikePattern(name)).single();
     if (error || !data) return null;
     return data;
   }
@@ -114,7 +124,7 @@ export class SupabaseModuleRepository implements IModuleRepository {
 
   async findByName(name: string): Promise<Module | null> {
     const client = supabaseAdmin || supabase;
-    const { data, error } = await client.from('modules').select('*').eq('name', name).single();
+    const { data, error } = await client.from('modules').select('*').ilike('name', escapeIlikePattern(name)).single();
     if (error || !data) return null;
     return data;
   }

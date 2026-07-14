@@ -9,6 +9,20 @@ import UserTable from '../components/admin/UserTable';
 import ConfirmModal from '../components/common/ConfirmModal';
 import AuditLogsTab from '../components/admin/AuditLogsTab';
 
+// Roles that operate org-wide rather than belonging to one business
+// department (matches the isAdminOrMgmt check every department backend uses
+// to grant these roles multi-branch/multi-department access). A Department
+// selection isn't meaningful for them, so the field is hidden and not
+// required for these roles.
+const DEPARTMENT_OPTIONAL_ROLES = ['admin', 'hr', 'ceo', 'managing_director', 'director', 'executive'];
+const isOrgWideRole = (role: string) => DEPARTMENT_OPTIONAL_ROLES.includes(role);
+
+// Mirrors the backend's UserService validation so obviously-invalid input
+// is caught immediately instead of round-tripping to the server first.
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_REGEX = /^\d{10}$/;
+const MIN_PASSWORD_LENGTH = 4;
+
 /**
  * Admin Panel Page for managing organizational entities.
  */
@@ -148,7 +162,7 @@ const AdminPanelPage: React.FC = () => {
     setConfirmModal({
       isOpen: true,
       title: 'Delete Branch',
-      message: `Delete branch "${branch.name}"? This action cannot be undone.`,
+      message: `Delete branch "${branch.name}"? This action cannot be undone. It will be blocked if the branch still has any assigned users or department records.`,
       confirmLabel: 'Delete',
       cancelLabel: 'Cancel',
       isDanger: true,
@@ -230,7 +244,7 @@ const AdminPanelPage: React.FC = () => {
     setConfirmModal({
       isOpen: true,
       title: 'Delete Department',
-      message: `Delete department "${dept.name}"? This action cannot be undone.`,
+      message: `Delete department "${dept.name}"? This action cannot be undone. It will be blocked if the department still has any assigned users.`,
       confirmLabel: 'Delete',
       cancelLabel: 'Cancel',
       isDanger: true,
@@ -343,8 +357,25 @@ const AdminPanelPage: React.FC = () => {
 
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!userData.full_name || !userData.email || !userData.password || !userData.phone_number || !userData.branch_id || !userData.department_id || !userData.joining_date) {
-      toast.error('All fields (Name, Email, Password, Phone, Branch, Department, Joining Date) are required.');
+    const deptRequired = !isOrgWideRole(userData.role);
+    if (!userData.full_name || !userData.email || !userData.password || !userData.phone_number || !userData.branch_id || (deptRequired && !userData.department_id) || !userData.joining_date) {
+      toast.error(
+        deptRequired
+          ? 'All fields (Name, Email, Password, Phone, Branch, Department, Joining Date) are required.'
+          : 'All fields (Name, Email, Password, Phone, Branch, Joining Date) are required.'
+      );
+      return;
+    }
+    if (!EMAIL_REGEX.test(userData.email.trim())) {
+      toast.error('Please enter a valid email address.');
+      return;
+    }
+    if (userData.password.length < MIN_PASSWORD_LENGTH) {
+      toast.error(`Password must be at least ${MIN_PASSWORD_LENGTH} characters long.`);
+      return;
+    }
+    if (!PHONE_REGEX.test(userData.phone_number.trim())) {
+      toast.error('Phone number must be exactly 10 digits.');
       return;
     }
     setLoading(true);
@@ -456,8 +487,21 @@ const AdminPanelPage: React.FC = () => {
   const handleEditUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingId) return;
-    if (!userData.full_name || !userData.email || !userData.phone_number || !userData.branch_id || !userData.department_id || !userData.joining_date) {
+    const deptRequired = !isOrgWideRole(userData.role);
+    if (!userData.full_name || !userData.email || !userData.phone_number || !userData.branch_id || (deptRequired && !userData.department_id) || !userData.joining_date) {
       toast.error('All fields except password are required.');
+      return;
+    }
+    if (!EMAIL_REGEX.test(userData.email.trim())) {
+      toast.error('Please enter a valid email address.');
+      return;
+    }
+    if (!PHONE_REGEX.test(userData.phone_number.trim())) {
+      toast.error('Phone number must be exactly 10 digits.');
+      return;
+    }
+    if (userData.password && userData.password.length < MIN_PASSWORD_LENGTH) {
+      toast.error(`New password must be at least ${MIN_PASSWORD_LENGTH} characters long.`);
       return;
     }
     setLoading(true);
@@ -1011,7 +1055,7 @@ const AdminPanelPage: React.FC = () => {
                       </label>
                       <input
                         type="password"
-                        placeholder={isEditingUser ? 'Leave blank to keep current' : 'Min. 6 characters'}
+                        placeholder={isEditingUser ? 'Leave blank to keep current' : `Min. ${MIN_PASSWORD_LENGTH} characters`}
                         className="mis-input"
                         value={userData.password}
                         onChange={(e) => setUserData({ ...userData, password: e.target.value })}
@@ -1034,7 +1078,17 @@ const AdminPanelPage: React.FC = () => {
                       <select
                         className="mis-select"
                         value={userData.role}
-                        onChange={(e) => setUserData({ ...userData, role: e.target.value })}
+                        onChange={(e) => {
+                          const nextRole = e.target.value;
+                          setUserData({
+                            ...userData,
+                            role: nextRole,
+                            // Org-wide roles (CEO, admin, etc.) don't belong to one
+                            // department — clear a stale selection made before the
+                            // role was switched, so it can't be silently submitted.
+                            department_id: isOrgWideRole(nextRole) ? '' : userData.department_id,
+                          });
+                        }}
                       >
                         <option value="admin">Administrator</option>
                         <option value="hr">HR Manager</option>
@@ -1059,17 +1113,23 @@ const AdminPanelPage: React.FC = () => {
                       </select>
                     </div>
                   </div>
-                  <div className="mis-field">
-                    <label className="mis-label">Department</label>
-                    <select
-                      className="mis-select"
-                      value={userData.department_id}
-                      onChange={(e) => setUserData({ ...userData, department_id: e.target.value })}
-                    >
-                      <option value="">— None —</option>
-                      {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                    </select>
-                  </div>
+                  {isOrgWideRole(userData.role) ? (
+                    <p className="mis-alert mis-alert-info m-0 text-xs">
+                      Department isn't required for this role — it operates across the whole organisation rather than one department.
+                    </p>
+                  ) : (
+                    <div className="mis-field">
+                      <label className="mis-label">Department *</label>
+                      <select
+                        className="mis-select"
+                        value={userData.department_id}
+                        onChange={(e) => setUserData({ ...userData, department_id: e.target.value })}
+                      >
+                        <option value="">— None —</option>
+                        {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                      </select>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-4">
