@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { Chart, registerables } from 'chart.js';
 import toast from 'react-hot-toast';
 import DashboardLayout from '../../components/layout/DashboardLayout';
+import CountdownBadge from '../../components/common/CountdownBadge';
 import { itService } from '../../services/it.service';
 import { orgService } from '../../services/org.service';
 import { authService } from '../../services/auth.service';
@@ -61,6 +62,13 @@ const IconCompliance = () => (
 const IconProject = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+  </svg>
+);
+
+const IconClock = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10"/>
+    <polyline points="12 7 12 12 15.5 14"/>
   </svg>
 );
 
@@ -295,8 +303,8 @@ const ITDashboardPage: React.FC = () => {
         ) : (
           <>
             {/* KPI statistics cards */}
-            <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-4">
-              
+            <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-9 gap-4">
+
               <div className="mis-stat-card border-l-4 border-cyan-500">
                 <div className="flex justify-between items-start mb-2 text-left">
                   <span className="mis-stat-label text-[10px] uppercase tracking-wider font-semibold">Total Users</span>
@@ -360,7 +368,98 @@ const ITDashboardPage: React.FC = () => {
                 <p className="text-[9px] mt-1 text-left" style={{ color: 'var(--text-secondary)' }}>Delivery cycle</p>
               </div>
 
+              <div className="mis-stat-card border-l-4 border-red-500">
+                <div className="flex justify-between items-start mb-2 text-left">
+                  <span className="mis-stat-label text-[10px] uppercase tracking-wider font-semibold">Audits Overdue</span>
+                  <span className="text-red-500 opacity-80"><IconClock /></span>
+                </div>
+                <div className="mis-stat-value text-2.5xl font-bold text-left">{stats.kpis.auditsOverdue}</div>
+                <p className="text-[9px] mt-1 text-left text-red-400 animate-pulse">Past next due date</p>
+              </div>
+
+              <div className="mis-stat-card border-l-4 border-amber-500">
+                <div className="flex justify-between items-start mb-2 text-left">
+                  <span className="mis-stat-label text-[10px] uppercase tracking-wider font-semibold">AMC Due (30d)</span>
+                  <span className="text-amber-500 opacity-80"><IconClock /></span>
+                </div>
+                <div className="mis-stat-value text-2.5xl font-bold text-left">{stats.kpis.amcDueSoon}</div>
+                <p className="text-[9px] mt-1 text-left" style={{ color: 'var(--text-secondary)' }}>Renewals approaching</p>
+              </div>
+
             </section>
+
+            {/* Compliance & Renewals countdown section */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+              {/* Recurring audit schedule cards */}
+              <div className="mis-card p-5 lg:col-span-1">
+                <h3 className="text-sm font-bold mb-4 text-left border-b pb-2" style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
+                  🗓️ Audit Filing Countdown (HO)
+                </h3>
+                {stats.compliance?.auditSchedule?.length ? (
+                  <div className="space-y-3">
+                    {stats.compliance.auditSchedule.map((a: any, i: number) => (
+                      <div key={i} className="flex items-center justify-between p-2.5 rounded-lg border" style={{ borderColor: 'var(--border)' }}>
+                        <div>
+                          <div className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>{a.audit_type}</div>
+                          <div className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>
+                            Due {a.next_due_date ? new Date(a.next_due_date).toLocaleDateString('en-IN') : '—'}
+                          </div>
+                        </div>
+                        <CountdownBadge dueDate={a.next_due_date} />
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-center py-6" style={{ color: 'var(--text-secondary)' }}>No audit schedule entries yet.</p>
+                )}
+              </div>
+
+              {/* Upcoming AMC renewals */}
+              <div className="mis-card p-5 lg:col-span-1">
+                <h3 className="text-sm font-bold mb-4 text-left border-b pb-2" style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
+                  🛠️ Upcoming AMC Renewals
+                </h3>
+                {stats.compliance?.upcomingAmc?.length ? (
+                  <div className="space-y-3">
+                    {stats.compliance.upcomingAmc.map((a: any, i: number) => (
+                      <div key={i} className="flex items-center justify-between p-2.5 rounded-lg border" style={{ borderColor: 'var(--border)' }}>
+                        <div>
+                          <div className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>{a.item_covered}</div>
+                          <div className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>{a.vendor_name || '—'}</div>
+                        </div>
+                        <CountdownBadge dueDate={a.amc_renewal_date} />
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-center py-6" style={{ color: 'var(--text-secondary)' }}>No AMC contracts recorded yet.</p>
+                )}
+              </div>
+
+              {/* Expiring software licenses */}
+              <div className="mis-card p-5 lg:col-span-1">
+                <h3 className="text-sm font-bold mb-4 text-left border-b pb-2" style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
+                  💿 Software Licenses Expiring
+                </h3>
+                {stats.compliance?.expiringSoftware?.length ? (
+                  <div className="space-y-3">
+                    {stats.compliance.expiringSoftware.map((s: any, i: number) => (
+                      <div key={i} className="flex items-center justify-between p-2.5 rounded-lg border" style={{ borderColor: 'var(--border)' }}>
+                        <div>
+                          <div className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>{s.software_name}</div>
+                          <div className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>{s.status}</div>
+                        </div>
+                        <CountdownBadge dueDate={s.amc_renewal_date} />
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-center py-6" style={{ color: 'var(--text-secondary)' }}>No software licenses recorded yet.</p>
+                )}
+              </div>
+
+            </div>
 
             {/* Graphs sections */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

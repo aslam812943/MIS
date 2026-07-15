@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import DashboardLayout from '../../components/layout/DashboardLayout';
+import CountdownBadge from '../../components/common/CountdownBadge';
 import { itService } from '../../services/it.service';
 import { orgService } from '../../services/org.service';
 import { authService } from '../../services/auth.service';
@@ -46,19 +47,30 @@ const SHEET_HELP: Record<string, SheetHelpConfig> = {
     remember: 'Never leave a Critical finding sitting as Open past its target date — this is precisely what a regulator checks first on the next audit cycle.',
   },
   'vendors': {
-    why: 'Every hardware, software, network, cloud, and security vendor the firm depends on is tracked here — especially their AMC (Annual Maintenance Contract) renewal date. Missing a renewal date can mean a critical system loses support with zero warning.',
+    why: 'Every hardware, software, network, cloud, and security vendor the firm depends on is tracked here — who they are and who to call. Their actual AMC (Annual Maintenance Contract) renewal dates live in the separate "AMC Contracts" sheet, since one vendor can cover more than one AMC item (e.g. both server maintenance and a software licence).',
     fields: [
       { label: 'Vendor Name', note: 'The company\'s official name — each vendor should only be entered once.' },
       { label: 'Category', note: 'Hardware, Software, Network & ISP, Cloud, Security, or AMC Service — what kind of vendor this is.' },
       { label: 'POC Name / Email / Phone', note: 'The vendor\'s point of contact — who to actually call when something breaks.' },
       { label: 'Backup Contacts', note: 'A secondary contact in case the main POC is unreachable.' },
       { label: 'Escalation/Remarks', note: 'How to escalate issues with this vendor, or any other useful context.' },
-      { label: 'AMC Last Paid Date / AMC Due Date', note: 'When the maintenance contract was last renewed, and when it\'s next due — this is the single most important date on this sheet.' },
-      { label: 'Lead Time (Days)', note: 'How many days before the AMC due date to start getting reminded.' },
-      { label: 'Contract Value', note: 'The AMC/contract amount in INR.' },
       { label: 'Status', note: 'Active = currently supporting us. Under Renewal = renewal in progress. Expired = contract lapsed. Terminated = relationship ended.' },
     ],
-    remember: 'Set the AMC Due Date and Lead Time correctly — an expired AMC on a critical vendor means no support if something breaks, with no warning at all.',
+    remember: 'This sheet is just the vendor directory now — go to "AMC Contracts" to record what they cover and when it renews.',
+  },
+  'amc-contracts': {
+    why: 'A silently lapsed AMC (Annual Maintenance Contract) means a critical vendor support agreement — server maintenance, software support, network support — just stopped, often discovered only when something breaks and the vendor says "you\'re not covered anymore." This sheet gives every AMC item its own renewal countdown so that can\'t happen quietly.',
+    fields: [
+      { label: 'Vendor Name', note: 'Which vendor from the Vendors sheet this AMC is with.' },
+      { label: 'Item Covered', note: 'What this specific AMC actually covers — a server, a software product, network equipment, etc. One vendor can have several of these.' },
+      { label: 'AMC Start Date', note: 'When this AMC period began.' },
+      { label: 'AMC Renewal Date', note: 'When it needs to be renewed — the date the days-to-go countdown on the dashboard is calculated against.' },
+      { label: 'Last Paid Date', note: 'Payment history/proof for this AMC.' },
+      { label: 'AMC Amount', note: 'For budget tracking.' },
+      { label: 'Notification Lead Time (Days)', note: 'How many days before the Renewal Date the alert should start firing — some AMCs need 60 days\' notice to negotiate renewal terms, others can be handled in a week.' },
+      { label: 'Status', note: 'Active = currently in force. Renewal Due = approaching renewal. Renewed = just renewed for the next term. Lapsed = expired without renewal.' },
+    ],
+    remember: 'Set the Renewal Date and Lead Time correctly — an expired AMC on a critical vendor means no support if something breaks, with no warning at all. Apply the same green/amber/red countdown discipline here as on the Audit Schedule.',
   },
   'assets': {
     why: 'Every piece of IT hardware and software licence the firm owns is tracked here — not just what it is, but its full lifecycle: cost, depreciation, warranty, and whether it\'s due for replacement.',
@@ -66,10 +78,11 @@ const SHEET_HELP: Record<string, SheetHelpConfig> = {
       { label: 'Asset Barcode / ID', note: 'The unique tag physically on this asset — must be unique, this is how it\'s tracked and located.' },
       { label: 'Asset Type', note: 'Desktop, Laptop, Server, Printer, Network Device, or Software License.' },
       { label: 'Make / Model / Serial Number', note: 'Exactly as printed on the device — needed for warranty claims and insurance.' },
-      { label: 'Purchase Date / Purchase Value', note: 'When it was bought and for how much — this drives the automatic depreciation (book value) shown in the list view.' },
+      { label: 'Purchase Date / Purchase Value', note: 'When it was bought and for how much — entered once, never edited afterwards. Current Value is never typed in; it\'s always recalculated live from these two fields.' },
+      { label: 'Depreciation Rate (% per year)', note: 'Defaults to 15% — the standard Written Down Value (WDV/reducing-balance) rate under the Companies Act for computers and office equipment. Each year, this % is deducted from last year\'s REMAINING value, not the original price (e.g. ₹60,000 → ₹51,000 → ₹43,350 ...). Change it only if finance specifies a different rate for a particular asset category.' },
       { label: 'Vendor Support Contract', note: 'Which vendor supports this asset, if any — link it so AMC coverage is traceable back to a vendor record.' },
       { label: 'Assigned To / Physical Location', note: 'Who currently has it, and where it physically is.' },
-      { label: 'Useful Life (Years)', note: 'How many years this asset is expected to stay usable — this is what drives the automatic "due for upgrade" flag once that time has passed.' },
+      { label: 'Useful Life (Years)', note: 'How many years this asset is expected to stay usable — this is what drives the automatic "due for upgrade" flag once that time has passed (separate from depreciation, which never fully reaches zero under WDV).' },
       { label: 'Warranty Start / End', note: 'The manufacturer/vendor warranty period.' },
       { label: 'Under vendor AMC support?', note: 'Tick only if this specific asset is actively covered by a vendor AMC.' },
       { label: 'Criticality', note: 'Critical = business stops without it (e.g. a trading server). Non-Critical = inconvenient but not business-stopping if it fails.' },
@@ -139,6 +152,61 @@ const SHEET_HELP: Record<string, SheetHelpConfig> = {
     ],
     remember: 'Keep Status current as the project actually progresses — a stale "Planning" status on work that\'s really underway hides real progress from anyone checking in.',
   },
+  'audit-schedule': {
+    why: 'The firm runs three recurring compliance audits — System Audit, Cybersecurity Audit, and VAPT — each on its own cycle. This sheet tracks each type once, computes when it\'s next due from the recurrence you set, and drives the days-to-go countdown on the dashboard so a regulatory deadline never gets missed by accident. This is HO-only — there is no branch to pick, one countdown per audit type for the whole company.',
+    fields: [
+      { label: 'Audit Type', note: 'System Audit, Cybersecurity Audit, or VAPT — each has its own cadence and often its own external agency.' },
+      { label: 'Recurrence (Every X Months)', note: 'How often this audit repeats — e.g. 12 for an annual audit. Combined with Last Filing Date, this is what makes Next Due Date and Days to Go self-updating instead of something someone has to re-schedule by hand.' },
+      { label: 'Last Filing Date', note: 'The date this audit cycle\'s report was actually filed/submitted. Update this every time you file — the system recalculates Next Due Date automatically the moment you save.' },
+      { label: 'Auditor / Agency Name', note: 'Who conducted this audit.' },
+      { label: 'Report Upload', note: 'PDF of the filed report, for your own records.' },
+      { label: 'Status', note: 'Upcoming = not yet due. Filed = this cycle\'s report has been submitted. Overdue = past the computed due date.' },
+      { label: 'Ad-hoc run?', note: 'VAPT in particular is often triggered by a major system change, not just the calendar — tick this and describe the triggering event to log an extra run alongside the yearly default, without disturbing the regular cycle.' },
+    ],
+    remember: 'Next Due Date and Days to Go are computed, not typed in — they always equal Last Filing Date + Recurrence. The dashboard countdown turns green (>30 days), amber (30 days to due), or red (overdue) off this same number.',
+  },
+  'servers': {
+    why: 'A server isn\'t just "an asset with a value" — its configuration is operationally critical information IT staff need to reference constantly (what OS, how much RAM, what it\'s actually used for). This sheet is kept separate from the general Asset register for that reason, and links back to it for value/depreciation/warranty instead of duplicating that data.',
+    fields: [
+      { label: 'Server Name', note: 'The internal identifier used day to day, e.g. "DP-DB-01".' },
+      { label: 'Linked Asset ID', note: 'Connects back to the general Asset register so this server\'s purchase value, depreciation, and warranty are tracked once, not twice.' },
+      { label: 'Role / Purpose', note: 'What this server actually does — e.g. Trading Database, Backup Server, File Server, Domain Controller.' },
+      { label: 'Physical or Virtual', note: 'Some "servers" today are virtual machines on shared hardware, not a physical box.' },
+      { label: 'OS / CPU / RAM / Storage', note: 'Core specs, needed for upgrade planning and troubleshooting.' },
+      { label: 'IP Address', note: 'Network reference.' },
+      { label: 'Location / Rack', note: 'Physical location, or hosting provider if cloud-based.' },
+      { label: 'Assigned Admin', note: 'Who\'s responsible for this specific server.' },
+      { label: 'Last Configuration Update Date', note: 'When specs/settings last changed — important for audit trails and troubleshooting.' },
+      { label: 'Linked Network Diagram', note: 'Which diagram shows this server\'s connections.' },
+    ],
+    remember: 'Update Last Configuration Update Date every time you actually change something on this server — this is exactly what an auditor or an incident responder checks first.',
+  },
+  'team-duties': {
+    why: 'HR\'s Employee Master tells you who works here. This sheet tells you what each IT person is actually responsible for — who owns backups, who owns the firewall, who\'s the escalation contact for a specific vendor. During an incident or an audit, "who\'s responsible for this" needs to be answerable in seconds, not by asking around.',
+    fields: [
+      { label: 'Employee Name', note: 'Picked from the IT department roster — name/contact details link back to HR\'s Employee Master, not duplicated here.' },
+      { label: 'Designation', note: 'Role title.' },
+      { label: 'Duties / Responsibilities', note: 'The specific areas they own — e.g. "Server maintenance, backup verification," "Network & firewall," "Vendor coordination."' },
+      { label: 'On-Call / Escalation Priority', note: 'If something breaks at 11pm, who gets called first (1), second (2), third (3), and so on.' },
+      { label: 'Reporting To', note: 'Internal accountability structure. Picked from the IT roster — leave blank if this person\'s manager sits outside the IT department.' },
+    ],
+    remember: 'Keep this current the moment responsibilities change — a stale duties sheet is exactly what makes "who owns this?" take an hour instead of ten seconds during a live incident.',
+  },
+  'software': {
+    why: 'A laptop is used by one person and sits in one place. A software licence might be used by an entire department, tied to a specific business function, and its real compliance risk is less about physical depreciation and more about whether the licence/AMC is still valid — an expired software licence is a bigger operational risk than an old laptop.',
+    fields: [
+      { label: 'Software Name', note: 'Identity of the product.' },
+      { label: 'Purchase Date', note: 'Start of the licence/AMC clock.' },
+      { label: 'For (Purpose)', note: 'What business function it serves — e.g. "Trading terminal," "Antivirus," "Accounting."' },
+      { label: 'Used By', note: 'Department or specific employees using it.' },
+      { label: 'AMC / Renewal Date', note: 'When the licence or support needs renewing — feeds the same days-to-go countdown pattern as Audits and AMC Contracts.' },
+      { label: 'PO Number / PO PDF Upload', note: 'Reference to the purchase order that bought it, and the actual document.' },
+      { label: 'Vendor', note: 'Links back to the Vendors sheet.' },
+      { label: 'Number of Licenses / Seats', note: 'For tracking usage vs. what\'s paid for.' },
+      { label: 'Status', note: 'Active = currently valid. Expiring Soon = renewal window approaching. Expired = lapsed.' },
+    ],
+    remember: 'An expired software licence on something business-critical (a trading terminal, antivirus) is a bigger operational risk than an old laptop — treat the renewal countdown here with the same urgency as AMC and audit dates.',
+  },
 };
 
 const ITDataEntryPage: React.FC = () => {
@@ -156,6 +224,9 @@ const ITDataEntryPage: React.FC = () => {
   const [branches, setBranches] = useState<any[]>([]);
   const [vendors, setVendors] = useState<any[]>([]);
   const [auditsList, setAuditsList] = useState<any[]>([]);
+  const [itStaff, setItStaff] = useState<any[]>([]);
+  const [assetsList, setAssetsList] = useState<any[]>([]);
+  const [diagramsList, setDiagramsList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
@@ -182,6 +253,9 @@ const ITDataEntryPage: React.FC = () => {
     fetchBranches();
     fetchVendors();
     fetchAudits();
+    fetchITStaff();
+    fetchAssets();
+    fetchDiagrams();
   }, []);
 
   useEffect(() => {
@@ -221,6 +295,33 @@ const ITDataEntryPage: React.FC = () => {
       setAuditsList(data || []);
     } catch (err) {
       console.error('Failed to load audits list', err);
+    }
+  };
+
+  const fetchITStaff = async () => {
+    try {
+      const data = await itService.getITStaffDropdown();
+      setItStaff(data || []);
+    } catch (err) {
+      console.error('Failed to load IT staff list', err);
+    }
+  };
+
+  const fetchAssets = async () => {
+    try {
+      const data = await itService.getEntries('assets');
+      setAssetsList(data || []);
+    } catch (err) {
+      console.error('Failed to load assets list', err);
+    }
+  };
+
+  const fetchDiagrams = async () => {
+    try {
+      const data = await itService.getEntries('diagrams');
+      setDiagramsList(data || []);
+    } catch (err) {
+      console.error('Failed to load diagrams list', err);
     }
   };
 
@@ -286,7 +387,10 @@ const ITDataEntryPage: React.FC = () => {
     }
 
     // 4. Positive number limits
-    const numFields = ['purchase_value', 'useful_life_years', 'contract_value', 'notification_lead_time_days', 'sla_target_hours'];
+    const numFields = [
+      'purchase_value', 'useful_life_years', 'contract_value', 'notification_lead_time_days', 'sla_target_hours',
+      'depreciation_rate', 'amc_amount', 'recurrence_months', 'number_of_licenses', 'escalation_priority'
+    ];
     for (const f of numFields) {
       if (formData[f] !== undefined && formData[f] !== null && formData[f] !== '') {
         if (isNaN(Number(formData[f])) || Number(formData[f]) < 0) {
@@ -297,7 +401,7 @@ const ITDataEntryPage: React.FC = () => {
     }
 
     // 4b. Fields that are meaningless at zero
-    const strictlyPositiveFields = ['useful_life_years', 'sla_target_hours'];
+    const strictlyPositiveFields = ['useful_life_years', 'sla_target_hours', 'recurrence_months', 'number_of_licenses', 'escalation_priority'];
     for (const f of strictlyPositiveFields) {
       if (formData[f] !== undefined && formData[f] !== null && formData[f] !== '' && Number(formData[f]) <= 0) {
         toast.error(`${f.replace(/_/g, ' ').toUpperCase()} must be greater than zero.`);
@@ -316,7 +420,8 @@ const ITDataEntryPage: React.FC = () => {
       'scheduled_date', 'start_date', 'end_date', 'submission_deadline', 'actual_submission_date',
       'implementation_target_date', 'actual_implementation_date', 'amc_last_paid_date', 'amc_due_date',
       'purchase_date', 'warranty_start_date', 'warranty_end_date', 'last_assessed_date', 'next_review_date',
-      'opened_date', 'closed_date', 'discovered_date', 'resolved_date', 'target_end_date', 'actual_end_date'
+      'opened_date', 'closed_date', 'discovered_date', 'resolved_date', 'target_end_date', 'actual_end_date',
+      'amc_start_date', 'amc_renewal_date', 'last_paid_date', 'last_filing_date', 'last_config_update_date'
     ];
     for (const f of dateFields) {
       if (formData[f] && isNaN(Date.parse(formData[f]))) {
@@ -348,6 +453,10 @@ const ITDataEntryPage: React.FC = () => {
     }
     if (formData.start_date && formData.actual_end_date && new Date(formData.actual_end_date) < new Date(formData.start_date)) {
       toast.error('Actual end date cannot be before start date.');
+      return false;
+    }
+    if (formData.amc_start_date && formData.amc_renewal_date && new Date(formData.amc_renewal_date) < new Date(formData.amc_start_date)) {
+      toast.error('AMC renewal date cannot be before AMC start date.');
       return false;
     }
 
@@ -473,28 +582,29 @@ const ITDataEntryPage: React.FC = () => {
     }
   };
 
-  // Real-time straight-line depreciation display helper for assets tab
+  // Real-time Written Down Value (WDV) depreciation preview for the assets
+  // tab — mirrors ITService.calculateBookValue exactly: each year the rate
+  // is deducted from last year's REMAINING value, not the original price.
   const getEstimatedDepreciation = () => {
     if (sheetTab !== 'assets') return null;
     const value = Number(formData.purchase_value || 0);
+    const rate = Number(formData.depreciation_rate ?? 15) / 100;
     const life = Number(formData.useful_life_years || 0);
     const pDateStr = formData.purchase_date;
 
-    if (value <= 0 || life <= 0 || !pDateStr) return null;
+    if (value <= 0 || !pDateStr) return null;
 
     const purchaseDate = new Date(pDateStr);
     const today = new Date();
-    let yearsElapsed = (today.getTime() - purchaseDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
-    if (yearsElapsed < 0) yearsElapsed = 0;
-    if (yearsElapsed > life) yearsElapsed = life;
+    const daysElapsed = (today.getTime() - purchaseDate.getTime()) / (1000 * 60 * 60 * 24);
+    const yearsElapsed = Math.max(0, Math.floor(daysElapsed / 365.25));
 
-    const annualDepr = value / life;
-    const bookValue = value - (yearsElapsed * annualDepr);
+    const bookValue = value * Math.pow(1 - rate, yearsElapsed);
 
     return {
       bookValue: bookValue.toFixed(2),
-      yearsElapsed: yearsElapsed.toFixed(1),
-      isExpired: yearsElapsed >= life
+      yearsElapsed: String(yearsElapsed),
+      isExpired: life > 0 && yearsElapsed >= life
     };
   };
 
@@ -544,11 +654,24 @@ const ITDataEntryPage: React.FC = () => {
           { name: 'poc_phone', label: 'POC Phone', type: 'tel', required: true },
           { name: 'other_members', label: 'Backup Contacts', type: 'text' },
           { name: 'remarks', label: 'Escalation/Remarks', type: 'textarea' },
-          { name: 'amc_last_paid_date', label: 'AMC Last Paid Date', type: 'date' },
-          { name: 'amc_due_date', label: 'AMC Due Date', type: 'date', required: true },
-          { name: 'notification_lead_time_days', label: 'Lead Time (Days)', type: 'number', required: true },
-          { name: 'contract_value', label: 'Contract Value (INR)', type: 'number', required: true },
           { name: 'status', label: 'Status', type: 'select', options: ['Active', 'Under Renewal', 'Expired', 'Terminated'], required: true }
+        ];
+      case 'amc-contracts':
+        return [
+          {
+            name: 'vendor_id',
+            label: 'Vendor Name',
+            type: 'select',
+            options: vendors.map(v => ({ value: v.id, label: v.vendor_name })),
+            required: true
+          },
+          { name: 'item_covered', label: 'Item Covered', type: 'text', required: true },
+          { name: 'amc_start_date', label: 'AMC Start Date', type: 'date', required: true },
+          { name: 'amc_renewal_date', label: 'AMC Renewal Date', type: 'date', required: true },
+          { name: 'last_paid_date', label: 'Last Paid Date', type: 'date' },
+          { name: 'amc_amount', label: 'AMC Amount (INR)', type: 'number', required: true },
+          { name: 'notification_lead_time_days', label: 'Notification Lead Time (Days)', type: 'number', required: true },
+          { name: 'status', label: 'Status', type: 'select', options: ['Active', 'Renewal Due', 'Renewed', 'Lapsed'], required: true }
         ];
       case 'assets':
         return [
@@ -558,6 +681,7 @@ const ITDataEntryPage: React.FC = () => {
           { name: 'serial_number', label: 'Serial Number', type: 'text', required: true },
           { name: 'purchase_date', label: 'Purchase Date', type: 'date', required: true },
           { name: 'purchase_value', label: 'Purchase Value (INR)', type: 'number', required: true },
+          { name: 'depreciation_rate', label: 'Depreciation Rate (% per year)', type: 'number', required: true },
           {
             name: 'vendor_id',
             label: 'Vendor Support Contract',
@@ -625,6 +749,84 @@ const ITDataEntryPage: React.FC = () => {
           { name: 'target_end_date', label: 'Target End Date', type: 'date', required: true },
           { name: 'actual_end_date', label: 'Actual End Date', type: 'date' },
           { name: 'status', label: 'Status', type: 'select', options: ['Planning', 'In Progress', 'On Hold', 'Completed', 'Cancelled'], required: true }
+        ];
+      case 'audit-schedule':
+        return [
+          { name: 'audit_type', label: 'Audit Type', type: 'select', options: ['System Audit', 'Cybersecurity Audit', 'VAPT'], required: true },
+          { name: 'recurrence_months', label: 'Recurrence (Every X Months)', type: 'number', required: true },
+          { name: 'last_filing_date', label: 'Last Filing Date', type: 'date', required: true },
+          { name: 'auditor_name', label: 'Auditor / Agency Name', type: 'text', required: true },
+          { name: 'report_upload_url', label: 'Report Upload', type: 'file' },
+          { name: 'status', label: 'Status', type: 'select', options: ['Upcoming', 'Filed', 'Overdue'], required: true },
+          { name: 'is_ad_hoc', label: 'Ad-hoc run (e.g. VAPT after a major change)?', type: 'checkbox' },
+          { name: 'trigger_event_description', label: 'Triggering Event (if ad-hoc)', type: 'textarea' }
+        ];
+      case 'servers':
+        return [
+          { name: 'server_name', label: 'Server Name', type: 'text', required: true },
+          {
+            name: 'linked_asset_id',
+            label: 'Linked Asset ID',
+            type: 'select',
+            options: assetsList.map(a => ({ value: a.id, label: a.asset_id })),
+            required: false
+          },
+          { name: 'role_purpose', label: 'Role / Purpose', type: 'text', required: true },
+          { name: 'physical_or_virtual', label: 'Physical or Virtual', type: 'select', options: ['Physical', 'Virtual'], required: true },
+          { name: 'os', label: 'Operating System', type: 'text' },
+          { name: 'cpu', label: 'CPU', type: 'text' },
+          { name: 'ram', label: 'RAM', type: 'text' },
+          { name: 'storage', label: 'Storage', type: 'text' },
+          { name: 'ip_address', label: 'IP Address', type: 'text' },
+          { name: 'location_rack', label: 'Location / Rack', type: 'text' },
+          { name: 'assigned_admin', label: 'Assigned Admin', type: 'text' },
+          { name: 'last_config_update_date', label: 'Last Configuration Update Date', type: 'date' },
+          {
+            name: 'linked_diagram_id',
+            label: 'Linked Network Diagram',
+            type: 'select',
+            options: diagramsList.map(d => ({ value: d.id, label: d.diagram_name })),
+            required: false
+          }
+        ];
+      case 'team-duties':
+        return [
+          {
+            name: 'profile_id',
+            label: 'Employee Name',
+            type: 'select',
+            options: itStaff.map(p => ({ value: p.id, label: p.full_name })),
+            required: true
+          },
+          { name: 'designation', label: 'Designation', type: 'text', required: true },
+          { name: 'duties_responsibilities', label: 'Duties / Responsibilities', type: 'textarea', required: true },
+          { name: 'escalation_priority', label: 'On-Call / Escalation Priority', type: 'number', required: true },
+          {
+            name: 'reporting_to',
+            label: 'Reporting To',
+            type: 'select',
+            options: itStaff.map(p => ({ value: p.id, label: p.full_name })),
+            required: false
+          }
+        ];
+      case 'software':
+        return [
+          { name: 'software_name', label: 'Software Name', type: 'text', required: true },
+          { name: 'purchase_date', label: 'Purchase Date', type: 'date', required: true },
+          { name: 'purpose_for', label: 'For (Purpose)', type: 'text', required: true },
+          { name: 'used_by', label: 'Used By', type: 'text', required: true },
+          { name: 'amc_renewal_date', label: 'AMC / Renewal Date', type: 'date' },
+          { name: 'po_number', label: 'PO Number', type: 'text' },
+          { name: 'po_pdf_url', label: 'PO PDF Upload', type: 'file' },
+          {
+            name: 'vendor_id',
+            label: 'Vendor',
+            type: 'select',
+            options: vendors.map(v => ({ value: v.id, label: v.vendor_name })),
+            required: false
+          },
+          { name: 'number_of_licenses', label: 'Number of Licenses / Seats', type: 'number', required: true },
+          { name: 'status', label: 'Status', type: 'select', options: ['Active', 'Expiring Soon', 'Expired'], required: true }
         ];
       default:
         return [];
@@ -725,15 +927,20 @@ const ITDataEntryPage: React.FC = () => {
         {/* Sheet Tab Bar */}
         <div className="mis-module-tabs flex-wrap mb-4">
           {[
+            { id: 'audit-schedule', label: 'Audit Filing & Countdown' },
             { id: 'audits', label: 'Audits' },
             { id: 'audit-findings', label: 'Audit Findings' },
             { id: 'vendors', label: 'Vendors' },
+            { id: 'amc-contracts', label: 'AMC Contracts' },
             { id: 'assets', label: 'Assets' },
-            // 'diagrams' (Topology Diagrams) is temporarily hidden — will be added back later.
+            { id: 'diagrams', label: 'Diagrams' },
+            { id: 'servers', label: 'Servers & Config' },
             { id: 'cybersecurity-compliance', label: 'Compliance Control' },
             { id: 'tickets', label: 'Support Tickets' },
             { id: 'incidents', label: 'Incidents & RCA' },
-            { id: 'projects', label: 'Projects' }
+            { id: 'projects', label: 'Projects' },
+            { id: 'software', label: 'Software Register' },
+            { id: 'team-duties', label: 'Team Duties' }
           ].map(tab => (
             <button
               key={tab.id}
@@ -758,7 +965,7 @@ const ITDataEntryPage: React.FC = () => {
                 onChange={e => setSearchTerm(e.target.value)}
                 className="mis-input text-xs w-full sm:w-64"
               />
-              {hasMultiBranchAccess && (
+              {hasMultiBranchAccess && !['audit-schedule', 'team-duties'].includes(sheetTab) && (
                 <select
                   value={branchFilter}
                   onChange={e => setBranchFilter(e.target.value)}
@@ -793,7 +1000,7 @@ const ITDataEntryPage: React.FC = () => {
                         onChange={e => setBatchStatus(e.target.value)}
                       >
                         <option value="">Update Status...</option>
-                        {['Active', 'Compliant', 'Non-Compliant', 'Resolved', 'Mitigated', 'Closed', 'Implemented', 'Expired', 'In Progress'].map(st => (
+                        {['Active', 'Compliant', 'Non-Compliant', 'Resolved', 'Mitigated', 'Closed', 'Implemented', 'Expired', 'In Progress', 'Upcoming', 'Filed', 'Overdue', 'Renewal Due', 'Renewed', 'Lapsed', 'Expiring Soon'].map(st => (
                           <option key={st} value={st}>{st}</option>
                         ))}
                       </select>
@@ -829,6 +1036,9 @@ const ITDataEntryPage: React.FC = () => {
                           <th>Upgrade Needed</th>
                         </>
                       )}
+                      {(sheetTab === 'audit-schedule' || sheetTab === 'amc-contracts' || sheetTab === 'software') && (
+                        <th>Days to Go</th>
+                      )}
                       <th>Date Added</th>
                       <th className="text-right">Actions</th>
                     </tr>
@@ -849,6 +1059,14 @@ const ITDataEntryPage: React.FC = () => {
                             val = row.it_vendors.vendor_name;
                           } else if (f.name === 'audit_id' && row.it_audits) {
                             val = row.it_audits.audit_name;
+                          } else if (f.name === 'linked_asset_id' && row.it_assets) {
+                            val = row.it_assets.asset_id;
+                          } else if (f.name === 'linked_diagram_id' && row.it_diagrams) {
+                            val = row.it_diagrams.diagram_name;
+                          } else if (f.name === 'profile_id' && row.profiles) {
+                            val = row.profiles.full_name;
+                          } else if (f.name === 'reporting_to' && row.reporting_to_profile) {
+                            val = row.reporting_to_profile.full_name;
                           } else if (typeof val === 'boolean') {
                             val = val ? 'Yes' : 'No';
                           }
@@ -889,6 +1107,11 @@ const ITDataEntryPage: React.FC = () => {
                               )}
                             </td>
                           </>
+                        )}
+                        {(sheetTab === 'audit-schedule' || sheetTab === 'amc-contracts' || sheetTab === 'software') && (
+                          <td>
+                            <CountdownBadge dueDate={sheetTab === 'audit-schedule' ? row.next_due_date : row.amc_renewal_date} />
+                          </td>
                         )}
                         <td>{new Date(row.created_at).toLocaleDateString()}</td>
                         <td className="text-right space-x-2">
@@ -1050,7 +1273,7 @@ const ITDataEntryPage: React.FC = () => {
                 {sheetTab === 'assets' && deprEst && (
                   <div className="md:col-span-2 p-4 rounded border border-indigo-500/20 bg-indigo-900/10 mt-2">
                     <h4 className="text-sm font-semibold text-indigo-400 uppercase tracking-wider mb-2">
-                      Live Depreciation Estimate
+                      Live Depreciation Estimate (WDV)
                     </h4>
                     <div className="grid grid-cols-3 gap-4 text-sm">
                       <div>
@@ -1073,8 +1296,8 @@ const ITDataEntryPage: React.FC = () => {
                   </div>
                 )}
 
-                {/* Branch selector if admin */}
-                {hasMultiBranchAccess && !editingId && (
+                {/* Branch selector if admin — hidden for HO-only sheets, which have no branch_id column at all */}
+                {hasMultiBranchAccess && !editingId && !['audit-schedule', 'team-duties'].includes(sheetTab) && (
                   <div className="flex flex-col gap-1.5">
                     <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Branch Designation</label>
                     <select

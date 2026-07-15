@@ -134,21 +134,28 @@ export class NotificationService {
    * branch AND department — e.g. an IT due item goes only to that branch's
    * IT HOD, not to every HOD in the branch regardless of department, and
    * not to the employee who happened to create the record.
+   *
+   * A null branchId means an HO-only, org-wide record (e.g. the recurring
+   * IT audit schedule, which deliberately has no branch_id column) — in
+   * that case notify every active HOD/regional manager in the department
+   * org-wide, rather than dropping the notification entirely.
    */
   private async resolveRecipients(branchId: string | null, department: string): Promise<Recipient[]> {
-    if (!branchId) return [];
-
     const departmentId = await this.resolveDepartmentId(department);
     if (!departmentId) return [];
 
-    const { data: profiles } = await this.client()
+    let query = this.client()
       .from('profiles')
       .select('id, email, full_name')
-      .eq('branch_id', branchId)
       .eq('department_id', departmentId)
       .eq('status', 'active')
       .in('role', ['hod', 'regional_manager']);
 
+    if (branchId) {
+      query = query.eq('branch_id', branchId);
+    }
+
+    const { data: profiles } = await query;
     return profiles || [];
   }
 
@@ -256,11 +263,27 @@ export class NotificationService {
 
       // IT
       this.scanDueDate({
-        table: 'it_vendors', department: 'IT', link: '/it-entry',
-        selectCols: 'id, vendor_name, amc_due_date, status, notification_lead_time_days, branch_id, created_by',
-        dueCol: 'amc_due_date', statusCol: 'status', openStatuses: ['Active', 'Under Renewal', 'Expired'],
-        leadCol: 'notification_lead_time_days', defaultLeadDays: 15,
-        label: (r) => `AMC contract with "${r.vendor_name}"`,
+        table: 'it_amc_contracts', department: 'IT', link: '/it-entry',
+        selectCols: 'id, item_covered, amc_renewal_date, status, notification_lead_time_days, branch_id, created_by',
+        dueCol: 'amc_renewal_date', statusCol: 'status', openStatuses: ['Active', 'Renewal Due', 'Lapsed'],
+        leadCol: 'notification_lead_time_days', defaultLeadDays: 30,
+        label: (r) => `AMC for "${r.item_covered}"`,
+      }),
+      this.scanDueDate({
+        // HO-only, no branch_id column — resolveRecipients() falls back to
+        // notifying every IT HOD org-wide for these (see its null-branchId path).
+        table: 'it_audit_schedule', department: 'IT', link: '/it-entry',
+        selectCols: 'id, audit_type, next_due_date, status, created_by',
+        dueCol: 'next_due_date', statusCol: 'status', openStatuses: ['Upcoming', 'Overdue'],
+        defaultLeadDays: 30,
+        label: (r) => `${r.audit_type} filing`,
+      }),
+      this.scanDueDate({
+        table: 'it_software', department: 'IT', link: '/it-entry',
+        selectCols: 'id, software_name, amc_renewal_date, status, notification_lead_time_days, branch_id, created_by',
+        dueCol: 'amc_renewal_date', statusCol: 'status', openStatuses: ['Active', 'Expiring Soon'],
+        leadCol: 'notification_lead_time_days', defaultLeadDays: 30,
+        label: (r) => `Software license "${r.software_name}"`,
       }),
       this.scanDueDate({
         table: 'it_audit_findings', department: 'IT', link: '/it-entry',

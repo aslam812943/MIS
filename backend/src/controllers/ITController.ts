@@ -56,6 +56,49 @@ export class ITController {
     }
   };
 
+  getITStaffDropdown = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const requesterId = (req as any).user.id;
+      const staff = await this.itService.getITStaffDropdown(requesterId);
+      res.status(HttpStatus.OK).json(staff);
+    } catch (error) {
+      this.respondError(res, error, 'Failed to retrieve IT staff.');
+    }
+  };
+
+  uploadDocument = async (req: Request, res: Response): Promise<void> => {
+    try {
+      if (!req.file) {
+        res.status(HttpStatus.BAD_REQUEST).json({ message: 'No file uploaded.' });
+        return;
+      }
+
+      if (req.file.size > 5 * 1024 * 1024) {
+        res.status(HttpStatus.BAD_REQUEST).json({ message: 'File size exceeds maximum limit of 5MB.' });
+        return;
+      }
+
+      const allowedMimes = ['application/pdf', 'image/png', 'image/jpeg', 'image/jpg'];
+      const allowedExts = ['pdf', 'png', 'jpg', 'jpeg'];
+      const fileExt = (req.file.originalname.split('.').pop() || '').toLowerCase();
+
+      if (!allowedMimes.includes(req.file.mimetype) || !allowedExts.includes(fileExt)) {
+        res.status(HttpStatus.BAD_REQUEST).json({ message: 'Unsupported file format. Only PDF, PNG, and JPEG are allowed.' });
+        return;
+      }
+
+      const fileUrl = await this.itService.uploadDocument(
+        req.file.buffer,
+        req.file.originalname,
+        req.file.mimetype
+      );
+
+      res.status(HttpStatus.OK).json({ fileUrl });
+    } catch (error) {
+      this.respondError(res, error, 'Failed to upload document.');
+    }
+  };
+
   getDashboardStats = async (req: Request, res: Response): Promise<void> => {
     try {
       const requesterId = (req as any).user.id;

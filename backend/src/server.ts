@@ -35,6 +35,14 @@ app.listen(PORT, async () => {
         });
         console.log('📦 Storage Bucket kyc-documents: Initialized');
       }
+      if (!buckets?.find(b => b.name === 'it-documents')) {
+        await client.storage.createBucket('it-documents', {
+          public: true,
+          allowedMimeTypes: ['image/png', 'image/jpeg', 'image/jpg', 'application/pdf'],
+          fileSizeLimit: 5 * 1024 * 1024
+        });
+        console.log('📦 Storage Bucket it-documents: Initialized');
+      }
     }
   } catch (err) {
     console.error('❌ Initialization failed:', err);
