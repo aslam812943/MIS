@@ -368,6 +368,16 @@ export class UserService {
       }
     }
 
+    // Nothing left to write to the profiles table — e.g. the caller only
+    // changed the password, which lives in Supabase Auth (handled above)
+    // and isn't a profiles column at all. An empty `.update({})` has no
+    // columns to SET, so Postgres/PostgREST returns no row and `.single()`
+    // throws ("Cannot coerce the result to a single JSON object"). Just
+    // return the profile as it already is instead of issuing a no-op write.
+    if (Object.keys(safeUpdate).length === 0) {
+      return targetUser;
+    }
+
     return this.userRepository.update(id, safeUpdate);
   }
 

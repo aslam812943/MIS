@@ -9,11 +9,17 @@ const SHEET_TABLE_MAPPING: { [key: string]: string } = {
   'cybersecurity-compliance': 'it_cybersecurity_compliance',
   'tickets': 'it_tickets',
   'incidents': 'it_incidents',
-  'projects': 'it_projects'
+  'projects': 'it_projects',
+  'audit-schedule': 'it_audit_schedule',
+  'amc-contracts': 'it_amc_contracts',
+  'servers': 'it_servers',
+  'team-duties': 'it_team_duties',
+  'software': 'it_software'
 };
 
-// Mirrors each table's DB CHECK constraint on `status` in database_it.sql.
-// 'diagrams' has no entry — it has no status column at all.
+// Mirrors each table's DB CHECK constraint on `status` in database_it.sql /
+// database_it_v2_expansion.sql. 'diagrams', 'servers' and 'team-duties' have
+// no entry — they have no status column at all.
 const SHEET_STATUS_OPTIONS: { [key: string]: string[] } = {
   'audits': ['Scheduled', 'In Progress', 'Report Received', 'Submitted', 'Overdue'],
   'audit-findings': ['Open', 'In Progress', 'Implemented', 'Closed', 'Overdue'],
@@ -23,11 +29,19 @@ const SHEET_STATUS_OPTIONS: { [key: string]: string[] } = {
   'tickets': ['Open', 'In Progress', 'Resolved', 'Closed'],
   'incidents': ['Identified', 'Investigating', 'Mitigated', 'Resolved'],
   'projects': ['Planning', 'In Progress', 'On Hold', 'Completed', 'Cancelled'],
+  'audit-schedule': ['Upcoming', 'Filed', 'Overdue'],
+  'amc-contracts': ['Active', 'Renewal Due', 'Renewed', 'Lapsed'],
+  'software': ['Active', 'Expiring Soon', 'Expired'],
 };
 
 // Only audit-findings and incidents have a `severity` column.
 const SHEETS_WITH_SEVERITY = new Set(['audit-findings', 'incidents']);
 const SEVERITY_OPTIONS = ['Critical', 'High', 'Medium', 'Low'];
+
+// Sheets that are HO-only (org-wide) by design and whose tables therefore
+// have no branch_id column at all — audits are confirmed HO-only, and the
+// IT team roster is a single org-wide list, not per-branch.
+const NO_BRANCH_SHEETS = new Set(['audit-schedule', 'team-duties']);
 
 export class ITService {
   /**
@@ -69,27 +83,44 @@ export class ITService {
   }
 
   /**
-   * Computes current book value based on straight-line depreciation.
+   * Computes current book value using Written Down Value (WDV / reducing
+   * balance) depreciation — the standard method under the Companies Act for
+   * computers and office equipment, and what "15% per year" means in Indian
+   * accounting: each year, the rate is deducted from last year's REMAINING
+   * value, not from the original purchase price.
+   *   Current Value = Purchase Value * (1 - rate)^yearsElapsed
+   * Years elapsed is whole completed years only (no mid-year proration) —
+   * confirmed as the simpler, agreed approach over 180-day proration.
    */
   private calculateBookValue(asset: any): number {
-    if (!asset.purchase_date || asset.purchase_value === undefined || !asset.useful_life_years) {
+    if (!asset.purchase_date || asset.purchase_value === undefined) {
       return Number(asset.purchase_value || 0);
     }
     const purchaseValue = Number(asset.purchase_value);
-    const usefulLife = Number(asset.useful_life_years);
-    if (usefulLife <= 0) return 0;
+    const rate = Number(asset.depreciation_rate ?? 15) / 100;
 
     const purchaseDate = new Date(asset.purchase_date);
     const today = new Date();
 
-    // Years elapsed calculation
-    let yearsElapsed = (today.getTime() - purchaseDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
-    if (yearsElapsed < 0) yearsElapsed = 0;
-    if (yearsElapsed > usefulLife) yearsElapsed = usefulLife;
+    const daysElapsed = (today.getTime() - purchaseDate.getTime()) / (1000 * 60 * 60 * 24);
+    const yearsElapsed = Math.max(0, Math.floor(daysElapsed / 365.25));
 
-    const annualDepreciation = purchaseValue / usefulLife;
-    const currentBookValue = purchaseValue - (yearsElapsed * annualDepreciation);
+    const currentBookValue = purchaseValue * Math.pow(1 - rate, yearsElapsed);
     return Number(currentBookValue.toFixed(2));
+  }
+
+  /**
+   * Recomputes the audit schedule's next_due_date server-side as
+   * last_filing_date + recurrence_months, so it's always consistent with
+   * the two inputs that drive it — the client never sets it directly.
+   */
+  private computeNextAuditDueDate(payload: any) {
+    delete payload.next_due_date;
+    if (!payload.last_filing_date || !payload.recurrence_months) return;
+
+    const base = new Date(payload.last_filing_date);
+    base.setMonth(base.getMonth() + Number(payload.recurrence_months));
+    payload.next_due_date = base.toISOString().slice(0, 10);
   }
 
   /**
@@ -148,7 +179,9 @@ export class ITService {
       'scheduled_date', 'start_date', 'end_date', 'submission_deadline', 'actual_submission_date',
       'implementation_target_date', 'actual_implementation_date', 'amc_last_paid_date', 'amc_due_date',
       'purchase_date', 'warranty_start_date', 'warranty_end_date', 'last_assessed_date', 'next_review_date',
-      'opened_date', 'closed_date', 'discovered_date', 'resolved_date', 'target_end_date', 'actual_end_date'
+      'opened_date', 'closed_date', 'discovered_date', 'resolved_date', 'target_end_date', 'actual_end_date',
+      'amc_start_date', 'amc_renewal_date', 'last_paid_date', 'last_filing_date', 'next_due_date',
+      'last_config_update_date'
     ];
     for (const field of dateFields) {
       if (payload[field] !== undefined && payload[field] !== null && String(payload[field]).trim() !== '') {
@@ -177,6 +210,9 @@ export class ITService {
     }
     if (payload.start_date && payload.actual_end_date && new Date(payload.actual_end_date) < new Date(payload.start_date)) {
       throw new Error('Actual end date cannot be before start date.');
+    }
+    if (payload.amc_start_date && payload.amc_renewal_date && new Date(payload.amc_renewal_date) < new Date(payload.amc_start_date)) {
+      throw new Error('AMC renewal date cannot be before AMC start date.');
     }
 
     // 3. String length checks (DoS prevention)
@@ -214,7 +250,10 @@ export class ITService {
     }
 
     // Non-negative numbers check
-    const numberFields = ['purchase_value', 'useful_life_years', 'contract_value', 'notification_lead_time_days', 'sla_target_hours'];
+    const numberFields = [
+      'purchase_value', 'useful_life_years', 'contract_value', 'notification_lead_time_days', 'sla_target_hours',
+      'depreciation_rate', 'amc_amount', 'recurrence_months', 'number_of_licenses', 'escalation_priority'
+    ];
     for (const field of numberFields) {
       if (payload[field] !== undefined && payload[field] !== null && payload[field] !== '') {
         const val = Number(payload[field]);
@@ -226,7 +265,7 @@ export class ITService {
 
     // Fields that are meaningless at zero (an asset with 0 years useful
     // life, or a ticket with a 0-hour SLA target, can't be acted on).
-    const strictlyPositiveFields = ['useful_life_years', 'sla_target_hours'];
+    const strictlyPositiveFields = ['useful_life_years', 'sla_target_hours', 'recurrence_months', 'number_of_licenses', 'escalation_priority'];
     for (const field of strictlyPositiveFields) {
       if (payload[field] !== undefined && payload[field] !== null && payload[field] !== '') {
         if (Number(payload[field]) <= 0) {
@@ -255,9 +294,21 @@ export class ITService {
       }
     }
 
+    // audit_type means something different depending on the sheet: the old
+    // per-cycle 'audits' log (Internal/CERT-In/SEBI-Mandated/VAPT) vs. the
+    // new recurring 'audit-schedule' (System Audit/Cybersecurity Audit/VAPT).
     if (payload.audit_type !== undefined && payload.audit_type !== null && String(payload.audit_type).trim() !== '') {
-      if (!['Internal', 'CERT-In Empanelled External', 'SEBI-Mandated Cyber Audit', 'VAPT'].includes(String(payload.audit_type).trim())) {
+      const allowedAuditTypes = sheet === 'audit-schedule'
+        ? ['System Audit', 'Cybersecurity Audit', 'VAPT']
+        : ['Internal', 'CERT-In Empanelled External', 'SEBI-Mandated Cyber Audit', 'VAPT'];
+      if (!allowedAuditTypes.includes(String(payload.audit_type).trim())) {
         throw new Error('Invalid audit type.');
+      }
+    }
+
+    if (payload.physical_or_virtual !== undefined && payload.physical_or_virtual !== null && String(payload.physical_or_virtual).trim() !== '') {
+      if (!['Physical', 'Virtual'].includes(String(payload.physical_or_virtual).trim())) {
+        throw new Error('Invalid value for Physical or Virtual.');
       }
     }
 
@@ -281,6 +332,8 @@ export class ITService {
   private static readonly UNIQUE_FIELD_LABEL: { [key: string]: string } = {
     'vendors': 'vendor name',
     'assets': 'asset barcode/ID',
+    'servers': 'server name',
+    'team-duties': 'employee (already has a duties record)',
   };
 
   /**
@@ -314,6 +367,48 @@ export class ITService {
   }
 
   /**
+   * Fetches IT department staff for dropdown mapping (Team Duties employee
+   * picker, audit-schedule auditor picker).
+   */
+  async getITStaffDropdown(userId: string): Promise<any[]> {
+    const client = supabaseAdmin;
+    if (!client) throw new Error('Supabase client not initialized.');
+
+    const access = await this.verifyAccess(userId);
+    if (!access.authorized) throw new Error('Unauthorized.');
+
+    const { data, error } = await client
+      .from('profiles')
+      .select('id, full_name, departments(name)')
+      .order('full_name', { ascending: true });
+
+    if (error) throw new Error(`Failed to load staff: ${error.message}`);
+    return (data || []).filter((p: any) => (p.departments as any)?.name?.toUpperCase() === 'IT');
+  }
+
+  /**
+   * Uploads an IT document (audit report, PO PDF, diagram file, evidence
+   * file) to the dedicated it-documents bucket. Mirrors
+   * KYCService.uploadDocument's storage-upload pattern.
+   */
+  async uploadDocument(fileBuffer: Buffer, fileName: string, mimeType: string): Promise<string> {
+    const client = supabaseAdmin;
+    if (!client) throw new Error('Supabase client not initialized.');
+
+    const fileExt = fileName.split('.').pop() || 'bin';
+    const filePath = `documents/${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${fileExt}`;
+
+    const { error } = await client.storage.from('it-documents').upload(filePath, fileBuffer, {
+      contentType: mimeType,
+      upsert: true
+    });
+    if (error) throw new Error(`Upload failed: ${error.message}`);
+
+    const { data: urlData } = client.storage.from('it-documents').getPublicUrl(filePath);
+    return urlData.publicUrl;
+  }
+
+  /**
    * Retrieves entries for a specific IT table.
    */
   async getEntries(
@@ -334,7 +429,7 @@ export class ITService {
     if (!table) throw new Error('Invalid sheet mapping.');
 
     let targetBranchId: string | undefined = branchIdFilter;
-    if (access.role === 'employee') {
+    if (access.role === 'employee' && !NO_BRANCH_SHEETS.has(sheet)) {
       targetBranchId = access.branchId || undefined;
     }
 
@@ -343,11 +438,17 @@ export class ITService {
       selectString = '*, it_vendors(vendor_name)';
     } else if (sheet === 'audit-findings') {
       selectString = '*, it_audits(audit_name)';
+    } else if (sheet === 'amc-contracts' || sheet === 'software') {
+      selectString = '*, it_vendors(vendor_name)';
+    } else if (sheet === 'servers') {
+      selectString = '*, it_assets(asset_id), it_diagrams(diagram_name)';
+    } else if (sheet === 'team-duties') {
+      selectString = '*, profiles!it_team_duties_profile_id_fkey(full_name), reporting_to_profile:profiles!it_team_duties_reporting_to_fkey(full_name)';
     }
 
     let query = client.from(table).select(selectString);
 
-    if (targetBranchId) {
+    if (targetBranchId && !NO_BRANCH_SHEETS.has(sheet)) {
       query = query.eq('branch_id', targetBranchId);
     }
     if (startDate) {
@@ -372,6 +473,14 @@ export class ITService {
           query = query.ilike('audit_name', `%${safeSearch}%`);
         } else if (sheet === 'tickets') {
           query = query.or(`ticket_number.ilike.%${safeSearch}%,issue_description.ilike.%${safeSearch}%`);
+        } else if (sheet === 'amc-contracts') {
+          query = query.ilike('item_covered', `%${safeSearch}%`);
+        } else if (sheet === 'audit-schedule') {
+          query = query.ilike('audit_type', `%${safeSearch}%`);
+        } else if (sheet === 'servers') {
+          query = query.or(`server_name.ilike.%${safeSearch}%,role_purpose.ilike.%${safeSearch}%`);
+        } else if (sheet === 'software') {
+          query = query.ilike('software_name', `%${safeSearch}%`);
         }
       }
     }
@@ -388,6 +497,24 @@ export class ITService {
       }));
     }
 
+    // Post-process audit-schedule / AMC / software rows to expose a
+    // consistent days_to_go number the frontend's CountdownBadge reads
+    // directly, instead of re-deriving date math per-sheet on the client.
+    if ((sheet === 'audit-schedule' || sheet === 'amc-contracts' || sheet === 'software') && data) {
+      const dueCol = sheet === 'audit-schedule' ? 'next_due_date' : 'amc_renewal_date';
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      return data.map((row: any) => {
+        let daysToGo: number | null = null;
+        if (row[dueCol]) {
+          const due = new Date(row[dueCol]);
+          due.setHours(0, 0, 0, 0);
+          daysToGo = Math.round((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        }
+        return { ...row, days_to_go: daysToGo };
+      });
+    }
+
     return data || [];
   }
 
@@ -401,20 +528,30 @@ export class ITService {
     const table = SHEET_TABLE_MAPPING[sheet];
     if (!table) throw new Error('Invalid sheet mapping.');
 
-    const branchId = access.role === 'employee' ? access.branchId : (data.branch_id || access.branchId);
-
-    const payload = {
+    const payload: any = {
       ...data,
-      branch_id: branchId,
       created_by: requesterId
     };
 
+    if (NO_BRANCH_SHEETS.has(sheet)) {
+      delete payload.branch_id;
+    } else {
+      payload.branch_id = access.role === 'employee' ? access.branchId : (data.branch_id || access.branchId);
+    }
+
     delete (payload as any).it_vendors;
     delete (payload as any).it_audits;
+    delete (payload as any).it_assets;
+    delete (payload as any).it_diagrams;
+    delete (payload as any).profiles;
+    delete (payload as any).reporting_to_profile;
     delete (payload as any).book_value;
+    delete (payload as any).days_to_go;
     delete (payload as any).id;
     delete (payload as any).created_at;
     delete (payload as any).updated_at;
+
+    if (sheet === 'audit-schedule') this.computeNextAuditDueDate(payload);
 
     this.validatePayload(sheet, payload);
 
@@ -433,26 +570,41 @@ export class ITService {
     const table = SHEET_TABLE_MAPPING[sheet];
     if (!table) throw new Error('Invalid sheet mapping.');
 
-    let query = client.from(table).select('id, branch_id').eq('id', id).single();
+    let query = client.from(table).select('*').eq('id', id).single();
     const { data: record, error: fetchError } = await query;
     if (fetchError || !record) throw new Error('Record not found.');
 
     // Branch is locked at creation time (the edit form never shows a branch
     // selector), so an HOD editing a record outside their own branch should
-    // be blocked the same way bulkUpdate() already blocks it.
-    if ((access.role === 'employee' || access.role === 'hod') && access.branchId && record.branch_id !== access.branchId) {
+    // be blocked the same way bulkUpdate() already blocks it. Skipped
+    // entirely for HO-only sheets, whose tables have no branch_id column.
+    if (!NO_BRANCH_SHEETS.has(sheet) && (access.role === 'employee' || access.role === 'hod') && access.branchId && record.branch_id !== access.branchId) {
       throw new Error('Unauthorized branch access.');
     }
 
     const payload = { ...updates };
     delete (payload as any).it_vendors;
     delete (payload as any).it_audits;
+    delete (payload as any).it_assets;
+    delete (payload as any).it_diagrams;
+    delete (payload as any).profiles;
+    delete (payload as any).reporting_to_profile;
     delete (payload as any).book_value;
+    delete (payload as any).days_to_go;
     delete (payload as any).branch_id;
     delete (payload as any).created_by;
     delete (payload as any).id;
     delete (payload as any).created_at;
     delete (payload as any).updated_at;
+
+    if (sheet === 'audit-schedule') {
+      // A partial update (e.g. only changing auditor_name) shouldn't lose
+      // the due-date inputs it didn't touch — recompute from the merged
+      // view of the existing row + incoming changes.
+      const merged = { ...record, ...payload };
+      this.computeNextAuditDueDate(merged);
+      payload.next_due_date = merged.next_due_date;
+    }
 
     this.validatePayload(sheet, payload);
 
@@ -471,10 +623,11 @@ export class ITService {
     const table = SHEET_TABLE_MAPPING[sheet];
     if (!table) throw new Error('Invalid sheet mapping.');
 
-    const { data: record, error: fetchError } = await client.from(table).select('branch_id').eq('id', id).single();
+    const selectCols = NO_BRANCH_SHEETS.has(sheet) ? 'id' : 'branch_id';
+    const { data: record, error: fetchError } = await client.from(table).select(selectCols).eq('id', id).single();
     if (fetchError || !record) throw new Error('Record not found.');
 
-    if ((access.role === 'employee' || access.role === 'hod') && access.branchId && record.branch_id !== access.branchId) {
+    if (!NO_BRANCH_SHEETS.has(sheet) && (access.role === 'employee' || access.role === 'hod') && access.branchId && (record as any).branch_id !== access.branchId) {
       throw new Error('Unauthorized branch access.');
     }
 
@@ -496,7 +649,7 @@ export class ITService {
 
     if (!Array.isArray(ids) || ids.length === 0) throw new Error('At least one record id is required.');
 
-    if ((access.role === 'employee' || access.role === 'hod') && access.branchId) {
+    if (!NO_BRANCH_SHEETS.has(sheet) && (access.role === 'employee' || access.role === 'hod') && access.branchId) {
       const { data: mismatchRows } = await client
         .from(table)
         .select('id')
@@ -555,25 +708,37 @@ export class ITService {
     if (records.length > 500) throw new Error('Bulk import limit exceeded (500 records max).');
 
     const defaultBranchId = access.branchId;
+    const noBranch = NO_BRANCH_SHEETS.has(sheet);
 
     const validatedRecords = records.map((row: any) => {
-      const branchId = access.role === 'employee' ? defaultBranchId : (row.branch_id || defaultBranchId);
-      if ((access.role === 'employee' || access.role === 'hod') && defaultBranchId && branchId !== defaultBranchId) {
-        throw new Error('Unauthorized: Row contains foreign branch ID.');
-      }
-
       const item: any = {
         ...row,
-        branch_id: branchId,
         created_by: requesterId
       };
 
+      if (noBranch) {
+        delete item.branch_id;
+      } else {
+        const branchId = access.role === 'employee' ? defaultBranchId : (row.branch_id || defaultBranchId);
+        if ((access.role === 'employee' || access.role === 'hod') && defaultBranchId && branchId !== defaultBranchId) {
+          throw new Error('Unauthorized: Row contains foreign branch ID.');
+        }
+        item.branch_id = branchId;
+      }
+
       delete item.it_vendors;
       delete item.it_audits;
+      delete item.it_assets;
+      delete item.it_diagrams;
+      delete item.profiles;
+      delete item.reporting_to_profile;
       delete item.book_value;
+      delete item.days_to_go;
       delete item.id;
       delete item.created_at;
       delete item.updated_at;
+
+      if (sheet === 'audit-schedule') this.computeNextAuditDueDate(item);
 
       this.validatePayload(sheet, item);
       return item;
@@ -708,6 +873,42 @@ export class ITService {
       }
     });
 
+    // Days-to-go helper shared by the audit schedule / AMC / software cards
+    // below — same math as getEntries()'s per-row post-processing.
+    const daysToGo = (dateStr: string | null): number | null => {
+      if (!dateStr) return null;
+      const due = new Date(dateStr);
+      due.setHours(0, 0, 0, 0);
+      const todayMidnight = new Date();
+      todayMidnight.setHours(0, 0, 0, 0);
+      return Math.round((due.getTime() - todayMidnight.getTime()) / (1000 * 60 * 60 * 24));
+    };
+
+    // Recurring audit schedule — HO-only, no branch filter.
+    const { data: auditSchedule } = await client
+      .from('it_audit_schedule')
+      .select('audit_type, next_due_date, status, is_ad_hoc')
+      .order('next_due_date', { ascending: true });
+    const auditScheduleWithCountdown = (auditSchedule || []).map(a => ({ ...a, days_to_go: daysToGo(a.next_due_date) }));
+    const auditsOverdueCount = auditScheduleWithCountdown.filter(a => (a.days_to_go ?? 0) < 0 && a.status !== 'Filed').length;
+
+    // AMC contracts — soonest renewals first.
+    const { data: amcContracts } = await applyFilters(
+      client.from('it_amc_contracts').select('item_covered, amc_renewal_date, status, it_vendors(vendor_name)')
+    );
+    const amcWithCountdown = (amcContracts || [])
+      .map((a: any) => ({ ...a, vendor_name: a.it_vendors?.vendor_name, days_to_go: daysToGo(a.amc_renewal_date) }))
+      .sort((a, b) => (a.days_to_go ?? Infinity) - (b.days_to_go ?? Infinity));
+    const amcDueSoonCount = amcWithCountdown.filter(a => a.days_to_go !== null && a.days_to_go <= 30 && a.status !== 'Lapsed' && a.status !== 'Renewed').length;
+
+    // Software register — soonest AMC/license renewals first.
+    const { data: software } = await applyFilters(
+      client.from('it_software').select('software_name, amc_renewal_date, status')
+    );
+    const softwareWithCountdown = (software || [])
+      .map(s => ({ ...s, days_to_go: daysToGo(s.amc_renewal_date) }))
+      .sort((a, b) => (a.days_to_go ?? Infinity) - (b.days_to_go ?? Infinity));
+
     return {
       kpis: {
         totalUsers: usersCount || 0,
@@ -716,7 +917,14 @@ export class ITService {
         criticalIncidents: criticalIncidentsCount,
         systemAvailability,
         slaCompliance,
-        ongoingProjects: ongoingProjectsCount
+        ongoingProjects: ongoingProjectsCount,
+        auditsOverdue: auditsOverdueCount,
+        amcDueSoon: amcDueSoonCount
+      },
+      compliance: {
+        auditSchedule: auditScheduleWithCountdown,
+        upcomingAmc: amcWithCountdown.slice(0, 5),
+        expiringSoftware: softwareWithCountdown.slice(0, 5)
       },
       charts: {
         ageAnalysis: Object.values(ageBrackets),

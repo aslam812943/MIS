@@ -20,6 +20,15 @@ export const itService = {
   },
 
   /**
+   * Fetches IT department staff for dropdown selection (Team Duties,
+   * audit-schedule auditor picker).
+   */
+  getITStaffDropdown: async () => {
+    const response = await api.get('/admin/it/dropdown/staff');
+    return response.data;
+  },
+
+  /**
    * Fetches entries for a specific IT department sheet.
    */
   getEntries: async (
@@ -78,12 +87,13 @@ export const itService = {
   },
 
   /**
-   * Uploads supporting documents/diagrams/evidence to storage
+   * Uploads supporting documents/diagrams/evidence to the dedicated
+   * it-documents storage bucket.
    */
   uploadDocument: async (file: File) => {
     const formData = new FormData();
     formData.append('file', file);
-    const response = await api.post('/admin/kyc/upload', formData, {
+    const response = await api.post('/admin/it/upload', formData, {
       headers: {
         'Content-Type': 'multipart/form-data'
       }

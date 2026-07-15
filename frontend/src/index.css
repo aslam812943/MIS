@@ -1029,6 +1029,12 @@ body {
   border-color: var(--border);
 }
 
+.mis-badge-danger {
+  color: var(--badge-danger-text);
+  background: var(--badge-danger-bg);
+  border-color: var(--badge-danger-border);
+}
+
 /* ─── List rows (admin entities) ─────────────── */
 .mis-list-row {
   display: flex;
