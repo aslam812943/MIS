@@ -160,6 +160,10 @@ const Sidebar: React.FC = () => {
   const isAdmin = user?.role === 'admin';
   const isHOD = user?.role === 'hod';
   const isEmployee = user?.role === 'employee';
+  const isHR = user?.role === 'hr';
+  // Matches DashboardPage.tsx's showHRDashboard check — same roles that see
+  // the HR tab on the landing page get a direct link to it here.
+  const showHRDashboard = isAdmin || isHR;
   
   const isIEPFUser = user?.department_name?.toUpperCase() === 'IEPF';
   const showIEPFDashboard = isAdmin || ['ceo', 'managing_director', 'director', 'executive'].includes(user?.role || '') || (isIEPFUser && isHOD);
@@ -403,16 +407,26 @@ const Sidebar: React.FC = () => {
           </>
         )}
 
-        {isAdmin && (
+        {showHRDashboard && (
           <>
             <span className="mis-sidebar-section-label">Administration</span>
-            <NavItem
-              to={ROUTES.ADMIN_PANEL}
-              icon={<IconShield />}
-              label="Admin Panel"
-              badge="ADMIN"
-              onClick={closeOnMobile}
-            />
+            {isAdmin && (
+              <NavItem
+                to={ROUTES.ADMIN_PANEL}
+                icon={<IconShield />}
+                label="Admin Panel"
+                badge="ADMIN"
+                onClick={closeOnMobile}
+              />
+            )}
+            {showHRDashboard && (
+              <NavItem
+                to={ROUTES.DASHBOARD}
+                icon={<IconIEPFDashboard />}
+                label="HR Dashboard"
+                onClick={closeOnMobile}
+              />
+            )}
           </>
         )}
 

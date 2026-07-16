@@ -495,6 +495,57 @@ export class UserService {
       return resignD >= startD && resignD <= endD;
     }).length;
 
+    // Active headcount at the START of the range too (not just the end) —
+    // needed for a proper attrition rate, which is resignations-during-range
+    // divided by the headcount the range started with, not the headcount it
+    // ended with (which already has those same resignations subtracted out).
+    const activeEmployeesAtStart = users.filter(u => {
+      const joinD = u.joining_date ? new Date(u.joining_date) : new Date(0);
+      if (joinD > startD) return false;
+      if (u.status === 'resigned' && u.resignation_date) {
+        const resignD = new Date(u.resignation_date);
+        if (resignD <= startD) return false;
+      }
+      return true;
+    });
+    const attritionRate = activeEmployeesAtStart.length > 0
+      ? Number(((resignationsCount / activeEmployeesAtStart.length) * 100).toFixed(1))
+      : 0;
+
+    // Average tenure across everyone currently active, in years.
+    const avgTenureYears = activeEmployeesAtEnd.length > 0
+      ? Number((activeEmployeesAtEnd.reduce((sum, u) => {
+          if (!u.joining_date) return sum;
+          const years = (endD.getTime() - new Date(u.joining_date).getTime()) / (1000 * 60 * 60 * 24 * 365.25);
+          return sum + Math.max(0, years);
+        }, 0) / activeEmployeesAtEnd.length).toFixed(1))
+      : 0;
+
+    // Resigned but still serving notice — a real-time snapshot (not
+    // range-filtered), same "don't let this slip through the cracks" intent
+    // as the countdown badges elsewhere in the app.
+    const pendingOffboardingCount = users.filter(u =>
+      u.status === 'resigned' && u.last_working_date && new Date(u.last_working_date) >= now
+    ).length;
+
+    // Resignation reasons within range — same "what's actually driving
+    // this" bar-chart pattern as IEPF's Pending Reason Analysis.
+    const resignationReasonBreakdown: Record<string, number> = {};
+    users.forEach(u => {
+      if (u.status !== 'resigned' || !u.resignation_date) return;
+      const resignD = new Date(u.resignation_date);
+      if (resignD < startD || resignD > endD) return;
+      const reason = u.resignation_reason?.trim() || 'Not specified';
+      resignationReasonBreakdown[reason] = (resignationReasonBreakdown[reason] || 0) + 1;
+    });
+
+    // Role distribution across everyone currently active.
+    const roleBreakdown: Record<string, number> = {};
+    activeEmployeesAtEnd.forEach(u => {
+      const role = u.role || 'employee';
+      roleBreakdown[role] = (roleBreakdown[role] || 0) + 1;
+    });
+
     // 4. Branch breakdown — users with no branch assigned (e.g. org-wide
     // roles like admin/CEO) are excluded rather than lumped into an
     // "Unassigned" bucket, which isn't meaningful on a per-branch chart.
@@ -587,11 +638,16 @@ export class UserService {
         totalEmployees: totalEmployeesCount,
         newJoiners: newJoinersCount,
         resignations: resignationsCount,
+        attritionRate,
+        avgTenureYears,
+        pendingOffboarding: pendingOffboardingCount,
       },
       charts: {
         branchDistribution: Object.entries(branchBreakdown).map(([name, value]) => ({ name, value })),
         departmentDistribution: Object.entries(deptBreakdown).map(([name, value]) => ({ name, value })),
         growth: growthData,
+        resignationReasons: Object.entries(resignationReasonBreakdown).map(([name, value]) => ({ name, value })),
+        roleDistribution: Object.entries(roleBreakdown).map(([name, value]) => ({ name, value })),
       }
     };
   }

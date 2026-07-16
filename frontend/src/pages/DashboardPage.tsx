@@ -7,6 +7,7 @@ import { orgService } from '../services/org.service';
 import { authService } from '../services/auth.service';
 import { useTheme } from '../context/ThemeContext';
 import type { DateRange } from '../utils/periodRange';
+import { getDefaultPeriod } from '../utils/periodRange';
 
 Chart.register(...registerables);
 
@@ -52,6 +53,21 @@ const IconUserMinus = () => (
   </svg>
 );
 
+const IconPercent = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="19" y1="5" x2="5" y2="19" />
+    <circle cx="6.5" cy="6.5" r="2.5" />
+    <circle cx="17.5" cy="17.5" r="2.5" />
+  </svg>
+);
+
+const IconClockHistory = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10" />
+    <polyline points="12 7 12 12 15.5 14" />
+  </svg>
+);
+
 /**
  * Main Dashboard landing page.
  */
@@ -68,16 +84,20 @@ const DashboardPage: React.FC = () => {
   const [hrLoading, setHRLoading] = useState(false);
 
   // Filter state — Monthly/Quarterly/Yearly/Custom, shared across every dashboard
-  const [period, setPeriod] = useState<{ current: DateRange; previous: DateRange } | null>(null);
+  const [period, setPeriod] = useState<{ current: DateRange; previous: DateRange }>(getDefaultPeriod);
 
   // Chart refs
   const growthCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const branchCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const deptCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const resignReasonCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const roleCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const growthChartInstance = useRef<Chart | null>(null);
   const branchChartInstance = useRef<Chart | null>(null);
   const deptChartInstance = useRef<Chart | null>(null);
+  const resignReasonChartInstance = useRef<Chart | null>(null);
+  const roleChartInstance = useRef<Chart | null>(null);
 
   const fetchHRData = async (range: { current: DateRange; previous: DateRange }) => {
     if (!showHRDashboard) return;
@@ -311,6 +331,74 @@ const DashboardPage: React.FC = () => {
       }
     }
 
+    // ── 4. RESIGNATION REASONS (HORIZONTAL BAR) ───────────
+    if (resignReasonCanvasRef.current && hrData.charts?.resignationReasons) {
+      if (resignReasonChartInstance.current) resignReasonChartInstance.current.destroy();
+      const ctx = resignReasonCanvasRef.current.getContext('2d');
+      if (ctx) {
+        const labels = hrData.charts.resignationReasons.map((d: any) => d.name);
+        const dataValues = hrData.charts.resignationReasons.map((d: any) => d.value);
+        resignReasonChartInstance.current = new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels,
+            datasets: [{
+              label: 'Resignations',
+              data: dataValues,
+              backgroundColor: 'rgba(239, 68, 68, 0.85)',
+              hoverBackgroundColor: 'rgba(239, 68, 68, 1)',
+              borderColor: '#ef4444',
+              borderWidth: 1.5,
+              borderRadius: 6
+            }]
+          },
+          options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: { backgroundColor: tooltipBg, titleColor: tooltipTitleColor, borderColor: tooltipBorderColor, borderWidth: 1, padding: 10 }
+            },
+            scales: {
+              x: { grid: { color: gridColor }, ticks: { color: tickColor, stepSize: 1, font: { family: 'inherit' } }, beginAtZero: true },
+              y: { grid: { display: false }, ticks: { color: tickColor, font: { family: 'inherit', size: 10 } } }
+            }
+          }
+        });
+      }
+    }
+
+    // ── 5. ROLE DISTRIBUTION (DOUGHNUT) ───────────
+    if (roleCanvasRef.current && hrData.charts?.roleDistribution) {
+      if (roleChartInstance.current) roleChartInstance.current.destroy();
+      const ctx = roleCanvasRef.current.getContext('2d');
+      if (ctx) {
+        const labels = hrData.charts.roleDistribution.map((d: any) => d.name);
+        const dataValues = hrData.charts.roleDistribution.map((d: any) => d.value);
+        roleChartInstance.current = new Chart(ctx, {
+          type: 'doughnut',
+          data: {
+            labels,
+            datasets: [{
+              data: dataValues,
+              backgroundColor: ['#06b6d4', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#3b82f6', '#f43f5e', '#84cc16', '#eab308'],
+              borderWidth: 2,
+              borderColor: cardBgColor
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { position: 'bottom', labels: { color: legendColor, font: { size: 11, family: 'inherit' }, padding: 15 } },
+              tooltip: { backgroundColor: tooltipBg, titleColor: tooltipTitleColor, borderColor: tooltipBorderColor, borderWidth: 1, padding: 10 }
+            }
+          }
+        });
+      }
+    }
+
     });
 
     return () => {
@@ -318,6 +406,8 @@ const DashboardPage: React.FC = () => {
       if (growthChartInstance.current) growthChartInstance.current.destroy();
       if (branchChartInstance.current) branchChartInstance.current.destroy();
       if (deptChartInstance.current) deptChartInstance.current.destroy();
+      if (resignReasonChartInstance.current) resignReasonChartInstance.current.destroy();
+      if (roleChartInstance.current) roleChartInstance.current.destroy();
     };
   }, [hrData, dashboardTab, theme]);
 
@@ -360,17 +450,20 @@ const DashboardPage: React.FC = () => {
 
         {loading ? (
           <div className="mis-empty py-20">Loading dashboard metrics...</div>
-        ) : dashboardTab === 'hr' && hrData ? (
+        ) : dashboardTab === 'hr' ? (
           /* ── HR Dashboard Tab ──────────────────────────────────── */
           <div className="space-y-8">
-            {/* Filter Bar */}
+            {/* Filter Bar — rendered unconditionally (not gated behind
+                hrData) so PeriodFilter can mount and report its default
+                period; hrData only exists AFTER that period is set and
+                fetched, so gating this on hrData would deadlock. */}
             <div className="mis-card p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
               <span className="text-xs font-bold uppercase tracking-wider opacity-60 mr-2" style={{ color: 'var(--text-secondary)' }}>Filter Period:</span>
               <PeriodFilter onChange={p => setPeriod({ current: p.current, previous: p.previous })} />
             </div>
 
-            {hrLoading ? (
-              <div className="mis-empty py-20">Refreshing HR metrics...</div>
+            {hrLoading || !hrData ? (
+              <div className="mis-empty py-20">{hrLoading ? 'Refreshing HR metrics...' : 'Loading HR metrics...'}</div>
             ) : (
               <>
                 {/* KPI Cards */}
@@ -410,6 +503,40 @@ const DashboardPage: React.FC = () => {
                       <IconUserMinus />
                     </div>
                   </div>
+
+                  <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(139, 92, 246, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
+                    <div>
+                      <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Attrition Rate</div>
+                      <div className="text-3xl font-bold" style={{ color: '#8b5cf6' }}>{hrData.kpis.attritionRate}%</div>
+                      <div className="text-xs opacity-50 mt-1">Resignations vs headcount at period start</div>
+                      <TrendDelta current={hrData.kpis.attritionRate} previous={previousHrData?.kpis?.attritionRate} isPercentagePoint />
+                    </div>
+                    <div className="p-3.5 rounded-full" style={{ background: 'rgba(139, 92, 246, 0.1)', color: '#8b5cf6' }}>
+                      <IconPercent />
+                    </div>
+                  </div>
+
+                  <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(245, 158, 11, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
+                    <div>
+                      <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Avg. Tenure</div>
+                      <div className="text-3xl font-bold" style={{ color: '#f59e0b' }}>{hrData.kpis.avgTenureYears} <span className="text-sm font-normal opacity-60">yrs</span></div>
+                      <div className="text-xs opacity-50 mt-1">Across all active employees</div>
+                    </div>
+                    <div className="p-3.5 rounded-full" style={{ background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b' }}>
+                      <IconClockHistory />
+                    </div>
+                  </div>
+
+                  <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(244, 63, 94, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
+                    <div>
+                      <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Pending Offboarding</div>
+                      <div className="text-3xl font-bold" style={{ color: '#f43f5e' }}>{hrData.kpis.pendingOffboarding}</div>
+                      <div className="text-xs opacity-50 mt-1">Resigned, still serving notice period</div>
+                    </div>
+                    <div className="p-3.5 rounded-full" style={{ background: 'rgba(244, 63, 94, 0.1)', color: '#f43f5e' }}>
+                      <IconUserMinus />
+                    </div>
+                  </div>
                 </div>
 
                 {/* Growth & Distribution charts */}
@@ -443,6 +570,29 @@ const DashboardPage: React.FC = () => {
                   </div>
                   <div className="h-[300px] w-full relative">
                     <canvas ref={deptCanvasRef} />
+                  </div>
+                </div>
+
+                {/* Resignation reasons & Role distribution */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  <div className="mis-card p-6 lg:col-span-2 flex flex-col justify-between">
+                    <div>
+                      <h3 className="font-bold text-lg mb-1" style={{ color: 'var(--text-primary)' }}>Resignation Reasons</h3>
+                      <p className="text-xs opacity-75 mb-6" style={{ color: 'var(--text-secondary)' }}>What's actually driving attrition in the selected period.</p>
+                    </div>
+                    <div className="h-[300px] w-full relative">
+                      <canvas ref={resignReasonCanvasRef} />
+                    </div>
+                  </div>
+
+                  <div className="mis-card p-6 flex flex-col justify-between">
+                    <div>
+                      <h3 className="font-bold text-lg mb-1" style={{ color: 'var(--text-primary)' }}>Role Distribution</h3>
+                      <p className="text-xs opacity-75 mb-6" style={{ color: 'var(--text-secondary)' }}>Active headcount broken down by role.</p>
+                    </div>
+                    <div className="h-[300px] w-full relative">
+                      <canvas ref={roleCanvasRef} />
+                    </div>
                   </div>
                 </div>
               </>
