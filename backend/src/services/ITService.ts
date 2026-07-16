@@ -14,7 +14,8 @@ const SHEET_TABLE_MAPPING: { [key: string]: string } = {
   'amc-contracts': 'it_amc_contracts',
   'servers': 'it_servers',
   'team-duties': 'it_team_duties',
-  'software': 'it_software'
+  'software': 'it_software',
+  'purchase-orders': 'it_purchase_orders'
 };
 
 // Mirrors each table's DB CHECK constraint on `status` in database_it.sql /
@@ -32,6 +33,7 @@ const SHEET_STATUS_OPTIONS: { [key: string]: string[] } = {
   'audit-schedule': ['Upcoming', 'Filed', 'Overdue'],
   'amc-contracts': ['Active', 'Renewal Due', 'Renewed', 'Lapsed'],
   'software': ['Active', 'Expiring Soon', 'Expired'],
+  'purchase-orders': ['Raised', 'Approved', 'Fulfilled', 'Cancelled'],
 };
 
 // Only audit-findings and incidents have a `severity` column.
@@ -181,7 +183,7 @@ export class ITService {
       'purchase_date', 'warranty_start_date', 'warranty_end_date', 'last_assessed_date', 'next_review_date',
       'opened_date', 'closed_date', 'discovered_date', 'resolved_date', 'target_end_date', 'actual_end_date',
       'amc_start_date', 'amc_renewal_date', 'last_paid_date', 'last_filing_date', 'next_due_date',
-      'last_config_update_date'
+      'last_config_update_date', 'po_date'
     ];
     for (const field of dateFields) {
       if (payload[field] !== undefined && payload[field] !== null && String(payload[field]).trim() !== '') {
@@ -252,7 +254,7 @@ export class ITService {
     // Non-negative numbers check
     const numberFields = [
       'purchase_value', 'useful_life_years', 'contract_value', 'notification_lead_time_days', 'sla_target_hours',
-      'depreciation_rate', 'amc_amount', 'recurrence_months', 'number_of_licenses', 'escalation_priority'
+      'depreciation_rate', 'amc_amount', 'recurrence_months', 'number_of_licenses', 'escalation_priority', 'amount'
     ];
     for (const field of numberFields) {
       if (payload[field] !== undefined && payload[field] !== null && payload[field] !== '') {
@@ -334,7 +336,80 @@ export class ITService {
     'assets': 'asset barcode/ID',
     'servers': 'server name',
     'team-duties': 'employee (already has a duties record)',
+    'tickets': 'ticket number',
+    'incidents': 'incident number',
+    'purchase-orders': 'PO number',
   };
+
+  // Reference-number fields that are server-generated, never accepted from
+  // the client — manual typing here caused typos and (for po_number
+  // especially, which had no DB uniqueness at all) outright duplicates.
+  // Each is sequential-per-year: PO-2026-0001, TKT-2026-0001, etc. Fields
+  // NOT in this list (asset_id, finding_id, Settlements' application_no)
+  // stay manual on purpose — they have to match a real external reference
+  // (a physical barcode, an auditor's own code, a bank/ASBA application
+  // number) that this system doesn't control.
+  private static readonly AUTO_CODE_FIELDS: { [key: string]: { column: string; prefix: () => string; pad: number } } = {
+    'purchase-orders': { column: 'po_number', prefix: () => `PO-${new Date().getFullYear()}-`, pad: 4 },
+    'tickets': { column: 'ticket_number', prefix: () => `TKT-${new Date().getFullYear()}-`, pad: 4 },
+    'incidents': { column: 'incident_number', prefix: () => `INC-${new Date().getFullYear()}-`, pad: 4 },
+  };
+
+  /**
+   * Computes the next sequential code for a given year-prefixed column
+   * (e.g. "PO-2026-0001") by reading the current highest matching value.
+   * Inherently racy under true concurrency — insertWithAutoCode() below
+   * retries with a bumped value on an actual DB collision, the same
+   * pattern already used for employee_id generation in UserService.
+   */
+  private async generateNextCode(client: any, table: string, column: string, prefix: string, pad: number): Promise<string> {
+    const { data, error } = await client
+      .from(table)
+      .select(column)
+      .like(column, `${prefix}%`)
+      .order(column, { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) throw new Error(`Failed to calculate next ${column}: ${error.message}`);
+    if (!data) return `${prefix}${'1'.padStart(pad, '0')}`;
+    const numStr = String((data as any)[column]).substring(prefix.length);
+    const nextNum = (parseInt(numStr, 10) || 0) + 1;
+    return `${prefix}${String(nextNum).padStart(pad, '0')}`;
+  }
+
+  private bumpCode(code: string, prefix: string, pad: number): string {
+    const numStr = code.substring(prefix.length);
+    const nextNum = (parseInt(numStr, 10) || 0) + 1;
+    return `${prefix}${String(nextNum).padStart(pad, '0')}`;
+  }
+
+  /**
+   * Inserts a row whose unique code column is server-generated, retrying
+   * with the next code on an actual unique-violation (two concurrent
+   * creates computing the same "next" value) instead of failing outright.
+   */
+  private async insertWithAutoCode(
+    client: any,
+    table: string,
+    sheet: string,
+    payload: any,
+    config: { column: string; prefix: () => string; pad: number },
+    startingCode: string
+  ): Promise<{ data: any; nextCode: string }> {
+    const prefix = config.prefix();
+    let code = startingCode;
+    const MAX_ATTEMPTS = 5;
+    for (let attempt = 1; ; attempt++) {
+      const { data, error } = await client.from(table).insert({ ...payload, [config.column]: code }).select().single();
+      if (!error) return { data, nextCode: this.bumpCode(code, prefix, config.pad) };
+      const isCollision = error.message.includes('duplicate key') && error.message.includes(config.column);
+      if (!isCollision || attempt >= MAX_ATTEMPTS) {
+        if (isCollision) throw new Error('Could not generate a unique reference number right now — please try again.');
+        throw new Error(this.friendlyDbError(sheet, error.message));
+      }
+      code = this.bumpCode(code, prefix, config.pad);
+    }
+  }
 
   /**
    * Translates a raw Postgres/PostgREST error into a clear, user-facing
@@ -553,7 +628,16 @@ export class ITService {
 
     if (sheet === 'audit-schedule') this.computeNextAuditDueDate(payload);
 
+    const autoCode = ITService.AUTO_CODE_FIELDS[sheet];
+    if (autoCode) delete payload[autoCode.column];
+
     this.validatePayload(sheet, payload);
+
+    if (autoCode) {
+      const startingCode = await this.generateNextCode(client, table, autoCode.column, autoCode.prefix(), autoCode.pad);
+      const { data } = await this.insertWithAutoCode(client, table, sheet, payload, autoCode, startingCode);
+      return data;
+    }
 
     const { data: result, error } = await client.from(table).insert(payload).select().single();
     if (error) throw new Error(this.friendlyDbError(sheet, error.message));
@@ -591,6 +675,10 @@ export class ITService {
     delete (payload as any).reporting_to_profile;
     delete (payload as any).book_value;
     delete (payload as any).days_to_go;
+    // Server-generated reference numbers are immutable once assigned —
+    // same as IEPF's claim_number never being editable after creation.
+    const autoCodeOnUpdate = ITService.AUTO_CODE_FIELDS[sheet];
+    if (autoCodeOnUpdate) delete (payload as any)[autoCodeOnUpdate.column];
     delete (payload as any).branch_id;
     delete (payload as any).created_by;
     delete (payload as any).id;
@@ -694,7 +782,14 @@ export class ITService {
     return data;
   }
 
-  async bulkImport(requesterId: string, sheet: string, records: any[]): Promise<any> {
+  /**
+   * Imports rows one at a time rather than as a single batch INSERT, so one
+   * bad row (a validation failure, or a DB-level rejection like a duplicate
+   * asset_id) doesn't abort the entire file — every other valid row still
+   * gets inserted, and the caller gets back exactly which rows failed and
+   * why, instead of a single opaque error covering the whole import.
+   */
+  async bulkImport(requesterId: string, sheet: string, records: any[]): Promise<{ inserted: any[]; failed: { row: number; error: string }[] }> {
     const client = supabaseAdmin;
     if (!client) throw new Error('Supabase client not initialized.');
 
@@ -710,43 +805,68 @@ export class ITService {
     const defaultBranchId = access.branchId;
     const noBranch = NO_BRANCH_SHEETS.has(sheet);
 
-    const validatedRecords = records.map((row: any) => {
-      const item: any = {
-        ...row,
-        created_by: requesterId
-      };
+    // Computed once up front (not per-row, to avoid 500 extra queries), then
+    // advanced in memory after each successful insert. insertWithAutoCode()
+    // still re-verifies against the DB and bumps on an actual collision, so
+    // this running value is just a starting point, not the source of truth.
+    const autoCode = ITService.AUTO_CODE_FIELDS[sheet];
+    let runningCode = autoCode
+      ? await this.generateNextCode(client, table, autoCode.column, autoCode.prefix(), autoCode.pad)
+      : null;
 
-      if (noBranch) {
-        delete item.branch_id;
-      } else {
-        const branchId = access.role === 'employee' ? defaultBranchId : (row.branch_id || defaultBranchId);
-        if ((access.role === 'employee' || access.role === 'hod') && defaultBranchId && branchId !== defaultBranchId) {
-          throw new Error('Unauthorized: Row contains foreign branch ID.');
+    const inserted: any[] = [];
+    const failed: { row: number; error: string }[] = [];
+
+    for (let i = 0; i < records.length; i++) {
+      const row = records[i];
+      try {
+        const item: any = {
+          ...row,
+          created_by: requesterId
+        };
+
+        if (noBranch) {
+          delete item.branch_id;
+        } else {
+          const branchId = access.role === 'employee' ? defaultBranchId : (row.branch_id || defaultBranchId);
+          if ((access.role === 'employee' || access.role === 'hod') && defaultBranchId && branchId !== defaultBranchId) {
+            throw new Error('Row contains a foreign branch ID.');
+          }
+          item.branch_id = branchId;
         }
-        item.branch_id = branchId;
+
+        delete item.it_vendors;
+        delete item.it_audits;
+        delete item.it_assets;
+        delete item.it_diagrams;
+        delete item.profiles;
+        delete item.reporting_to_profile;
+        delete item.book_value;
+        delete item.days_to_go;
+        delete item.id;
+        delete item.created_at;
+        delete item.updated_at;
+
+        if (sheet === 'audit-schedule') this.computeNextAuditDueDate(item);
+        if (autoCode) delete item[autoCode.column];
+
+        this.validatePayload(sheet, item);
+
+        if (autoCode) {
+          const result = await this.insertWithAutoCode(client, table, sheet, item, autoCode, runningCode!);
+          runningCode = result.nextCode;
+          inserted.push(result.data);
+        } else {
+          const { data, error } = await client.from(table).insert(item).select().single();
+          if (error) throw new Error(this.friendlyDbError(sheet, error.message));
+          inserted.push(data);
+        }
+      } catch (err: any) {
+        failed.push({ row: i + 1, error: err instanceof Error ? err.message : 'Import failed.' });
       }
+    }
 
-      delete item.it_vendors;
-      delete item.it_audits;
-      delete item.it_assets;
-      delete item.it_diagrams;
-      delete item.profiles;
-      delete item.reporting_to_profile;
-      delete item.book_value;
-      delete item.days_to_go;
-      delete item.id;
-      delete item.created_at;
-      delete item.updated_at;
-
-      if (sheet === 'audit-schedule') this.computeNextAuditDueDate(item);
-
-      this.validatePayload(sheet, item);
-      return item;
-    });
-
-    const { data, error } = await client.from(table).insert(validatedRecords).select();
-    if (error) throw new Error(this.friendlyDbError(sheet, error.message));
-    return data;
+    return { inserted, failed };
   }
 
   /**
@@ -909,6 +1029,14 @@ export class ITService {
       .map(s => ({ ...s, days_to_go: daysToGo(s.amc_renewal_date) }))
       .sort((a, b) => (a.days_to_go ?? Infinity) - (b.days_to_go ?? Infinity));
 
+    // Purchase Orders log — manual record of POs raised via the embedded
+    // PO Generator tool (that tool has no API of its own to pull from).
+    const { data: purchaseOrders } = await applyFilters(
+      client.from('it_purchase_orders').select('amount, status')
+    );
+    const posRaisedCount = (purchaseOrders || []).length;
+    const totalPoValue = (purchaseOrders || []).reduce((sum, po: any) => sum + Number(po.amount || 0), 0);
+
     return {
       kpis: {
         totalUsers: usersCount || 0,
@@ -919,7 +1047,9 @@ export class ITService {
         slaCompliance,
         ongoingProjects: ongoingProjectsCount,
         auditsOverdue: auditsOverdueCount,
-        amcDueSoon: amcDueSoonCount
+        amcDueSoon: amcDueSoonCount,
+        posRaised: posRaisedCount,
+        totalPoValue: Number(totalPoValue.toFixed(2))
       },
       compliance: {
         auditSchedule: auditScheduleWithCountdown,

@@ -1,11 +1,16 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { Chart, registerables } from 'chart.js';
 import toast from 'react-hot-toast';
 import DashboardLayout from '../../components/layout/DashboardLayout';
+import PeriodFilter from '../../components/common/PeriodFilter';
+import TrendDelta from '../../components/common/TrendDelta';
 import { kycService } from '../../services/kyc.service';
 import { orgService } from '../../services/org.service';
 import { authService } from '../../services/auth.service';
 import { useTheme } from '../../context/ThemeContext';
+import type { DateRange } from '../../utils/periodRange';
+import { getDefaultPeriod } from '../../utils/periodRange';
 
 Chart.register(...registerables);
 
@@ -47,10 +52,10 @@ const KYCDashboardPage: React.FC = () => {
   const userBranchId = currentUser?.branch_id || '';
 
   const [stats, setStats] = useState<any>(null);
+  const [previousStats, setPreviousStats] = useState<any>(null);
   const [branches, setBranches] = useState<any[]>([]);
   const [branchFilter, setBranchFilter] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const [period, setPeriod] = useState<{ current: DateRange; previous: DateRange }>(getDefaultPeriod);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -69,8 +74,10 @@ const KYCDashboardPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    if (!period) return;
     fetchDashboardData(true);
-  }, [branchFilter, startDate, endDate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [branchFilter, period]);
 
   const fetchBranches = async () => {
     if (!hasMultiBranchAccess) return;
@@ -83,13 +90,19 @@ const KYCDashboardPage: React.FC = () => {
   };
 
   const fetchDashboardData = async (initial = false) => {
+    if (!period) return;
     if (initial) setLoading(true);
     else setRefreshing(true);
 
+    const branchIdParam = hasMultiBranchAccess ? (branchFilter || undefined) : userBranchId;
+    // Fired together, but only the current-period call blocks the loading
+    // state — the dashboard renders as soon as it's back instead of
+    // waiting on the previous-period comparison too.
+    const currentPromise = kycService.getDashboardData(branchIdParam, period.current.start, period.current.end);
+    const previousPromise = kycService.getDashboardData(branchIdParam, period.previous.start, period.previous.end);
+
     try {
-      const branchIdParam = hasMultiBranchAccess ? (branchFilter || undefined) : userBranchId;
-      const data = await kycService.getDashboardData(branchIdParam, startDate || undefined, endDate || undefined);
-      setStats(data);
+      setStats(await currentPromise);
       if (!initial) {
         toast.success('Metrics refreshed successfully.');
       }
@@ -100,6 +113,8 @@ const KYCDashboardPage: React.FC = () => {
       setLoading(false);
       setRefreshing(false);
     }
+
+    previousPromise.then(setPreviousStats).catch(() => {});
   };
 
   const getChartThemeColors = (activeTheme: string) => {
@@ -251,17 +266,6 @@ const KYCDashboardPage: React.FC = () => {
     };
   }, [stats, theme]);
 
-  if (loading) {
-    return (
-      <DashboardLayout>
-        <div className="mis-loading-center py-32 flex flex-col items-center justify-center">
-          <div className="mis-spinner" />
-          <p className="mt-4 text-xs text-slate-500 dark:text-slate-400">Loading KYC Analytics Dashboard...</p>
-        </div>
-      </DashboardLayout>
-    );
-  }
-
   const { kpis, compliance, registryUpdates } = stats || {
     kpis: { totalOnboarded: 0, pendingVerifications: 0, processedModifications: 0, activeReactivations: 0, closedAccounts: 0, demiseReportsCount: 0 },
     compliance: { Compliant: 0, 'Non-Compliant': 0, Due: 0 },
@@ -275,8 +279,8 @@ const KYCDashboardPage: React.FC = () => {
         
         {/* Header */}
         <header className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 p-6 border rounded-xl shadow-xs" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+          <div className="text-center sm:text-left w-full sm:w-auto">
+            <h1 className="text-2xl font-bold tracking-tight flex items-center justify-center sm:justify-start gap-2" style={{ color: 'var(--text-primary)' }}>
               📊 KYC Department Analytics
             </h1>
             <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
@@ -285,26 +289,7 @@ const KYCDashboardPage: React.FC = () => {
           </div>
 
           <div className="flex flex-wrap items-center gap-3 self-end sm:self-auto">
-            <div className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>
-              <span>From:</span>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="mis-input py-1 px-2 text-xs"
-                style={{ width: '130px' }}
-              />
-            </div>
-            <div className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>
-              <span>To:</span>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="mis-input py-1 px-2 text-xs"
-                style={{ width: '130px' }}
-              />
-            </div>
+            <PeriodFilter onChange={p => setPeriod({ current: p.current, previous: p.previous })} />
             {hasMultiBranchAccess && (
               <select
                 value={branchFilter}
@@ -325,12 +310,26 @@ const KYCDashboardPage: React.FC = () => {
             >
               {refreshing ? 'Refreshing...' : '🔄 Refresh Metrics'}
             </button>
+            <Link
+              to="/comparison/kyc"
+              className="px-3 py-1.5 border rounded-lg text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+              style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}
+            >
+              🔀 Compare Periods
+            </Link>
           </div>
         </header>
 
+        {loading ? (
+          <div className="mis-loading-center py-32 flex flex-col items-center justify-center">
+            <div className="mis-spinner" />
+            <p className="mt-4 text-xs text-slate-500 dark:text-slate-400">Loading KYC Analytics Dashboard...</p>
+          </div>
+        ) : (
+        <>
         {/* KPI Cards Grid */}
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          
+
           <div className="p-5 border rounded-xl shadow-xs flex items-center gap-4 animate-fade-in" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
             <div className="p-3 rounded-lg bg-teal-50 dark:bg-teal-950/40 text-teal-600 dark:text-teal-400">
               <IconPeople />
@@ -338,6 +337,7 @@ const KYCDashboardPage: React.FC = () => {
             <div>
               <span className="text-xs font-semibold block" style={{ color: 'var(--text-secondary)' }}>Total Onboarded Clients</span>
               <span className="text-xl font-bold block mt-1" style={{ color: 'var(--text-primary)' }}>{kpis.totalOnboarded}</span>
+              <TrendDelta current={kpis.totalOnboarded} previous={previousStats?.kpis?.totalOnboarded} />
             </div>
           </div>
 
@@ -348,6 +348,7 @@ const KYCDashboardPage: React.FC = () => {
             <div>
               <span className="text-xs font-semibold block" style={{ color: 'var(--text-secondary)' }}>Pending Verifications</span>
               <span className="text-xl font-bold block mt-1" style={{ color: 'var(--text-primary)' }}>{kpis.pendingVerifications}</span>
+              <TrendDelta current={kpis.pendingVerifications} previous={previousStats?.kpis?.pendingVerifications} />
             </div>
           </div>
 
@@ -358,6 +359,7 @@ const KYCDashboardPage: React.FC = () => {
             <div>
               <span className="text-xs font-semibold block" style={{ color: 'var(--text-secondary)' }}>Modifications Applied</span>
               <span className="text-xl font-bold block mt-1" style={{ color: 'var(--text-primary)' }}>{kpis.processedModifications}</span>
+              <TrendDelta current={kpis.processedModifications} previous={previousStats?.kpis?.processedModifications} />
             </div>
           </div>
 
@@ -368,6 +370,7 @@ const KYCDashboardPage: React.FC = () => {
             <div>
               <span className="text-xs font-semibold block" style={{ color: 'var(--text-secondary)' }}>Closed Accounts / Closures</span>
               <span className="text-xl font-bold block mt-1" style={{ color: 'var(--text-primary)' }}>{kpis.closedAccounts}</span>
+              <TrendDelta current={kpis.closedAccounts} previous={previousStats?.kpis?.closedAccounts} />
             </div>
           </div>
 
@@ -461,6 +464,8 @@ const KYCDashboardPage: React.FC = () => {
           </div>
 
         </section>
+        </>
+        )}
 
       </div>
     </DashboardLayout>

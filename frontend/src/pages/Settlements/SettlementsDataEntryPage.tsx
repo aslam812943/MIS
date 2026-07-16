@@ -34,7 +34,7 @@ const SHEET_HELP: Record<string, SheetHelpConfig> = {
   client_requests: {
     why: 'Clients raise settlement-related service requests — demat transfers, pledge releases, account closures, bank detail updates — that need to be tracked to resolution instead of handled informally and forgotten.',
     fields: [
-      { label: 'Request ID (Ticket #)', note: 'A unique reference for this ticket.' },
+      { label: 'Request ID (Ticket #)', note: 'Auto-generated when you save (e.g. REQ-2026-0001) — no need to type one, this guarantees it\'s always unique.' },
       { label: 'Client Name', note: 'Selected via the KYC-verified client search so it always matches a real, verified client.' },
       { label: 'Request Type', note: 'What kind of request this is — Demat Transfer, Pledge Release, Account Closure, Bank Detail Update, Rematerialization, or Other.' },
       { label: 'Date Received', note: 'When the client actually made the request — this drives the "days pending" shown in the list, so keep it accurate.' },
@@ -331,7 +331,7 @@ const SettlementsDataEntryPage: React.FC = () => {
         return 'Shortage quantity must be greater than 0 for Shortage status.';
       }
     } else if (sheetTab === 'client_requests') {
-      if (!formData.request_id?.trim()) return 'Request ID is required.';
+      // request_id is server-generated on save, never user-entered.
       if (!formData.client_name?.trim()) return 'Client Name is required.';
       if (!formData.request_type) return 'Request Type is required.';
       if (!formData.date_received) return 'Date Received is required.';
@@ -988,11 +988,9 @@ const SettlementsDataEntryPage: React.FC = () => {
                       <label className="mis-label">Request ID (Ticket #)</label>
                       <input
                         type="text"
-                        value={formData.request_id}
-                        onChange={(e) => handleInputChange('request_id', e.target.value)}
-                        placeholder="REQ-10082"
-                        className="mis-input"
-                        required
+                        className="mis-input disabled:opacity-75 disabled:cursor-not-allowed font-semibold"
+                        value={editingId ? formData.request_id : 'Auto-generated on save (e.g. REQ-2026-0001)'}
+                        disabled
                       />
                     </div>
                     {renderClientNameField()}

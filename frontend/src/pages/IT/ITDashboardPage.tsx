@@ -1,12 +1,16 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { Chart, registerables } from 'chart.js';
 import toast from 'react-hot-toast';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import CountdownBadge from '../../components/common/CountdownBadge';
+import PeriodFilter from '../../components/common/PeriodFilter';
+import TrendDelta from '../../components/common/TrendDelta';
 import { itService } from '../../services/it.service';
 import { orgService } from '../../services/org.service';
 import { authService } from '../../services/auth.service';
 import { useTheme } from '../../context/ThemeContext';
+import type { DateRange } from '../../utils/periodRange';
 
 Chart.register(...registerables);
 
@@ -72,6 +76,15 @@ const IconClock = () => (
   </svg>
 );
 
+const IconReceipt = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M4 2h16v20l-3-2-3 2-3-2-3 2-3-2-1 2z"/>
+    <line x1="8" y1="7" x2="16" y2="7"/>
+    <line x1="8" y1="11" x2="16" y2="11"/>
+    <line x1="8" y1="15" x2="12" y2="15"/>
+  </svg>
+);
+
 const ITDashboardPage: React.FC = () => {
   const currentUser = authService.getCurrentUser();
   const { theme } = useTheme();
@@ -79,10 +92,10 @@ const ITDashboardPage: React.FC = () => {
   const hasMultiBranchAccess = isAdmin || ['ceo', 'managing_director', 'director', 'executive', 'hod'].includes(currentUser?.role || '');
 
   const [stats, setStats] = useState<any>(null);
+  const [previousStats, setPreviousStats] = useState<any>(null);
   const [branches, setBranches] = useState<any[]>([]);
   const [branchFilter, setBranchFilter] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const [period, setPeriod] = useState<{ current: DateRange; previous: DateRange } | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -101,8 +114,10 @@ const ITDashboardPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    if (!period) return;
     fetchDashboardStats(true);
-  }, [branchFilter, startDate, endDate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [branchFilter, period]);
 
   const fetchBranches = async () => {
     if (!hasMultiBranchAccess) return;
@@ -115,21 +130,27 @@ const ITDashboardPage: React.FC = () => {
   };
 
   const fetchDashboardStats = async (showLoading = false) => {
+    if (!period) return;
     if (showLoading) setLoading(true);
     else setRefreshing(true);
+
+    // Fired together, but only the current-period call blocks the loading
+    // state — the dashboard renders as soon as it's back instead of
+    // waiting on the previous-period comparison too. Trend badges just
+    // pop in a moment later once that resolves.
+    const currentPromise = itService.getDashboardData(branchFilter || undefined, period.current.start, period.current.end);
+    const previousPromise = itService.getDashboardData(branchFilter || undefined, period.previous.start, period.previous.end);
+
     try {
-      const data = await itService.getDashboardData(
-        branchFilter || undefined,
-        startDate || undefined,
-        endDate || undefined
-      );
-      setStats(data);
+      setStats(await currentPromise);
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Failed to load IT dashboard analytics.');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
+
+    previousPromise.then(setPreviousStats).catch(() => {});
   };
 
   // Render Charts whenever stats state updates
@@ -246,7 +267,7 @@ const ITDashboardPage: React.FC = () => {
           className="flex flex-col lg:flex-row justify-between lg:items-center gap-6 p-6 border rounded-xl shadow-xs text-left"
           style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
         >
-          <div>
+          <div className="text-center lg:text-left w-full lg:w-auto">
             <h1 className="text-2.5xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
               📊 IT Compliance & Asset Analytics
             </h1>
@@ -255,10 +276,11 @@ const ITDashboardPage: React.FC = () => {
             </p>
           </div>
 
-          <div className="flex flex-wrap gap-3 items-center">
+          <div className="flex flex-wrap items-center gap-3 self-end lg:self-auto">
+            <PeriodFilter onChange={p => setPeriod({ current: p.current, previous: p.previous })} />
             {hasMultiBranchAccess && (
               <select
-                className="mis-select-dropdown"
+                className="mis-select w-44 text-xs cursor-pointer"
                 value={branchFilter}
                 onChange={e => setBranchFilter(e.target.value)}
               >
@@ -268,31 +290,21 @@ const ITDashboardPage: React.FC = () => {
                 ))}
               </select>
             )}
-
-            <div className="flex items-center gap-2 bg-gray-900 border border-gray-800 rounded px-2">
-              <span className="text-xs text-gray-400">From</span>
-              <input
-                type="date"
-                className="bg-transparent border-0 text-white text-xs p-1.5 focus:ring-0 outline-none"
-                value={startDate}
-                onChange={e => setStartDate(e.target.value)}
-              />
-              <span className="text-xs text-gray-400">To</span>
-              <input
-                type="date"
-                className="bg-transparent border-0 text-white text-xs p-1.5 focus:ring-0 outline-none"
-                value={endDate}
-                onChange={e => setEndDate(e.target.value)}
-              />
-            </div>
-
-            <button 
-              className="mis-btn btn-secondary text-xs flex items-center gap-1.5 py-2"
+            <button
               onClick={() => fetchDashboardStats(false)}
               disabled={refreshing}
+              className="px-3 py-1.5 border rounded-lg text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+              style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}
             >
-              {refreshing ? 'Refreshing...' : 'Sync Data'}
+              {refreshing ? 'Refreshing...' : '🔄 Sync Data'}
             </button>
+            <Link
+              to="/comparison/it"
+              className="px-3 py-1.5 border rounded-lg text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+              style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}
+            >
+              🔀 Compare Periods
+            </Link>
           </div>
         </header>
 
@@ -303,87 +315,116 @@ const ITDashboardPage: React.FC = () => {
         ) : (
           <>
             {/* KPI statistics cards */}
-            <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-9 gap-4">
+            <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
 
               <div className="mis-stat-card border-l-4 border-cyan-500">
                 <div className="flex justify-between items-start mb-2 text-left">
-                  <span className="mis-stat-label text-[10px] uppercase tracking-wider font-semibold">Total Users</span>
+                  <span className="mis-stat-label text-[10px] uppercase tracking-wider font-semibold leading-tight block min-h-[26px] pr-1">Total Users</span>
                   <span className="text-cyan-500 opacity-80"><IconUsers /></span>
                 </div>
                 <div className="mis-stat-value text-2.5xl font-bold text-left">{stats.kpis.totalUsers}</div>
                 <p className="text-[9px] mt-1 text-left" style={{ color: 'var(--text-secondary)' }}>Active personnel</p>
+                <TrendDelta current={stats.kpis.totalUsers} previous={previousStats?.kpis?.totalUsers} />
               </div>
 
               <div className="mis-stat-card border-l-4 border-emerald-500">
                 <div className="flex justify-between items-start mb-2 text-left">
-                  <span className="mis-stat-label text-[10px] uppercase tracking-wider font-semibold">Active Devices</span>
+                  <span className="mis-stat-label text-[10px] uppercase tracking-wider font-semibold leading-tight block min-h-[26px] pr-1">Active Devices</span>
                   <span className="text-emerald-500 opacity-80"><IconDevice /></span>
                 </div>
                 <div className="mis-stat-value text-2.5xl font-bold text-left">{stats.kpis.activeDevices}</div>
                 <p className="text-[9px] mt-1 text-left" style={{ color: 'var(--text-secondary)' }}>Monitored assets</p>
+                <TrendDelta current={stats.kpis.activeDevices} previous={previousStats?.kpis?.activeDevices} />
               </div>
 
               <div className="mis-stat-card border-l-4 border-amber-500">
                 <div className="flex justify-between items-start mb-2 text-left">
-                  <span className="mis-stat-label text-[10px] uppercase tracking-wider font-semibold">Open Tickets</span>
+                  <span className="mis-stat-label text-[10px] uppercase tracking-wider font-semibold leading-tight block min-h-[26px] pr-1">Open Tickets</span>
                   <span className="text-amber-500 opacity-80"><IconTicket /></span>
                 </div>
                 <div className="mis-stat-value text-2.5xl font-bold text-left">{stats.kpis.openTickets}</div>
                 <p className="text-[9px] mt-1 text-left text-amber-400 animate-pulse">Action pending</p>
+                <TrendDelta current={stats.kpis.openTickets} previous={previousStats?.kpis?.openTickets} />
               </div>
 
               <div className="mis-stat-card border-l-4 border-red-500">
                 <div className="flex justify-between items-start mb-2 text-left">
-                  <span className="mis-stat-label text-[10px] uppercase tracking-wider font-semibold">Critical Incidents</span>
+                  <span className="mis-stat-label text-[10px] uppercase tracking-wider font-semibold leading-tight block min-h-[26px] pr-1">Critical Incidents</span>
                   <span className="text-red-500 opacity-80"><IconIncident /></span>
                 </div>
                 <div className="mis-stat-value text-2.5xl font-bold text-left">{stats.kpis.criticalIncidents}</div>
                 <p className="text-[9px] mt-1 text-left" style={{ color: 'var(--text-secondary)' }}>Unresolved CSCRF</p>
+                <TrendDelta current={stats.kpis.criticalIncidents} previous={previousStats?.kpis?.criticalIncidents} />
               </div>
 
               <div className="mis-stat-card border-l-4 border-blue-500">
                 <div className="flex justify-between items-start mb-2 text-left">
-                  <span className="mis-stat-label text-[10px] uppercase tracking-wider font-semibold">System Uptime</span>
+                  <span className="mis-stat-label text-[10px] uppercase tracking-wider font-semibold leading-tight block min-h-[26px] pr-1">System Uptime</span>
                   <span className="text-blue-500 opacity-80"><IconAvailability /></span>
                 </div>
                 <div className="mis-stat-value text-2.5xl font-bold text-left">{stats.kpis.systemAvailability}%</div>
                 <p className="text-[9px] mt-1 text-left" style={{ color: 'var(--text-secondary)' }}>Calculated average</p>
+                <TrendDelta current={stats.kpis.systemAvailability} previous={previousStats?.kpis?.systemAvailability} isPercentagePoint />
               </div>
 
               <div className="mis-stat-card border-l-4 border-indigo-500">
                 <div className="flex justify-between items-start mb-2 text-left">
-                  <span className="mis-stat-label text-[10px] uppercase tracking-wider font-semibold">SLA Met</span>
+                  <span className="mis-stat-label text-[10px] uppercase tracking-wider font-semibold leading-tight block min-h-[26px] pr-1">SLA Met</span>
                   <span className="text-indigo-500 opacity-80"><IconCompliance /></span>
                 </div>
                 <div className="mis-stat-value text-2.5xl font-bold text-left">{stats.kpis.slaCompliance}%</div>
                 <p className="text-[9px] mt-1 text-left" style={{ color: 'var(--text-secondary)' }}>Compliance target</p>
+                <TrendDelta current={stats.kpis.slaCompliance} previous={previousStats?.kpis?.slaCompliance} isPercentagePoint />
               </div>
 
               <div className="mis-stat-card border-l-4 border-purple-500">
                 <div className="flex justify-between items-start mb-2 text-left">
-                  <span className="mis-stat-label text-[10px] uppercase tracking-wider font-semibold">Ongoing Projects</span>
+                  <span className="mis-stat-label text-[10px] uppercase tracking-wider font-semibold leading-tight block min-h-[26px] pr-1">Ongoing Projects</span>
                   <span className="text-purple-500 opacity-80"><IconProject /></span>
                 </div>
                 <div className="mis-stat-value text-2.5xl font-bold text-left">{stats.kpis.ongoingProjects}</div>
                 <p className="text-[9px] mt-1 text-left" style={{ color: 'var(--text-secondary)' }}>Delivery cycle</p>
+                <TrendDelta current={stats.kpis.ongoingProjects} previous={previousStats?.kpis?.ongoingProjects} />
               </div>
 
               <div className="mis-stat-card border-l-4 border-red-500">
                 <div className="flex justify-between items-start mb-2 text-left">
-                  <span className="mis-stat-label text-[10px] uppercase tracking-wider font-semibold">Audits Overdue</span>
+                  <span className="mis-stat-label text-[10px] uppercase tracking-wider font-semibold leading-tight block min-h-[26px] pr-1">Audits Overdue</span>
                   <span className="text-red-500 opacity-80"><IconClock /></span>
                 </div>
                 <div className="mis-stat-value text-2.5xl font-bold text-left">{stats.kpis.auditsOverdue}</div>
                 <p className="text-[9px] mt-1 text-left text-red-400 animate-pulse">Past next due date</p>
+                <TrendDelta current={stats.kpis.auditsOverdue} previous={previousStats?.kpis?.auditsOverdue} />
               </div>
 
               <div className="mis-stat-card border-l-4 border-amber-500">
                 <div className="flex justify-between items-start mb-2 text-left">
-                  <span className="mis-stat-label text-[10px] uppercase tracking-wider font-semibold">AMC Due (30d)</span>
+                  <span className="mis-stat-label text-[10px] uppercase tracking-wider font-semibold leading-tight block min-h-[26px] pr-1">AMC Due (30d)</span>
                   <span className="text-amber-500 opacity-80"><IconClock /></span>
                 </div>
                 <div className="mis-stat-value text-2.5xl font-bold text-left">{stats.kpis.amcDueSoon}</div>
                 <p className="text-[9px] mt-1 text-left" style={{ color: 'var(--text-secondary)' }}>Renewals approaching</p>
+                <TrendDelta current={stats.kpis.amcDueSoon} previous={previousStats?.kpis?.amcDueSoon} />
+              </div>
+
+              <div className="mis-stat-card border-l-4 border-teal-500">
+                <div className="flex justify-between items-start mb-2 text-left">
+                  <span className="mis-stat-label text-[10px] uppercase tracking-wider font-semibold leading-tight block min-h-[26px] pr-1">POs Raised</span>
+                  <span className="text-teal-500 opacity-80"><IconReceipt /></span>
+                </div>
+                <div className="mis-stat-value text-2.5xl font-bold text-left">{stats.kpis.posRaised}</div>
+                <p className="text-[9px] mt-1 text-left" style={{ color: 'var(--text-secondary)' }}>Logged this period</p>
+                <TrendDelta current={stats.kpis.posRaised} previous={previousStats?.kpis?.posRaised} />
+              </div>
+
+              <div className="mis-stat-card border-l-4 border-emerald-500">
+                <div className="flex justify-between items-start mb-2 text-left">
+                  <span className="mis-stat-label text-[10px] uppercase tracking-wider font-semibold leading-tight block min-h-[26px] pr-1">Total PO Value</span>
+                  <span className="text-emerald-500 opacity-80"><IconReceipt /></span>
+                </div>
+                <div className="mis-stat-value text-2.5xl font-bold text-left">₹{stats.kpis.totalPoValue.toLocaleString('en-IN')}</div>
+                <p className="text-[9px] mt-1 text-left" style={{ color: 'var(--text-secondary)' }}>Sum of logged POs</p>
+                <TrendDelta current={stats.kpis.totalPoValue} previous={previousStats?.kpis?.totalPoValue} />
               </div>
 
             </section>

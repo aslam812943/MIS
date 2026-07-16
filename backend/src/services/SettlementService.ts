@@ -650,6 +650,29 @@ export class SettlementService {
   /**
    * Create a new Client Request ticket
    */
+  /**
+   * Generates the next sequential Request ID for the current year (e.g.
+   * REQ-2026-0001) — request_id used to be manually typed, which caused
+   * typos and outright duplicate-value conflicts under the UNIQUE
+   * constraint. Same "read max, increment" pattern as IEPFService's
+   * claim_number generator.
+   */
+  private async generateNextRequestId(client: any): Promise<string> {
+    const prefix = `REQ-${new Date().getFullYear()}-`;
+    const { data, error } = await client
+      .from('settlement_client_requests')
+      .select('request_id')
+      .like('request_id', `${prefix}%`)
+      .order('request_id', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) throw new Error(`Failed to calculate next Request ID: ${error.message}`);
+    if (!data) return `${prefix}0001`;
+    const numStr = String(data.request_id).substring(prefix.length);
+    const nextNum = (parseInt(numStr, 10) || 0) + 1;
+    return `${prefix}${String(nextNum).padStart(4, '0')}`;
+  }
+
   async createClientRequestRecord(requesterId: string, recordData: Partial<ClientRequestRecord>): Promise<ClientRequestRecord> {
     const client = supabaseAdmin;
     if (!client) throw new Error('Supabase admin client not configured.');
@@ -661,10 +684,6 @@ export class SettlementService {
 
     // Server-side validation
     if (!recordData.date_received) throw new Error('Date Received is required.');
-
-    const requestId = recordData.request_id?.trim();
-    if (!requestId) throw new Error('Request ID is required.');
-    if (requestId.length > 100) throw new Error('Request ID cannot exceed 100 characters.');
 
     const clientName = recordData.client_name?.trim();
     if (!clientName) throw new Error('Client Name is required.');
@@ -698,7 +717,6 @@ export class SettlementService {
     }
 
     const insertData = {
-      request_id: requestId,
       client_name: clientName,
       request_type: requestType,
       date_received: recordData.date_received,
@@ -708,17 +726,26 @@ export class SettlementService {
       created_by: requesterId
     };
 
-    const { data, error } = await client
-      .from('settlement_client_requests')
-      .insert(insertData)
-      .select('*, branches(name), profiles:created_by(full_name, email)')
-      .single();
+    let requestId = await this.generateNextRequestId(client);
+    const MAX_ATTEMPTS = 5;
+    for (let attempt = 1; ; attempt++) {
+      const { data, error } = await client
+        .from('settlement_client_requests')
+        .insert({ ...insertData, request_id: requestId })
+        .select('*, branches(name), profiles:created_by(full_name, email)')
+        .single();
 
-    if (error) {
-      throw new Error(`Failed to create Client Request ticket: ${error.message}`);
+      if (!error) return data as any;
+
+      const isCollision = error.message.includes('duplicate key') && error.message.includes('request_id');
+      if (!isCollision || attempt >= MAX_ATTEMPTS) {
+        if (isCollision) throw new Error('Could not generate a unique Request ID right now — please try again.');
+        throw new Error(`Failed to create Client Request ticket: ${error.message}`);
+      }
+      const prefix = `REQ-${new Date().getFullYear()}-`;
+      const numStr = requestId.substring(prefix.length);
+      requestId = `${prefix}${String((parseInt(numStr, 10) || 0) + 1).padStart(4, '0')}`;
     }
-
-    return data as any;
   }
 
   /**
@@ -754,12 +781,8 @@ export class SettlementService {
     const updatedData: any = {};
     if (recordData.date_received) updatedData.date_received = recordData.date_received;
 
-    if (recordData.request_id !== undefined) {
-      const requestId = recordData.request_id.trim();
-      if (!requestId) throw new Error('Request ID cannot be empty.');
-      if (requestId.length > 100) throw new Error('Request ID cannot exceed 100 characters.');
-      updatedData.request_id = requestId;
-    }
+    // request_id is server-generated at creation and immutable thereafter —
+    // same as IEPF's claim_number — so no update path for it here.
 
     if (recordData.client_name !== undefined) {
       const clientName = recordData.client_name.trim();
