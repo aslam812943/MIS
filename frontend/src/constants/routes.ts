@@ -22,6 +22,7 @@ export const ROUTES = {
   IT_DASHBOARD: '/it-dashboard',
   FINANCE_DATA_ENTRY: '/finance-entry',
   FINANCE_DASHBOARD: '/finance-dashboard',
+  COMPARISON: '/comparison/:dept',
   ROOT: '/',
 } as const;
 

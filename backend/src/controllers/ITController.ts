@@ -234,7 +234,7 @@ export class ITController {
       const { sheet } = req.params;
       const { records } = req.body;
 
-      const imported = await this.itService.bulkImport(requesterId, sheet as string, records);
+      const result = await this.itService.bulkImport(requesterId, sheet as string, records);
 
       await logAudit(
         req,
@@ -242,10 +242,10 @@ export class ITController {
         `it_${String(sheet).replace(/-/g, '_')}`,
         undefined,
         null,
-        { imported_rows: Array.isArray(records) ? records.length : 0 }
+        { imported_rows: result.inserted.length, failed_rows: result.failed.length }
       );
 
-      res.status(HttpStatus.CREATED).json(imported);
+      res.status(HttpStatus.CREATED).json(result);
     } catch (error) {
       this.respondError(res, error, 'Failed to complete CSV import.');
     }

@@ -1,11 +1,15 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { Chart, registerables } from 'chart.js';
 import toast from 'react-hot-toast';
 import DashboardLayout from '../../components/layout/DashboardLayout';
+import PeriodFilter from '../../components/common/PeriodFilter';
+import TrendDelta from '../../components/common/TrendDelta';
 import { dpService } from '../../services/dp.service';
 import { orgService } from '../../services/org.service';
 import { authService } from '../../services/auth.service';
 import { useTheme } from '../../context/ThemeContext';
+import type { DateRange } from '../../utils/periodRange';
 
 Chart.register(...registerables);
 
@@ -55,10 +59,10 @@ const DPDashboardPage: React.FC = () => {
   const userBranchId = currentUser?.branch_id || '';
 
   const [stats, setStats] = useState<any>(null);
+  const [previousStats, setPreviousStats] = useState<any>(null);
   const [branches, setBranches] = useState<any[]>([]);
   const [branchFilter, setBranchFilter] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const [period, setPeriod] = useState<{ current: DateRange; previous: DateRange } | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -77,8 +81,10 @@ const DPDashboardPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    if (!period) return;
     fetchDashboardStats(true);
-  }, [branchFilter, startDate, endDate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [branchFilter, period]);
 
   const fetchBranches = async () => {
     if (!hasMultiBranchAccess) return;
@@ -91,13 +97,19 @@ const DPDashboardPage: React.FC = () => {
   };
 
   const fetchDashboardStats = async (initial = false) => {
+    if (!period) return;
     if (initial) setLoading(true);
     else setRefreshing(true);
 
+    const branchIdParam = hasMultiBranchAccess ? (branchFilter || undefined) : userBranchId;
+    // Fired together, but only the current-period call blocks the loading
+    // state — the dashboard renders as soon as it's back instead of
+    // waiting on the previous-period comparison too.
+    const currentPromise = dpService.getDashboardData(branchIdParam, period.current.start, period.current.end);
+    const previousPromise = dpService.getDashboardData(branchIdParam, period.previous.start, period.previous.end);
+
     try {
-      const branchIdParam = hasMultiBranchAccess ? (branchFilter || undefined) : userBranchId;
-      const data = await dpService.getDashboardData(branchIdParam, startDate || undefined, endDate || undefined);
-      setStats(data);
+      setStats(await currentPromise);
       if (!initial) {
         toast.success('Dashboard metrics updated.');
       }
@@ -108,6 +120,8 @@ const DPDashboardPage: React.FC = () => {
       setLoading(false);
       setRefreshing(false);
     }
+
+    previousPromise.then(setPreviousStats).catch(() => {});
   };
 
   // Render Chart.js instances
@@ -225,7 +239,7 @@ const DPDashboardPage: React.FC = () => {
           className="flex flex-col lg:flex-row justify-between lg:items-center gap-6 p-6 border rounded-xl shadow-xs text-left"
           style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
         >
-          <div>
+          <div className="text-center lg:text-left w-full lg:w-auto">
             <h1 className="text-2.5xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
               📊 DP Department Analytics
             </h1>
@@ -235,26 +249,7 @@ const DPDashboardPage: React.FC = () => {
           </div>
 
           <div className="flex flex-wrap items-center gap-3.5 sm:self-auto">
-            <div className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>
-              <span>From:</span>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="mis-input py-1 px-2 text-xs"
-                style={{ width: '130px', minWidth: '130px' }}
-              />
-            </div>
-            <div className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>
-              <span>To:</span>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="mis-input py-1 px-2 text-xs"
-                style={{ width: '130px', minWidth: '130px' }}
-              />
-            </div>
+            <PeriodFilter onChange={p => setPeriod({ current: p.current, previous: p.previous })} />
             {hasMultiBranchAccess && (
               <select
                 value={branchFilter}
@@ -277,6 +272,13 @@ const DPDashboardPage: React.FC = () => {
             >
               {refreshing ? 'Refreshing...' : '🔄 Refresh Metrics'}
             </button>
+            <Link
+              to="/comparison/dp"
+              className="px-3.5 py-1.5 border rounded-lg text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center justify-center gap-1 h-[34px]"
+              style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}
+            >
+              🔀 Compare Periods
+            </Link>
           </div>
         </header>
 
@@ -300,6 +302,7 @@ const DPDashboardPage: React.FC = () => {
                 </div>
                 <div className="mis-stat-value text-3xl font-bold text-left">{stats.kpis.totalAccounts}</div>
                 <p className="text-[10px] mt-1 text-left animate-pulse text-cyan-400">Total processed</p>
+                <TrendDelta current={stats.kpis.totalAccounts} previous={previousStats?.kpis?.totalAccounts} />
               </div>
 
               <div className="mis-stat-card border-l-4 border-amber-500">
@@ -309,6 +312,7 @@ const DPDashboardPage: React.FC = () => {
                 </div>
                 <div className="mis-stat-value text-3xl font-bold text-left">{stats.kpis.pendingModifications}</div>
                 <p className="text-[10px] mt-1 text-left" style={{ color: 'var(--text-secondary)' }}>Requires processing</p>
+                <TrendDelta current={stats.kpis.pendingModifications} previous={previousStats?.kpis?.pendingModifications} />
               </div>
 
               <div className="mis-stat-card border-l-4 border-emerald-500">
@@ -318,6 +322,7 @@ const DPDashboardPage: React.FC = () => {
                 </div>
                 <div className="mis-stat-value text-3xl font-bold text-left">{stats.kpis.completedDemats}</div>
                 <p className="text-[10px] mt-1 text-left" style={{ color: 'var(--text-secondary)' }}>Confirmed by RTA</p>
+                <TrendDelta current={stats.kpis.completedDemats} previous={previousStats?.kpis?.completedDemats} />
               </div>
 
               <div className="mis-stat-card border-l-4 border-purple-500">
@@ -327,6 +332,7 @@ const DPDashboardPage: React.FC = () => {
                 </div>
                 <div className="mis-stat-value text-3xl font-bold text-left">{stats.kpis.activeQueries}</div>
                 <p className="text-[10px] mt-1 text-left" style={{ color: 'var(--text-secondary)' }}>Open support tickets</p>
+                <TrendDelta current={stats.kpis.activeQueries} previous={previousStats?.kpis?.activeQueries} />
               </div>
 
               <div className="mis-stat-card border-l-4 border-red-500">
@@ -336,6 +342,7 @@ const DPDashboardPage: React.FC = () => {
                 </div>
                 <div className="mis-stat-value text-3xl font-bold text-left">{stats.kpis.openAudits}</div>
                 <p className="text-[10px] mt-1 text-left" style={{ color: 'var(--text-secondary)' }}>Action pending</p>
+                <TrendDelta current={stats.kpis.openAudits} previous={previousStats?.kpis?.openAudits} />
               </div>
 
             </section>

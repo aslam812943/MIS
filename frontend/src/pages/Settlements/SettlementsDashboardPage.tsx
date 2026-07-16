@@ -1,11 +1,16 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { Chart, registerables } from 'chart.js';
 import toast from 'react-hot-toast';
 import DashboardLayout from '../../components/layout/DashboardLayout';
+import PeriodFilter from '../../components/common/PeriodFilter';
+import TrendDelta from '../../components/common/TrendDelta';
 import { settlementService } from '../../services/settlement.service';
 import { orgService } from '../../services/org.service';
 import { authService } from '../../services/auth.service';
 import { useTheme } from '../../context/ThemeContext';
+import type { DateRange } from '../../utils/periodRange';
+import { getDefaultPeriod } from '../../utils/periodRange';
 
 Chart.register(...registerables);
 
@@ -47,10 +52,10 @@ const SettlementsDashboardPage: React.FC = () => {
   const userBranchId = currentUser?.branch_id || '';
 
   const [stats, setStats] = useState<any>(null);
+  const [previousStats, setPreviousStats] = useState<any>(null);
   const [branches, setBranches] = useState<any[]>([]);
   const [branchFilter, setBranchFilter] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const [period, setPeriod] = useState<{ current: DateRange; previous: DateRange }>(getDefaultPeriod);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -69,8 +74,10 @@ const SettlementsDashboardPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    if (!period) return;
     fetchDashboardData(true);
-  }, [branchFilter, startDate, endDate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [branchFilter, period]);
 
   const fetchBranches = async () => {
     if (!hasMultiBranchAccess) return;
@@ -83,13 +90,19 @@ const SettlementsDashboardPage: React.FC = () => {
   };
 
   const fetchDashboardData = async (initial = false) => {
+    if (!period) return;
     if (initial) setLoading(true);
     else setRefreshing(true);
 
+    const branchIdParam = hasMultiBranchAccess ? (branchFilter || undefined) : userBranchId;
+    // Fired together, but only the current-period call blocks the loading
+    // state — the dashboard renders as soon as it's back instead of
+    // waiting on the previous-period comparison too.
+    const currentPromise = settlementService.getDashboardData(branchIdParam, period.current.start, period.current.end);
+    const previousPromise = settlementService.getDashboardData(branchIdParam, period.previous.start, period.previous.end);
+
     try {
-      const branchIdParam = hasMultiBranchAccess ? (branchFilter || undefined) : userBranchId;
-      const data = await settlementService.getDashboardData(branchIdParam, startDate || undefined, endDate || undefined);
-      setStats(data);
+      setStats(await currentPromise);
       if (!initial) {
         toast.success('Dashboard metrics updated.');
       }
@@ -100,6 +113,8 @@ const SettlementsDashboardPage: React.FC = () => {
       setLoading(false);
       setRefreshing(false);
     }
+
+    previousPromise.then(setPreviousStats).catch(() => {});
   };
 
   // Render Chart.js instances once stats are loaded
@@ -252,17 +267,6 @@ const SettlementsDashboardPage: React.FC = () => {
     };
   }, [stats, theme]);
 
-  if (loading) {
-    return (
-      <DashboardLayout>
-        <div className="mis-loading-center py-32">
-          <div className="mis-spinner" />
-          <p className="mt-4 text-sm" style={{ color: 'var(--text-secondary)' }}>Loading Settlements Analytics Dashboard...</p>
-        </div>
-      </DashboardLayout>
-    );
-  }
-
   const { payinPayout, clientRequests, ipoAllocation, corporateActions } = stats || {
     payinPayout: { totalBuyQty: 0, totalSellQty: 0, totalShortageQty: 0, statusCounts: { Completed: 0, Pending: 0, Shortage: 0 }, totalRecords: 0 },
     clientRequests: { totalRecords: 0, statusCounts: { Received: 0, 'In Process': 0, Pending: 0, Completed: 0 }, overdueCount: 0 },
@@ -277,6 +281,12 @@ const SettlementsDashboardPage: React.FC = () => {
 
   const ipoAllotmentRate = getPercentage(ipoAllocation.totalAllottedQty, ipoAllocation.totalAppliedQty);
 
+  const prevPayinPayout = previousStats?.payinPayout;
+  const prevClientRequests = previousStats?.clientRequests;
+  const prevIpoAllocation = previousStats?.ipoAllocation;
+  const prevCorporateActions = previousStats?.corporateActions;
+  const prevIpoAllotmentRate = prevIpoAllocation ? getPercentage(prevIpoAllocation.totalAllottedQty, prevIpoAllocation.totalAppliedQty) : undefined;
+
   return (
     <DashboardLayout>
       <div className="mis-page mis-animate-in max-w-7xl mx-auto space-y-8">
@@ -286,7 +296,7 @@ const SettlementsDashboardPage: React.FC = () => {
           className="flex flex-col lg:flex-row justify-between lg:items-center gap-6 p-6 border rounded-xl shadow-xs text-left" 
           style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
         >
-          <div>
+          <div className="text-center lg:text-left w-full lg:w-auto">
             <h1 className="text-2.5xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
               📊 Clearing & Settlements Analytics
             </h1>
@@ -296,26 +306,7 @@ const SettlementsDashboardPage: React.FC = () => {
           </div>
           
           <div className="flex flex-wrap items-center gap-3.5 sm:self-auto">
-            <div className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>
-              <span>From:</span>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="mis-input py-1 px-2 text-xs"
-                style={{ width: '130px', minWidth: '130px' }}
-              />
-            </div>
-            <div className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>
-              <span>To:</span>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="mis-input py-1 px-2 text-xs"
-                style={{ width: '130px', minWidth: '130px' }}
-              />
-            </div>
+            <PeriodFilter onChange={p => setPeriod({ current: p.current, previous: p.previous })} />
             {hasMultiBranchAccess && (
               <select
                 value={branchFilter}
@@ -338,12 +329,26 @@ const SettlementsDashboardPage: React.FC = () => {
             >
               {refreshing ? 'Refreshing...' : '🔄 Refresh Metrics'}
             </button>
+            <Link
+              to="/comparison/settlements"
+              className="px-3.5 py-1.5 border rounded-lg text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center justify-center gap-1 h-[34px]"
+              style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}
+            >
+              🔀 Compare Periods
+            </Link>
           </div>
         </header>
 
+        {loading ? (
+          <div className="mis-loading-center py-32">
+            <div className="mis-spinner" />
+            <p className="mt-4 text-sm" style={{ color: 'var(--text-secondary)' }}>Loading Settlements Analytics Dashboard...</p>
+          </div>
+        ) : (
+        <>
         {/* ── KPI Card Grid ─────────────────────────────────── */}
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          
+
           <div className="mis-stat-card border-l-4 border-teal-500">
             <div className="flex justify-between items-start mb-2">
               <span className="mis-stat-label text-xs uppercase tracking-wider font-semibold">Securities Volume</span>
@@ -355,6 +360,10 @@ const SettlementsDashboardPage: React.FC = () => {
             <p className="text-[10px] mt-1" style={{ color: 'var(--text-secondary)' }}>
               Buy: {payinPayout.totalBuyQty.toLocaleString()} | Sell: {payinPayout.totalSellQty.toLocaleString()}
             </p>
+            <TrendDelta
+              current={payinPayout.totalBuyQty + payinPayout.totalSellQty}
+              previous={prevPayinPayout ? prevPayinPayout.totalBuyQty + prevPayinPayout.totalSellQty : undefined}
+            />
           </div>
 
           <div className="mis-stat-card border-l-4 border-amber-500">
@@ -366,6 +375,7 @@ const SettlementsDashboardPage: React.FC = () => {
             <p className="text-[10px] mt-1" style={{ color: 'var(--text-secondary)' }}>
               Open: {clientRequests.statusCounts.Received + clientRequests.statusCounts['In Process'] + clientRequests.statusCounts.Pending} | Solved: {clientRequests.statusCounts.Completed}
             </p>
+            <TrendDelta current={clientRequests.totalRecords} previous={prevClientRequests?.totalRecords} />
           </div>
 
           <div className="mis-stat-card border-l-4 border-indigo-500">
@@ -377,6 +387,7 @@ const SettlementsDashboardPage: React.FC = () => {
             <p className="text-[10px] mt-1" style={{ color: 'var(--text-secondary)' }}>
               Allotted: {ipoAllocation.totalAllottedQty.toLocaleString()} / {ipoAllocation.totalAppliedQty.toLocaleString()}
             </p>
+            <TrendDelta current={ipoAllotmentRate} previous={prevIpoAllotmentRate} isPercentagePoint />
           </div>
 
           <div className="mis-stat-card border-l-4 border-purple-500">
@@ -390,6 +401,7 @@ const SettlementsDashboardPage: React.FC = () => {
             <p className="text-[10px] mt-1" style={{ color: 'var(--text-secondary)' }}>
               Allocations Count: {corporateActions.totalRecords}
             </p>
+            <TrendDelta current={corporateActions.totalEntitlementAmt} previous={prevCorporateActions?.totalEntitlementAmt} />
           </div>
 
         </section>
@@ -569,6 +581,8 @@ const SettlementsDashboardPage: React.FC = () => {
           </div>
 
         </section>
+        </>
+        )}
 
       </div>
     </DashboardLayout>

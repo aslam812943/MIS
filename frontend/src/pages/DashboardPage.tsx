@@ -1,9 +1,12 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Chart, registerables } from 'chart.js';
 import DashboardLayout from '../components/layout/DashboardLayout';
+import PeriodFilter from '../components/common/PeriodFilter';
+import TrendDelta from '../components/common/TrendDelta';
 import { orgService } from '../services/org.service';
 import { authService } from '../services/auth.service';
 import { useTheme } from '../context/ThemeContext';
+import type { DateRange } from '../utils/periodRange';
 
 Chart.register(...registerables);
 
@@ -59,13 +62,13 @@ const DashboardPage: React.FC = () => {
 
   const [stats, setStats] = useState({ branches: 0, departments: 0, users: 0, modules: 0 });
   const [hrData, setHRData] = useState<any>(null);
+  const [previousHrData, setPreviousHrData] = useState<any>(null);
   const [dashboardTab, setDashboardTab] = useState<'system' | 'hr'>(showHRDashboard ? 'hr' : 'system');
   const [loading, setLoading] = useState(true);
   const [hrLoading, setHRLoading] = useState(false);
 
-  // Filter states
-  const [filterRange, setFilterRange] = useState<string>('6m');
-  const [customDates, setCustomDates] = useState({ startDate: '', endDate: '' });
+  // Filter state — Monthly/Quarterly/Yearly/Custom, shared across every dashboard
+  const [period, setPeriod] = useState<{ current: DateRange; previous: DateRange } | null>(null);
 
   // Chart refs
   const growthCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -76,22 +79,25 @@ const DashboardPage: React.FC = () => {
   const branchChartInstance = useRef<Chart | null>(null);
   const deptChartInstance = useRef<Chart | null>(null);
 
-  const fetchHRData = async (rangeVal: string, dates = customDates) => {
+  const fetchHRData = async (range: { current: DateRange; previous: DateRange }) => {
     if (!showHRDashboard) return;
     setHRLoading(true);
+
+    // Fired together, but only the current-period call blocks the loading
+    // state — the dashboard renders as soon as it's back instead of
+    // waiting on the previous-period comparison too.
+    const currentPromise = orgService.getHRDashboardData({ range: 'custom', startDate: range.current.start, endDate: range.current.end });
+    const previousPromise = orgService.getHRDashboardData({ range: 'custom', startDate: range.previous.start, endDate: range.previous.end });
+
     try {
-      const params: any = { range: rangeVal };
-      if (rangeVal === 'custom') {
-        params.startDate = dates.startDate;
-        params.endDate = dates.endDate;
-      }
-      const data = await orgService.getHRDashboardData(params);
-      setHRData(data);
+      setHRData(await currentPromise);
     } catch (err) {
       console.error(err);
     } finally {
       setHRLoading(false);
     }
+
+    previousPromise.then(setPreviousHrData).catch(() => {});
   };
 
   useEffect(() => {
@@ -121,10 +127,13 @@ const DashboardPage: React.FC = () => {
       setLoading(false);
     }
 
-    if (showHRDashboard) {
-      fetchHRData('6m');
-    }
   }, [showHRDashboard, user?.role]);
+
+  useEffect(() => {
+    if (!period || !showHRDashboard) return;
+    fetchHRData(period);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [period, showHRDashboard]);
 
   // Chart renderer useEffect
   useEffect(() => {
@@ -317,7 +326,7 @@ const DashboardPage: React.FC = () => {
       <div className="mis-page mis-animate-in max-w-7xl">
         <header className="mis-page-header">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
+            <div className="text-center md:text-left w-full md:w-auto">
               <h1 className="mis-page-title mis-page-title-accent">Welcome back</h1>
               <p className="mis-page-desc">
                 {showHRDashboard 
@@ -356,75 +365,8 @@ const DashboardPage: React.FC = () => {
           <div className="space-y-8">
             {/* Filter Bar */}
             <div className="mis-card p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs font-bold uppercase tracking-wider opacity-60 mr-2" style={{ color: 'var(--text-secondary)' }}>Filter Period:</span>
-                {[
-                  { id: 'this_month', label: 'This Month' },
-                  { id: '6m', label: 'Last 6 Months' },
-                  { id: '1y', label: 'Last 1 Year' },
-                  { id: 'custom', label: 'Custom Range' }
-                ].map(opt => (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    onClick={() => {
-                      setFilterRange(opt.id);
-                      if (opt.id !== 'custom') {
-                        fetchHRData(opt.id);
-                      }
-                    }}
-                    className={`mis-btn mis-btn-sm py-1.5 px-4 font-semibold text-xs transition-all ${
-                      filterRange === opt.id
-                        ? 'mis-btn-primary'
-                        : 'mis-btn-ghost'
-                    }`}
-                    style={
-                      filterRange === opt.id
-                        ? { background: 'var(--accent)', color: 'black', border: 'none' }
-                        : {}
-                    }
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-
-              {filterRange === 'custom' && (
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    fetchHRData('custom');
-                  }}
-                  className="flex flex-wrap items-center gap-2"
-                >
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="date"
-                      required
-                      className="mis-input text-xs py-1.5 px-3"
-                      value={customDates.startDate}
-                      onChange={(e) => setCustomDates({ ...customDates, startDate: e.target.value })}
-                      style={{ width: '135px' }}
-                    />
-                    <span className="text-xs opacity-60">to</span>
-                    <input
-                      type="date"
-                      required
-                      className="mis-input text-xs py-1.5 px-3"
-                      value={customDates.endDate}
-                      onChange={(e) => setCustomDates({ ...customDates, endDate: e.target.value })}
-                      style={{ width: '135px' }}
-                    />
-                  </div>
-                  <button
-                    type="submit"
-                    className="mis-btn mis-btn-primary mis-btn-sm py-1.5 px-4 font-semibold text-xs"
-                    style={{ background: 'var(--accent)', color: 'black', border: 'none' }}
-                  >
-                    Apply
-                  </button>
-                </form>
-              )}
+              <span className="text-xs font-bold uppercase tracking-wider opacity-60 mr-2" style={{ color: 'var(--text-secondary)' }}>Filter Period:</span>
+              <PeriodFilter onChange={p => setPeriod({ current: p.current, previous: p.previous })} />
             </div>
 
             {hrLoading ? (
@@ -438,6 +380,7 @@ const DashboardPage: React.FC = () => {
                       <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Total Employees</div>
                       <div className="text-3xl font-bold" style={{ color: 'var(--accent)' }}>{hrData.kpis.totalEmployees}</div>
                       <div className="text-xs opacity-50 mt-1">Currently working (Active)</div>
+                      <TrendDelta current={hrData.kpis.totalEmployees} previous={previousHrData?.kpis?.totalEmployees} />
                     </div>
                     <div className="p-3.5 rounded-full" style={{ background: 'rgba(6, 182, 212, 0.1)', color: 'var(--accent)' }}>
                       <IconUsers />
@@ -449,6 +392,7 @@ const DashboardPage: React.FC = () => {
                       <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>New Joiners</div>
                       <div className="text-3xl font-bold" style={{ color: '#10b981' }}>{hrData.kpis.newJoiners}</div>
                       <div className="text-xs opacity-50 mt-1">Joined in selected period</div>
+                      <TrendDelta current={hrData.kpis.newJoiners} previous={previousHrData?.kpis?.newJoiners} />
                     </div>
                     <div className="p-3.5 rounded-full" style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10b981' }}>
                       <IconUserPlus />
@@ -460,6 +404,7 @@ const DashboardPage: React.FC = () => {
                       <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Resignations</div>
                       <div className="text-3xl font-bold" style={{ color: '#ef4444' }}>{hrData.kpis.resignations}</div>
                       <div className="text-xs opacity-50 mt-1">Resigned in selected period</div>
+                      <TrendDelta current={hrData.kpis.resignations} previous={previousHrData?.kpis?.resignations} />
                     </div>
                     <div className="p-3.5 rounded-full" style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444' }}>
                       <IconUserMinus />

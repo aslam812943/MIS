@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import CountdownBadge from '../../components/common/CountdownBadge';
@@ -10,6 +10,18 @@ interface SheetHelpConfig {
   why: string;
   fields: { label: string; note: string }[];
   remember: string;
+}
+
+interface FormFieldConfig {
+  name: string;
+  label: string;
+  type: string;
+  required?: boolean;
+  // Server-generated reference numbers (PO/ticket/incident numbers) are
+  // rendered disabled with an "Auto-generated on save" placeholder instead
+  // of a normal editable input — see getFormFields()'s fallback renderer.
+  readOnly?: boolean;
+  options?: any[];
 }
 
 // Plain-English explanations shown next to each data entry form, written for
@@ -118,7 +130,7 @@ const SHEET_HELP: Record<string, SheetHelpConfig> = {
   'tickets': {
     why: 'Every day-to-day IT problem a staff member raises is logged here and tracked against a service standard (SLA), so issues get resolved on a known timeline instead of being handled informally and forgotten.',
     fields: [
-      { label: 'Ticket Reference Number', note: 'A unique reference for this support request.' },
+      { label: 'Ticket Reference Number', note: 'Auto-generated when you save (e.g. TKT-2026-0001) — no need to type one, this guarantees it\'s always unique.' },
       { label: 'Requester (User/Branch)', note: 'Who raised the issue and from where.' },
       { label: 'Issue Description', note: 'What\'s actually wrong, with enough detail that whoever picks it up doesn\'t have to ask again.' },
       { label: 'Assigned Executive', note: 'Who is handling this ticket.' },
@@ -132,7 +144,7 @@ const SHEET_HELP: Record<string, SheetHelpConfig> = {
   'incidents': {
     why: 'A real security or system incident is far more serious than a helpdesk ticket — it needs a root cause, a fix, and honest severity classification, because Critical incidents may carry a regulatory notification obligation to SEBI/CERT-In within a fixed time window.',
     fields: [
-      { label: 'Incident Code', note: 'A unique reference number for this incident.' },
+      { label: 'Incident Code', note: 'Auto-generated when you save (e.g. INC-2026-0001) — no need to type one, this guarantees it\'s always unique.' },
       { label: 'Incident Title', note: 'A short, clear name for what happened.' },
       { label: 'Event Description', note: 'What actually happened, stated as factually as possible.' },
       { label: 'Severity Rating', note: 'Critical/High/Medium/Low — classify accurately, not conservatively. Under-rating a serious incident can mean missing a mandatory regulatory notification window.' },
@@ -207,6 +219,18 @@ const SHEET_HELP: Record<string, SheetHelpConfig> = {
     ],
     remember: 'An expired software licence on something business-critical (a trading terminal, antivirus) is a bigger operational risk than an old laptop — treat the renewal countdown here with the same urgency as AMC and audit dates.',
   },
+  'purchase-orders': {
+    why: 'The PO Generator tab lets you build and print a purchase order, but that external tool has no memory of its own — it doesn\'t save anything anywhere. This sheet is the actual record: log every PO you generate here so there\'s a real, searchable history feeding the dashboard, instead of POs existing only as printed paper or a local download.',
+    fields: [
+      { label: 'PO Number', note: 'Auto-generated when you save (e.g. PO-2026-0001) — write this number onto the PO document you generated, so the two stay linked.' },
+      { label: 'Vendor', note: 'Which vendor this PO was raised for — links back to the Vendors sheet.' },
+      { label: 'Item Description', note: 'What was ordered — matches the line items on the generated PO.' },
+      { label: 'Amount (INR)', note: 'The total PO value, GST included — this is what feeds the "Total PO Value" dashboard figure.' },
+      { label: 'PO Date', note: 'The date printed on the PO.' },
+      { label: 'Status', note: 'Raised = generated and sent. Approved = vendor/internal sign-off done. Fulfilled = goods/services received. Cancelled = called off.' },
+    ],
+    remember: 'Log the PO here right after generating it — this sheet is the only place PO data exists for reporting, since the generator tool itself doesn\'t store anything.',
+  },
 };
 
 const ITDataEntryPage: React.FC = () => {
@@ -217,6 +241,15 @@ const ITDataEntryPage: React.FC = () => {
 
   // Active sheet tab
   const [sheetTab, setSheetTab] = useState('audits');
+  // Lets a caller (e.g. the "View Purchase Orders" shortcut) request landing
+  // on the register/form view when it switches sheets, instead of always
+  // landing on 'list' — read once by the tab-change effect below, then cleared.
+  const pendingActiveTabRef = useRef<'list' | 'register' | null>(null);
+
+  // Quick "log this PO" form shown inline on the PO Generator tab itself —
+  // saves directly to the purchase-orders sheet without switching tabs.
+  const [poQuickForm, setPoQuickForm] = useState<any>({ status: 'Raised' });
+  const [poQuickSubmitting, setPoQuickSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState<'list' | 'register'>('list');
 
   // UI state
@@ -248,6 +281,8 @@ const ITDataEntryPage: React.FC = () => {
   const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
   const [csvRows, setCsvRows] = useState<any[]>([]);
   const [csvMappings, setCsvMappings] = useState<{ [key: string]: string }>({});
+  const [csvImportErrors, setCsvImportErrors] = useState<{ row: number; error: string }[]>([]);
+  const [csvImporting, setCsvImporting] = useState(false);
 
   useEffect(() => {
     fetchBranches();
@@ -259,12 +294,17 @@ const ITDataEntryPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    // 'po-generator' is a pseudo-sheet (an embedded external tool, not a
+    // real backed table) — nothing to fetch, and asking the backend would
+    // just 400 with "Invalid sheet mapping."
+    if (sheetTab === 'po-generator') return;
     fetchEntries();
   }, [sheetTab, branchFilter, searchTerm]);
 
   // Clean form state when tab changes
   useEffect(() => {
-    setActiveTab('list');
+    setActiveTab(pendingActiveTabRef.current || 'list');
+    pendingActiveTabRef.current = null;
     setEditingId(null);
     setFormData({});
     setSelectedIds([]);
@@ -485,6 +525,25 @@ const ITDataEntryPage: React.FC = () => {
     }
   };
 
+  const handleQuickSavePo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!poQuickForm.item_description || !poQuickForm.amount || !poQuickForm.po_date) {
+      toast.error('Item Description, Amount, and PO Date are required.');
+      return;
+    }
+    setPoQuickSubmitting(true);
+    try {
+      const created = await itService.createEntry('purchase-orders', poQuickForm);
+      toast.success(`PO logged as ${created.po_number}.`);
+      setPoQuickForm({ status: 'Raised' });
+      if (sheetTab === 'purchase-orders') fetchEntries();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to log PO.');
+    } finally {
+      setPoQuickSubmitting(false);
+    }
+  };
+
   const handleEdit = (record: any) => {
     setEditingId(record.id);
     setFormData({ ...record });
@@ -521,11 +580,42 @@ const ITDataEntryPage: React.FC = () => {
     );
   };
 
+  // Accepts YYYY-MM-DD, YYYY/MM/DD, DD-MM-YYYY, or DD/MM/YYYY (whatever a
+  // CSV/Excel export commonly produces) and normalizes to the YYYY-MM-DD
+  // the backend requires. When a "/"-separated date is ambiguous between
+  // day-first and month-first (both segments <=12), day-first is assumed
+  // to match this app's Indian locale convention used elsewhere (en-IN
+  // date formatting) — e.g. "07/05/2026" is read as 7 May, not July 5.
+  // Anything that doesn't match a recognized shape is returned unchanged,
+  // so it still fails backend validation explicitly instead of being
+  // silently coerced into the wrong date.
+  const normalizeDateString = (raw: any): any => {
+    const val = String(raw ?? '').trim();
+    if (!val) return raw;
+
+    if (/^\d{4}-\d{2}-\d{2}/.test(val)) return val.slice(0, 10);
+
+    let m = val.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/);
+    if (m) {
+      const [, y, mo, d] = m;
+      return `${y}-${mo.padStart(2, '0')}-${d.padStart(2, '0')}`;
+    }
+
+    m = val.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+    if (m) {
+      const [, d, mo, y] = m;
+      return `${y}-${mo.padStart(2, '0')}-${d.padStart(2, '0')}`;
+    }
+
+    return val;
+  };
+
   // CSV Import mapping logic
   const handleCsvFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    setCsvImportErrors([]);
 
     const reader = new FileReader();
     reader.onload = (evt) => {
@@ -560,25 +650,43 @@ const ITDataEntryPage: React.FC = () => {
   const handleImportCsv = async () => {
     if (csvRows.length === 0) return;
 
+    const dateFieldNames = new Set(getFormFields().filter(f => f.type === 'date').map(f => f.name));
+
     const mappedRecords = csvRows.map(row => {
       const record: any = {};
       Object.entries(csvMappings).forEach(([dbCol, csvHeader]) => {
         if (csvHeader) {
-          record[dbCol] = row[csvHeader];
+          const raw = row[csvHeader];
+          record[dbCol] = dateFieldNames.has(dbCol) ? normalizeDateString(raw) : raw;
         }
       });
       return record;
     });
 
+    setCsvImporting(true);
     try {
-      await itService.bulkImport(sheetTab, mappedRecords);
-      toast.success('Successfully imported CSV rows.');
-      setCsvModalOpen(false);
+      const result = await itService.bulkImport(sheetTab, mappedRecords);
+      const insertedCount = result.inserted?.length ?? 0;
+      const failedRows: { row: number; error: string }[] = result.failed ?? [];
 
-      setCsvRows([]);
-      fetchEntries();
+      setCsvImportErrors(failedRows);
+
+      if (failedRows.length === 0) {
+        toast.success(`Successfully imported ${insertedCount} row${insertedCount === 1 ? '' : 's'}.`);
+        setCsvModalOpen(false);
+        setCsvHeaders([]);
+        setCsvRows([]);
+      } else if (insertedCount > 0) {
+        toast.error(`Imported ${insertedCount} row${insertedCount === 1 ? '' : 's'}, ${failedRows.length} failed — see details below.`);
+      } else {
+        toast.error(`All ${failedRows.length} rows failed — see details below.`);
+      }
+
+      if (insertedCount > 0) fetchEntries();
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'CSV Import failed.');
+    } finally {
+      setCsvImporting(false);
     }
   };
 
@@ -610,7 +718,7 @@ const ITDataEntryPage: React.FC = () => {
 
   const deprEst = getEstimatedDepreciation();
 
-  const getFormFields = () => {
+  const getFormFields = (): FormFieldConfig[] => {
     switch (sheetTab) {
       case 'audits':
         return [
@@ -719,7 +827,7 @@ const ITDataEntryPage: React.FC = () => {
         ];
       case 'tickets':
         return [
-          { name: 'ticket_number', label: 'Ticket Reference Number', type: 'text', required: true },
+          { name: 'ticket_number', label: 'Ticket Reference Number', type: 'text', required: true, readOnly: true },
           { name: 'requester_name', label: 'Requester (User/Branch)', type: 'text', required: true },
           { name: 'issue_description', label: 'Issue Description', type: 'textarea', required: true },
           { name: 'assigned_to', label: 'Assigned Executive', type: 'text' },
@@ -731,7 +839,7 @@ const ITDataEntryPage: React.FC = () => {
         ];
       case 'incidents':
         return [
-          { name: 'incident_number', label: 'Incident Code', type: 'text', required: true },
+          { name: 'incident_number', label: 'Incident Code', type: 'text', required: true, readOnly: true },
           { name: 'incident_name', label: 'Incident Title', type: 'text', required: true },
           { name: 'description', label: 'Event Description', type: 'textarea', required: true },
           { name: 'severity', label: 'Severity Rating', type: 'select', options: ['Critical', 'High', 'Medium', 'Low'], required: true },
@@ -828,6 +936,21 @@ const ITDataEntryPage: React.FC = () => {
           { name: 'number_of_licenses', label: 'Number of Licenses / Seats', type: 'number', required: true },
           { name: 'status', label: 'Status', type: 'select', options: ['Active', 'Expiring Soon', 'Expired'], required: true }
         ];
+      case 'purchase-orders':
+        return [
+          { name: 'po_number', label: 'PO Number', type: 'text', required: true, readOnly: true },
+          {
+            name: 'vendor_id',
+            label: 'Vendor',
+            type: 'select',
+            options: vendors.map(v => ({ value: v.id, label: v.vendor_name })),
+            required: false
+          },
+          { name: 'item_description', label: 'Item Description', type: 'textarea', required: true },
+          { name: 'amount', label: 'Amount (INR)', type: 'number', required: true },
+          { name: 'po_date', label: 'PO Date', type: 'date', required: true },
+          { name: 'status', label: 'Status', type: 'select', options: ['Raised', 'Approved', 'Fulfilled', 'Cancelled'], required: true }
+        ];
       default:
         return [];
     }
@@ -897,31 +1020,38 @@ const ITDataEntryPage: React.FC = () => {
             </p>
           </div>
           
-          <div className="flex items-center gap-2.5">
-            <button
-              onClick={() => setCsvModalOpen(true)}
-              className="px-3.5 py-1.5 border rounded-lg text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center gap-1.5 h-[34px]"
-              style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}
-            >
-              📤 Bulk Import CSV
-            </button>
-            <div className="mis-tabs">
+          {sheetTab !== 'po-generator' && (
+            <div className="flex items-center gap-2.5">
               <button
-                type="button"
-                onClick={() => setActiveTab('register')}
-                className={`mis-tab ${activeTab === 'register' ? 'active' : ''}`}
+                onClick={() => {
+                  setCsvModalOpen(true);
+                  setCsvHeaders([]);
+                  setCsvRows([]);
+                  setCsvImportErrors([]);
+                }}
+                className="px-3.5 py-1.5 border rounded-lg text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center gap-1.5 h-[34px]"
+                style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}
               >
-                {editingId ? '✏️ Edit Record' : 'Create Entry'}
+                📤 Bulk Import CSV
               </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('list')}
-                className={`mis-tab ${activeTab === 'list' ? 'active' : ''}`}
-              >
-                Search & View database
-              </button>
+              <div className="mis-tabs">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('register')}
+                  className={`mis-tab ${activeTab === 'register' ? 'active' : ''}`}
+                >
+                  {editingId ? '✏️ Edit Record' : 'Create Entry'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('list')}
+                  className={`mis-tab ${activeTab === 'list' ? 'active' : ''}`}
+                >
+                  Search & View database
+                </button>
+              </div>
             </div>
-          </div>
+          )}
         </header>
 
         {/* Sheet Tab Bar */}
@@ -940,20 +1070,121 @@ const ITDataEntryPage: React.FC = () => {
             { id: 'incidents', label: 'Incidents & RCA' },
             { id: 'projects', label: 'Projects' },
             { id: 'software', label: 'Software Register' },
-            { id: 'team-duties', label: 'Team Duties' }
+            { id: 'team-duties', label: 'Team Duties' },
+            { id: 'purchase-orders', label: 'Purchase Orders', icon: '🧾' },
+            { id: 'po-generator', label: 'PO Generator', icon: '🌐' }
           ].map(tab => (
             <button
               key={tab.id}
               onClick={() => setSheetTab(tab.id)}
               className={`mis-module-tab ${sheetTab === tab.id ? 'active' : ''}`}
             >
-              📄 {tab.label.toUpperCase()}
+              {tab.icon || '📄'} {tab.label.toUpperCase()}
             </button>
           ))}
         </div>
 
-        {/* Main Content Area */}
-        {activeTab === 'list' ? (
+        {/* PO Generator — external tool embedded inline (no API of its own,
+            so nothing here feeds the dashboard; see the Purchase Orders
+            sheet for that). Rendered instead of the normal list/register
+            content entirely. */}
+        {sheetTab === 'po-generator' ? (
+          <div className="mis-card p-5">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-3">
+              <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                Build and print your PO below, then log it here so it shows up on the dashboard — this tool doesn't save anything on its own.
+              </p>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => { pendingActiveTabRef.current = 'list'; setSheetTab('purchase-orders'); }}
+                  className="px-3 py-1.5 border rounded-lg text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                  style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}
+                >
+                  📋 View Purchase Orders
+                </button>
+                <a
+                  href="https://po.sharewealthindia.in/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs font-semibold whitespace-nowrap hover:underline"
+                  style={{ color: 'var(--text-accent)' }}
+                >
+                  Open in new tab ↗
+                </a>
+              </div>
+            </div>
+            <iframe
+              src="https://po.sharewealthindia.in/"
+              title="PO Generator"
+              // Without a sandbox, a framed page has no restrictions at all —
+              // notably it could navigate our top-level tab away to another
+              // URL (a classic hostile/compromised-iframe move). This grants
+              // exactly what the PO tool needs (scripts, its own storage,
+              // downloads, popups/print) while withholding top-navigation.
+              // Deliberately NOT including allow-popups-to-escape-sandbox:
+              // that token would let any popup the tool opens run fully
+              // unsandboxed, which could reach back via window.opener.top
+              // and navigate this tab anyway — closing that off entirely
+              // rather than relying on omitting top-navigation alone.
+              sandbox="allow-scripts allow-same-origin allow-forms allow-downloads allow-popups allow-modals"
+              style={{ width: '100%', height: '80vh', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}
+            />
+
+            {/* Inline "Save Record" — logs the PO built above without
+                switching tabs. Same createEntry('purchase-orders', ...)
+                call the Purchase Orders sheet's own form uses. */}
+            <form onSubmit={handleQuickSavePo} className="mt-5 pt-5 border-t" style={{ borderColor: 'var(--border)' }}>
+              <h3 className="text-sm font-bold mb-3" style={{ color: 'var(--text-primary)' }}>🧾 Log This PO</h3>
+              <p className="text-[10px] mb-3" style={{ color: 'var(--text-secondary)' }}>PO Number is assigned automatically when you save.</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                <select
+                  value={poQuickForm.vendor_id || ''}
+                  onChange={e => setPoQuickForm({ ...poQuickForm, vendor_id: e.target.value })}
+                  className="mis-select text-xs"
+                >
+                  <option value="">Vendor (optional)</option>
+                  {vendors.map(v => <option key={v.id} value={v.id}>{v.vendor_name}</option>)}
+                </select>
+                <input
+                  type="number"
+                  placeholder="Amount (INR) *"
+                  value={poQuickForm.amount ?? ''}
+                  onChange={e => setPoQuickForm({ ...poQuickForm, amount: e.target.value })}
+                  className="mis-input text-xs"
+                />
+                <input
+                  type="date"
+                  value={poQuickForm.po_date || ''}
+                  onChange={e => setPoQuickForm({ ...poQuickForm, po_date: e.target.value })}
+                  className="mis-input text-xs"
+                />
+                <select
+                  value={poQuickForm.status || 'Raised'}
+                  onChange={e => setPoQuickForm({ ...poQuickForm, status: e.target.value })}
+                  className="mis-select text-xs"
+                >
+                  {['Raised', 'Approved', 'Fulfilled', 'Cancelled'].map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+                <textarea
+                  placeholder="Item Description *"
+                  value={poQuickForm.item_description || ''}
+                  onChange={e => setPoQuickForm({ ...poQuickForm, item_description: e.target.value })}
+                  className="mis-input text-xs sm:col-span-2 lg:col-span-3"
+                  rows={2}
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={poQuickSubmitting}
+                className="mt-3 px-4 py-2 rounded-lg text-xs font-semibold disabled:opacity-50"
+                style={{ background: 'var(--text-accent)', color: 'white' }}
+              >
+                {poQuickSubmitting ? 'Saving...' : '💾 Save Record'}
+              </button>
+            </form>
+          </div>
+        ) : activeTab === 'list' ? (
           <div className="mis-card p-5">
             
             {/* Search and Filters toolbar */}
@@ -1251,6 +1482,22 @@ const ITDataEntryPage: React.FC = () => {
                     );
                   }
 
+                  if (f.readOnly) {
+                    return (
+                      <div key={f.name} className="flex flex-col gap-1.5">
+                        <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                          {f.label}
+                        </label>
+                        <input
+                          type="text"
+                          className="mis-input w-full disabled:opacity-75 disabled:cursor-not-allowed font-semibold"
+                          value={editingId ? (formData[f.name] || '') : 'Auto-generated on save'}
+                          disabled
+                        />
+                      </div>
+                    );
+                  }
+
                   return (
                     <div key={f.name} className="flex flex-col gap-1.5">
                       <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
@@ -1409,6 +1656,24 @@ const ITDataEntryPage: React.FC = () => {
                 </div>
               )}
 
+              {/* Per-row failure report — valid rows still get imported;
+                  only the rows below need fixing and re-uploading. */}
+              {csvImportErrors.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-semibold text-red-400 mb-2">
+                    {csvImportErrors.length} Row{csvImportErrors.length === 1 ? '' : 's'} Failed
+                  </h4>
+                  <div className="max-h-[180px] overflow-y-auto border border-red-900/40 rounded bg-red-950/20 divide-y divide-red-900/30">
+                    {csvImportErrors.map(fe => (
+                      <div key={fe.row} className="px-3 py-2 text-xs">
+                        <span className="font-semibold text-red-300">Row {fe.row}:</span>{' '}
+                        <span className="text-red-200">{fe.error}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
             </div>
 
             <div className="flex justify-end space-x-3 pt-6 mt-6 border-t border-gray-850">
@@ -1420,16 +1685,17 @@ const ITDataEntryPage: React.FC = () => {
 
                   setCsvHeaders([]);
                   setCsvRows([]);
+                  setCsvImportErrors([]);
                 }}
               >
                 Close
               </button>
               <button
-                className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold rounded-lg transition-all"
-                disabled={csvRows.length === 0}
+                className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold rounded-lg transition-all disabled:opacity-50"
+                disabled={csvRows.length === 0 || csvImporting}
                 onClick={handleImportCsv}
               >
-                Execute Import ({csvRows.length} Rows)
+                {csvImporting ? 'Importing...' : `Execute Import (${csvRows.length} Rows)`}
               </button>
             </div>
           </div>

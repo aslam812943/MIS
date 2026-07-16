@@ -1,11 +1,15 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { Chart, registerables } from 'chart.js';
 import toast from 'react-hot-toast';
 import DashboardLayout from '../../components/layout/DashboardLayout';
+import PeriodFilter from '../../components/common/PeriodFilter';
+import TrendDelta from '../../components/common/TrendDelta';
 import { financeService } from '../../services/finance.service';
 import { orgService } from '../../services/org.service';
 import { authService } from '../../services/auth.service';
 import { useTheme } from '../../context/ThemeContext';
+import type { DateRange } from '../../utils/periodRange';
 
 Chart.register(...registerables);
 
@@ -68,10 +72,10 @@ const FinanceDashboardPage: React.FC = () => {
   const hasMultiBranchAccess = isAdmin || ['ceo', 'managing_director', 'director', 'executive', 'hod'].includes(currentUser?.role || '');
 
   const [stats, setStats] = useState<any>(null);
+  const [previousStats, setPreviousStats] = useState<any>(null);
   const [branches, setBranches] = useState<any[]>([]);
   const [branchFilter, setBranchFilter] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const [period, setPeriod] = useState<{ current: DateRange; previous: DateRange } | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -90,8 +94,10 @@ const FinanceDashboardPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    if (!period) return;
     fetchDashboardStats(true);
-  }, [branchFilter, startDate, endDate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [branchFilter, period]);
 
   const fetchBranches = async () => {
     if (!hasMultiBranchAccess) return;
@@ -104,21 +110,26 @@ const FinanceDashboardPage: React.FC = () => {
   };
 
   const fetchDashboardStats = async (showLoading = false) => {
+    if (!period) return;
     if (showLoading) setLoading(true);
     else setRefreshing(true);
+
+    // Fired together, but only the current-period call blocks the loading
+    // state — the dashboard renders as soon as it's back instead of
+    // waiting on the previous-period comparison too.
+    const currentPromise = financeService.getDashboardData(branchFilter || undefined, period.current.start, period.current.end);
+    const previousPromise = financeService.getDashboardData(branchFilter || undefined, period.previous.start, period.previous.end);
+
     try {
-      const data = await financeService.getDashboardData(
-        branchFilter || undefined,
-        startDate || undefined,
-        endDate || undefined
-      );
-      setStats(data);
+      setStats(await currentPromise);
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Failed to load Finance dashboard analytics.');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
+
+    previousPromise.then(setPreviousStats).catch(() => {});
   };
 
   // Render Charts whenever stats state updates
@@ -233,7 +244,7 @@ const FinanceDashboardPage: React.FC = () => {
           className="flex flex-col lg:flex-row justify-between lg:items-center gap-6 p-6 border rounded-xl shadow-xs text-left"
           style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
         >
-          <div>
+          <div className="text-center lg:text-left w-full lg:w-auto">
             <h1 className="text-2.5xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
               📊 Finance Performance & Compliance Analytics
             </h1>
@@ -242,10 +253,11 @@ const FinanceDashboardPage: React.FC = () => {
             </p>
           </div>
 
-          <div className="flex flex-wrap gap-3 items-center">
+          <div className="flex flex-wrap items-center gap-3 self-end lg:self-auto">
+            <PeriodFilter onChange={p => setPeriod({ current: p.current, previous: p.previous })} />
             {hasMultiBranchAccess && (
               <select
-                className="mis-select-dropdown"
+                className="mis-select w-44 text-xs cursor-pointer"
                 value={branchFilter}
                 onChange={e => setBranchFilter(e.target.value)}
               >
@@ -255,31 +267,21 @@ const FinanceDashboardPage: React.FC = () => {
                 ))}
               </select>
             )}
-
-            <div className="flex items-center gap-2 bg-gray-900 border border-gray-800 rounded px-2">
-              <span className="text-xs text-gray-400">From</span>
-              <input
-                type="date"
-                className="bg-transparent border-0 text-white text-xs p-1.5 focus:ring-0 outline-none"
-                value={startDate}
-                onChange={e => setStartDate(e.target.value)}
-              />
-              <span className="text-xs text-gray-400">To</span>
-              <input
-                type="date"
-                className="bg-transparent border-0 text-white text-xs p-1.5 focus:ring-0 outline-none"
-                value={endDate}
-                onChange={e => setEndDate(e.target.value)}
-              />
-            </div>
-
             <button
-              className="mis-btn btn-secondary text-xs flex items-center gap-1.5 py-2"
               onClick={() => fetchDashboardStats(false)}
               disabled={refreshing}
+              className="px-3 py-1.5 border rounded-lg text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+              style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}
             >
-              {refreshing ? 'Refreshing...' : 'Sync Data'}
+              {refreshing ? 'Refreshing...' : '🔄 Sync Data'}
             </button>
+            <Link
+              to="/comparison/finance"
+              className="px-3 py-1.5 border rounded-lg text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+              style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}
+            >
+              🔀 Compare Periods
+            </Link>
           </div>
         </header>
 
@@ -299,6 +301,7 @@ const FinanceDashboardPage: React.FC = () => {
                 </div>
                 <div className="mis-stat-value text-2.5xl font-bold text-left">₹{stats.kpis.totalBrokerageRevenue.toLocaleString('en-IN')}</div>
                 <p className="text-[9px] mt-1 text-left" style={{ color: 'var(--text-secondary)' }}>Cash + F&O + Commodity</p>
+                <TrendDelta current={stats.kpis.totalBrokerageRevenue} previous={previousStats?.kpis?.totalBrokerageRevenue} />
               </div>
 
               <div className="mis-stat-card border-l-4 border-cyan-500">
@@ -308,6 +311,7 @@ const FinanceDashboardPage: React.FC = () => {
                 </div>
                 <div className="mis-stat-value text-2.5xl font-bold text-left">₹{stats.kpis.netProfit.toLocaleString('en-IN')}</div>
                 <p className="text-[9px] mt-1 text-left" style={{ color: 'var(--text-secondary)' }}>Selected period</p>
+                <TrendDelta current={stats.kpis.netProfit} previous={previousStats?.kpis?.netProfit} />
               </div>
 
               <div className="mis-stat-card border-l-4 border-indigo-500">
@@ -317,6 +321,7 @@ const FinanceDashboardPage: React.FC = () => {
                 </div>
                 <div className="mis-stat-value text-2.5xl font-bold text-left">{stats.kpis.ebitdaMargin}%</div>
                 <p className="text-[9px] mt-1 text-left" style={{ color: 'var(--text-secondary)' }}>Simplified proxy</p>
+                <TrendDelta current={stats.kpis.ebitdaMargin} previous={previousStats?.kpis?.ebitdaMargin} isPercentagePoint />
               </div>
 
               <div className="mis-stat-card border-l-4 border-amber-500">
@@ -326,6 +331,7 @@ const FinanceDashboardPage: React.FC = () => {
                 </div>
                 <div className="mis-stat-value text-2.5xl font-bold text-left">{stats.kpis.costToIncome}%</div>
                 <p className="text-[9px] mt-1 text-left" style={{ color: 'var(--text-secondary)' }}>Lower is better</p>
+                <TrendDelta current={stats.kpis.costToIncome} previous={previousStats?.kpis?.costToIncome} isPercentagePoint />
               </div>
 
               <div className="mis-stat-card border-l-4 border-blue-500">
@@ -335,6 +341,7 @@ const FinanceDashboardPage: React.FC = () => {
                 </div>
                 <div className="mis-stat-value text-2.5xl font-bold text-left">₹{stats.kpis.totalLiquidity.toLocaleString('en-IN')}</div>
                 <p className="text-[9px] mt-1 text-left" style={{ color: 'var(--text-secondary)' }}>Cash in hand + at bank</p>
+                <TrendDelta current={stats.kpis.totalLiquidity} previous={previousStats?.kpis?.totalLiquidity} />
               </div>
 
               <div className="mis-stat-card border-l-4 border-red-500">
@@ -344,6 +351,7 @@ const FinanceDashboardPage: React.FC = () => {
                 </div>
                 <div className="mis-stat-value text-2.5xl font-bold text-left">{stats.kpis.renewalsDueSoon}</div>
                 <p className="text-[9px] mt-1 text-left text-amber-400 animate-pulse">Action pending</p>
+                <TrendDelta current={stats.kpis.renewalsDueSoon} previous={previousStats?.kpis?.renewalsDueSoon} />
               </div>
 
               <div className="mis-stat-card border-l-4 border-purple-500">
@@ -353,6 +361,7 @@ const FinanceDashboardPage: React.FC = () => {
                 </div>
                 <div className="mis-stat-value text-2.5xl font-bold text-left">{stats.kpis.openClientRequests}</div>
                 <p className="text-[9px] mt-1 text-left" style={{ color: 'var(--text-secondary)' }}>Pending + In Process</p>
+                <TrendDelta current={stats.kpis.openClientRequests} previous={previousStats?.kpis?.openClientRequests} />
               </div>
 
             </section>

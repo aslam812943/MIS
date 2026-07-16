@@ -231,7 +231,7 @@ router.get('/it/dashboard', requireAuth, itController.getDashboardStats);
 router.get('/it/dropdown/vendors', requireAuth, itController.getVendorsDropdown);
 router.get('/it/dropdown/staff', requireAuth, itController.getITStaffDropdown);
 router.post('/it/upload', requireAuth, kycUpload.single('file'), itController.uploadDocument);
-router.get('/it/bulk/:sheet', requireAuth, itController.bulkImport);
+router.post('/it/bulk/:sheet', requireAuth, itController.bulkImport);
 router.patch('/it/bulk/:sheet', requireAuth, itController.bulkUpdate);
 router.get('/it/:sheet', requireAuth, itController.getEntries);
 router.post('/it/:sheet', requireAuth, itController.createEntry);

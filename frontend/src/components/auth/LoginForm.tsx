@@ -22,7 +22,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ selectedRole, onForgotPassword })
   useEffect(() => {
     const roleEmails: Record<UserRole, string> = {
       [UserRole.ADMIN]: 'admin@gmail.com',
-      [UserRole.CEO]: 'ceo1@gmail.com',
+      [UserRole.CEO]: 'ceo@mis.com',
       [UserRole.MANAGING_DIRECTOR]: 'md@mis.com',
       [UserRole.DIRECTOR]: 'director@mis.com',
       [UserRole.EXECUTIVE]: 'executive@mis.com',

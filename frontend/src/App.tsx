@@ -18,6 +18,7 @@ import ITDataEntryPage from './pages/IT/ITDataEntryPage';
 import ITDashboardPage from './pages/IT/ITDashboardPage';
 import FinanceDataEntryPage from './pages/Finance/FinanceDataEntryPage';
 import FinanceDashboardPage from './pages/Finance/FinanceDashboardPage';
+import ComparisonPage from './pages/Comparison/ComparisonPage';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 
 import { ROUTES } from './constants/routes';
@@ -193,6 +194,15 @@ function App() {
           element={
             <ProtectedRoute>
               <FinanceDashboardPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path={ROUTES.COMPARISON}
+          element={
+            <ProtectedRoute>
+              <ComparisonPage />
             </ProtectedRoute>
           }
         />
