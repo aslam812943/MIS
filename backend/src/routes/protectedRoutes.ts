@@ -28,6 +28,8 @@ import { DPService } from '../services/DPService.js';
 import { DPController } from '../controllers/DPController.js';
 import { ITService } from '../services/ITService.js';
 import { ITController } from '../controllers/ITController.js';
+import { HRService } from '../services/HRService.js';
+import { HRController } from '../controllers/HRController.js';
 import { FinanceService } from '../services/FinanceService.js';
 import { FinanceController } from '../controllers/FinanceController.js';
 import { NotificationService } from '../services/NotificationService.js';
@@ -70,6 +72,8 @@ const dpController = new DPController(dpService);
 
 const itService = new ITService();
 const itController = new ITController(itService);
+const hrService = new HRService(userService);
+const hrController = new HRController(hrService);
 const financeService = new FinanceService();
 const financeController = new FinanceController(financeService);
 
@@ -237,6 +241,22 @@ router.get('/it/:sheet', requireAuth, itController.getEntries);
 router.post('/it/:sheet', requireAuth, itController.createEntry);
 router.patch('/it/:sheet/:id', requireAuth, itController.updateEntry);
 router.delete('/it/:sheet/:id', requireAuth, itController.deleteEntry);
+
+/**
+ * HR Department endpoints — role-based access only (admin or hr), no
+ * department-membership/branch scoping, so requireAdminOrHR alone (same as
+ * the existing /users/* routes) is sufficient here, unlike IT/DP where
+ * authorization is computed inside the service per-request.
+ */
+router.get('/hr/dashboard', requireAuth, requireAdminOrHR, hrController.getDashboardStats);
+router.get('/hr/dropdown/positions', requireAuth, requireAdminOrHR, hrController.getOpenPositionsDropdown);
+router.post('/hr/upload', requireAuth, requireAdminOrHR, kycUpload.single('file'), hrController.uploadDocument);
+router.post('/hr/bulk/:sheet', requireAuth, requireAdminOrHR, hrController.bulkImport);
+router.patch('/hr/bulk/:sheet', requireAuth, requireAdminOrHR, hrController.bulkUpdate);
+router.get('/hr/:sheet', requireAuth, requireAdminOrHR, hrController.getEntries);
+router.post('/hr/:sheet', requireAuth, requireAdminOrHR, hrController.createEntry);
+router.patch('/hr/:sheet/:id', requireAuth, requireAdminOrHR, hrController.updateEntry);
+router.delete('/hr/:sheet/:id', requireAuth, requireAdminOrHR, hrController.deleteEntry);
 
 /**
  * Finance Department endpoints

@@ -328,50 +328,42 @@ const KYCDashboardPage: React.FC = () => {
         ) : (
         <>
         {/* KPI Cards Grid */}
-        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
 
-          <div className="p-5 border rounded-xl shadow-xs flex items-center gap-4 animate-fade-in" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-            <div className="p-3 rounded-lg bg-teal-50 dark:bg-teal-950/40 text-teal-600 dark:text-teal-400">
-              <IconPeople />
-            </div>
+          <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(20, 184, 166, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
             <div>
-              <span className="text-xs font-semibold block" style={{ color: 'var(--text-secondary)' }}>Total Onboarded Clients</span>
-              <span className="text-xl font-bold block mt-1" style={{ color: 'var(--text-primary)' }}>{kpis.totalOnboarded}</span>
+              <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Total Onboarded Clients</div>
+              <div className="text-3xl font-bold" style={{ color: '#14b8a6' }}>{kpis.totalOnboarded}</div>
               <TrendDelta current={kpis.totalOnboarded} previous={previousStats?.kpis?.totalOnboarded} />
             </div>
+            <div className="p-3.5 rounded-full" style={{ background: 'rgba(20, 184, 166, 0.1)', color: '#14b8a6' }}><IconPeople /></div>
           </div>
 
-          <div className="p-5 border rounded-xl shadow-xs flex items-center gap-4 animate-fade-in" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-            <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400">
-              <IconAlert />
-            </div>
+          <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(245, 158, 11, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
             <div>
-              <span className="text-xs font-semibold block" style={{ color: 'var(--text-secondary)' }}>Pending Verifications</span>
-              <span className="text-xl font-bold block mt-1" style={{ color: 'var(--text-primary)' }}>{kpis.pendingVerifications}</span>
+              <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Pending Verifications</div>
+              <div className="text-3xl font-bold" style={{ color: '#f59e0b' }}>{kpis.pendingVerifications}</div>
               <TrendDelta current={kpis.pendingVerifications} previous={previousStats?.kpis?.pendingVerifications} />
             </div>
+            <div className="p-3.5 rounded-full" style={{ background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b' }}><IconAlert /></div>
           </div>
 
-          <div className="p-5 border rounded-xl shadow-xs flex items-center gap-4 animate-fade-in" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-            <div className="p-3 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400">
-              <IconModify />
-            </div>
+          <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(99, 102, 241, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
             <div>
-              <span className="text-xs font-semibold block" style={{ color: 'var(--text-secondary)' }}>Modifications Applied</span>
-              <span className="text-xl font-bold block mt-1" style={{ color: 'var(--text-primary)' }}>{kpis.processedModifications}</span>
+              <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Modifications Applied</div>
+              <div className="text-3xl font-bold" style={{ color: '#6366f1' }}>{kpis.processedModifications}</div>
               <TrendDelta current={kpis.processedModifications} previous={previousStats?.kpis?.processedModifications} />
             </div>
+            <div className="p-3.5 rounded-full" style={{ background: 'rgba(99, 102, 241, 0.1)', color: '#6366f1' }}><IconModify /></div>
           </div>
 
-          <div className="p-5 border rounded-xl shadow-xs flex items-center gap-4 animate-fade-in" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-            <div className="p-3 rounded-lg bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400">
-              <IconCompliance />
-            </div>
+          <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(244, 63, 94, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
             <div>
-              <span className="text-xs font-semibold block" style={{ color: 'var(--text-secondary)' }}>Closed Accounts / Closures</span>
-              <span className="text-xl font-bold block mt-1" style={{ color: 'var(--text-primary)' }}>{kpis.closedAccounts}</span>
+              <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Closed Accounts / Closures</div>
+              <div className="text-3xl font-bold" style={{ color: '#f43f5e' }}>{kpis.closedAccounts}</div>
               <TrendDelta current={kpis.closedAccounts} previous={previousStats?.kpis?.closedAccounts} />
             </div>
+            <div className="p-3.5 rounded-full" style={{ background: 'rgba(244, 63, 94, 0.1)', color: '#f43f5e' }}><IconCompliance /></div>
           </div>
 
         </section>

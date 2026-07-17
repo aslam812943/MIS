@@ -292,76 +292,76 @@ const FinanceDashboardPage: React.FC = () => {
         ) : (
           <>
             {/* KPI statistics cards */}
-            <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-4">
+            <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
 
-              <div className="mis-stat-card border-l-4 border-emerald-500">
-                <div className="flex justify-between items-start mb-2 text-left">
-                  <span className="mis-stat-label text-[10px] uppercase tracking-wider font-semibold">Brokerage Revenue</span>
-                  <span className="text-emerald-500 opacity-80"><IconRevenue /></span>
+              <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(16, 185, 129, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
+                <div>
+                  <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Brokerage Revenue</div>
+                  <div className="text-3xl font-bold" style={{ color: '#10b981' }}>₹{stats.kpis.totalBrokerageRevenue.toLocaleString('en-IN')}</div>
+                  <div className="text-xs opacity-50 mt-1">Cash + F&O + Commodity</div>
+                  <TrendDelta current={stats.kpis.totalBrokerageRevenue} previous={previousStats?.kpis?.totalBrokerageRevenue} />
                 </div>
-                <div className="mis-stat-value text-2.5xl font-bold text-left">₹{stats.kpis.totalBrokerageRevenue.toLocaleString('en-IN')}</div>
-                <p className="text-[9px] mt-1 text-left" style={{ color: 'var(--text-secondary)' }}>Cash + F&O + Commodity</p>
-                <TrendDelta current={stats.kpis.totalBrokerageRevenue} previous={previousStats?.kpis?.totalBrokerageRevenue} />
+                <div className="p-3.5 rounded-full" style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10b981' }}><IconRevenue /></div>
               </div>
 
-              <div className="mis-stat-card border-l-4 border-cyan-500">
-                <div className="flex justify-between items-start mb-2 text-left">
-                  <span className="mis-stat-label text-[10px] uppercase tracking-wider font-semibold">Net Profit</span>
-                  <span className="text-cyan-500 opacity-80"><IconProfit /></span>
+              <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(6, 182, 212, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
+                <div>
+                  <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Net Profit</div>
+                  <div className="text-3xl font-bold" style={{ color: '#06b6d4' }}>₹{stats.kpis.netProfit.toLocaleString('en-IN')}</div>
+                  <div className="text-xs opacity-50 mt-1">Selected period</div>
+                  <TrendDelta current={stats.kpis.netProfit} previous={previousStats?.kpis?.netProfit} />
                 </div>
-                <div className="mis-stat-value text-2.5xl font-bold text-left">₹{stats.kpis.netProfit.toLocaleString('en-IN')}</div>
-                <p className="text-[9px] mt-1 text-left" style={{ color: 'var(--text-secondary)' }}>Selected period</p>
-                <TrendDelta current={stats.kpis.netProfit} previous={previousStats?.kpis?.netProfit} />
+                <div className="p-3.5 rounded-full" style={{ background: 'rgba(6, 182, 212, 0.1)', color: '#06b6d4' }}><IconProfit /></div>
               </div>
 
-              <div className="mis-stat-card border-l-4 border-indigo-500">
-                <div className="flex justify-between items-start mb-2 text-left">
-                  <span className="mis-stat-label text-[10px] uppercase tracking-wider font-semibold">EBITDA Margin</span>
-                  <span className="text-indigo-500 opacity-80"><IconMargin /></span>
+              <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(99, 102, 241, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
+                <div>
+                  <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>EBITDA Margin</div>
+                  <div className="text-3xl font-bold" style={{ color: '#6366f1' }}>{stats.kpis.ebitdaMargin}%</div>
+                  <div className="text-xs opacity-50 mt-1">Simplified proxy</div>
+                  <TrendDelta current={stats.kpis.ebitdaMargin} previous={previousStats?.kpis?.ebitdaMargin} isPercentagePoint />
                 </div>
-                <div className="mis-stat-value text-2.5xl font-bold text-left">{stats.kpis.ebitdaMargin}%</div>
-                <p className="text-[9px] mt-1 text-left" style={{ color: 'var(--text-secondary)' }}>Simplified proxy</p>
-                <TrendDelta current={stats.kpis.ebitdaMargin} previous={previousStats?.kpis?.ebitdaMargin} isPercentagePoint />
+                <div className="p-3.5 rounded-full" style={{ background: 'rgba(99, 102, 241, 0.1)', color: '#6366f1' }}><IconMargin /></div>
               </div>
 
-              <div className="mis-stat-card border-l-4 border-amber-500">
-                <div className="flex justify-between items-start mb-2 text-left">
-                  <span className="mis-stat-label text-[10px] uppercase tracking-wider font-semibold">Cost-to-Income</span>
-                  <span className="text-amber-500 opacity-80"><IconCostRatio /></span>
+              <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(245, 158, 11, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
+                <div>
+                  <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Cost-to-Income</div>
+                  <div className="text-3xl font-bold" style={{ color: '#f59e0b' }}>{stats.kpis.costToIncome}%</div>
+                  <div className="text-xs opacity-50 mt-1">Lower is better</div>
+                  <TrendDelta current={stats.kpis.costToIncome} previous={previousStats?.kpis?.costToIncome} isPercentagePoint />
                 </div>
-                <div className="mis-stat-value text-2.5xl font-bold text-left">{stats.kpis.costToIncome}%</div>
-                <p className="text-[9px] mt-1 text-left" style={{ color: 'var(--text-secondary)' }}>Lower is better</p>
-                <TrendDelta current={stats.kpis.costToIncome} previous={previousStats?.kpis?.costToIncome} isPercentagePoint />
+                <div className="p-3.5 rounded-full" style={{ background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b' }}><IconCostRatio /></div>
               </div>
 
-              <div className="mis-stat-card border-l-4 border-blue-500">
-                <div className="flex justify-between items-start mb-2 text-left">
-                  <span className="mis-stat-label text-[10px] uppercase tracking-wider font-semibold">Total Liquidity</span>
-                  <span className="text-blue-500 opacity-80"><IconLiquidity /></span>
+              <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(59, 130, 246, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
+                <div>
+                  <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Total Liquidity</div>
+                  <div className="text-3xl font-bold" style={{ color: '#3b82f6' }}>₹{stats.kpis.totalLiquidity.toLocaleString('en-IN')}</div>
+                  <div className="text-xs opacity-50 mt-1">Cash in hand + at bank</div>
+                  <TrendDelta current={stats.kpis.totalLiquidity} previous={previousStats?.kpis?.totalLiquidity} />
                 </div>
-                <div className="mis-stat-value text-2.5xl font-bold text-left">₹{stats.kpis.totalLiquidity.toLocaleString('en-IN')}</div>
-                <p className="text-[9px] mt-1 text-left" style={{ color: 'var(--text-secondary)' }}>Cash in hand + at bank</p>
-                <TrendDelta current={stats.kpis.totalLiquidity} previous={previousStats?.kpis?.totalLiquidity} />
+                <div className="p-3.5 rounded-full" style={{ background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6' }}><IconLiquidity /></div>
               </div>
 
-              <div className="mis-stat-card border-l-4 border-red-500">
-                <div className="flex justify-between items-start mb-2 text-left">
-                  <span className="mis-stat-label text-[10px] uppercase tracking-wider font-semibold">Renewals Due Soon</span>
-                  <span className="text-red-500 opacity-80"><IconRenewals /></span>
+              <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(239, 68, 68, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
+                <div>
+                  <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Renewals Due Soon</div>
+                  <div className="text-3xl font-bold" style={{ color: '#ef4444' }}>{stats.kpis.renewalsDueSoon}</div>
+                  <div className="text-xs mt-1 text-amber-400 animate-pulse">Action pending</div>
+                  <TrendDelta current={stats.kpis.renewalsDueSoon} previous={previousStats?.kpis?.renewalsDueSoon} />
                 </div>
-                <div className="mis-stat-value text-2.5xl font-bold text-left">{stats.kpis.renewalsDueSoon}</div>
-                <p className="text-[9px] mt-1 text-left text-amber-400 animate-pulse">Action pending</p>
-                <TrendDelta current={stats.kpis.renewalsDueSoon} previous={previousStats?.kpis?.renewalsDueSoon} />
+                <div className="p-3.5 rounded-full" style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444' }}><IconRenewals /></div>
               </div>
 
-              <div className="mis-stat-card border-l-4 border-purple-500">
-                <div className="flex justify-between items-start mb-2 text-left">
-                  <span className="mis-stat-label text-[10px] uppercase tracking-wider font-semibold">Open Client Requests</span>
-                  <span className="text-purple-500 opacity-80"><IconRequests /></span>
+              <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(168, 85, 247, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
+                <div>
+                  <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Open Client Requests</div>
+                  <div className="text-3xl font-bold" style={{ color: '#a855f7' }}>{stats.kpis.openClientRequests}</div>
+                  <div className="text-xs opacity-50 mt-1">Pending + In Process</div>
+                  <TrendDelta current={stats.kpis.openClientRequests} previous={previousStats?.kpis?.openClientRequests} />
                 </div>
-                <div className="mis-stat-value text-2.5xl font-bold text-left">{stats.kpis.openClientRequests}</div>
-                <p className="text-[9px] mt-1 text-left" style={{ color: 'var(--text-secondary)' }}>Pending + In Process</p>
-                <TrendDelta current={stats.kpis.openClientRequests} previous={previousStats?.kpis?.openClientRequests} />
+                <div className="p-3.5 rounded-full" style={{ background: 'rgba(168, 85, 247, 0.1)', color: '#a855f7' }}><IconRequests /></div>
               </div>
 
             </section>

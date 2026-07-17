@@ -43,6 +43,14 @@ app.listen(PORT, async () => {
         });
         console.log('📦 Storage Bucket it-documents: Initialized');
       }
+      if (!buckets?.find(b => b.name === 'hr-documents')) {
+        await client.storage.createBucket('hr-documents', {
+          public: true,
+          allowedMimeTypes: ['image/png', 'image/jpeg', 'image/jpg', 'application/pdf'],
+          fileSizeLimit: 5 * 1024 * 1024
+        });
+        console.log('📦 Storage Bucket hr-documents: Initialized');
+      }
     }
   } catch (err) {
     console.error('❌ Initialization failed:', err);

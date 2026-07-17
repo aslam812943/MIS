@@ -23,6 +23,7 @@ export const ROUTES = {
   FINANCE_DATA_ENTRY: '/finance-entry',
   FINANCE_DASHBOARD: '/finance-dashboard',
   COMPARISON: '/comparison/:dept',
+  HR_DATA_ENTRY: '/hr-entry',
   ROOT: '/',
 } as const;
 

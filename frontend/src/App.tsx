@@ -19,6 +19,7 @@ import ITDashboardPage from './pages/IT/ITDashboardPage';
 import FinanceDataEntryPage from './pages/Finance/FinanceDataEntryPage';
 import FinanceDashboardPage from './pages/Finance/FinanceDashboardPage';
 import ComparisonPage from './pages/Comparison/ComparisonPage';
+import HRDataEntryPage from './pages/HR/HRDataEntryPage';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 
 import { ROUTES } from './constants/routes';
@@ -203,6 +204,15 @@ function App() {
           element={
             <ProtectedRoute>
               <ComparisonPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path={ROUTES.HR_DATA_ENTRY}
+          element={
+            <ProtectedRoute>
+              <HRDataEntryPage />
             </ProtectedRoute>
           }
         />
