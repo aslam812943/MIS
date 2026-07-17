@@ -293,56 +293,56 @@ const DPDashboardPage: React.FC = () => {
         ) : (
           <>
             {/* KPI statistics cards */}
-            <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-              
-              <div className="mis-stat-card border-l-4 border-cyan-500">
-                <div className="flex justify-between items-start mb-2 text-left">
-                  <span className="mis-stat-label text-xs uppercase tracking-wider font-semibold">Total DP Accounts</span>
-                  <span className="text-cyan-500 opacity-85"><IconAccount /></span>
+            <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+
+              <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(6, 182, 212, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
+                <div>
+                  <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Total DP Accounts</div>
+                  <div className="text-3xl font-bold" style={{ color: '#06b6d4' }}>{stats.kpis.totalAccounts}</div>
+                  <div className="text-xs mt-1 animate-pulse text-cyan-400">Total processed</div>
+                  <TrendDelta current={stats.kpis.totalAccounts} previous={previousStats?.kpis?.totalAccounts} />
                 </div>
-                <div className="mis-stat-value text-3xl font-bold text-left">{stats.kpis.totalAccounts}</div>
-                <p className="text-[10px] mt-1 text-left animate-pulse text-cyan-400">Total processed</p>
-                <TrendDelta current={stats.kpis.totalAccounts} previous={previousStats?.kpis?.totalAccounts} />
+                <div className="p-3.5 rounded-full" style={{ background: 'rgba(6, 182, 212, 0.1)', color: '#06b6d4' }}><IconAccount /></div>
               </div>
 
-              <div className="mis-stat-card border-l-4 border-amber-500">
-                <div className="flex justify-between items-start mb-2 text-left">
-                  <span className="mis-stat-label text-xs uppercase tracking-wider font-semibold">Pending Modifications</span>
-                  <span className="text-amber-500 opacity-85"><IconModification /></span>
+              <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(245, 158, 11, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
+                <div>
+                  <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Pending Modifications</div>
+                  <div className="text-3xl font-bold" style={{ color: '#f59e0b' }}>{stats.kpis.pendingModifications}</div>
+                  <div className="text-xs opacity-50 mt-1">Requires processing</div>
+                  <TrendDelta current={stats.kpis.pendingModifications} previous={previousStats?.kpis?.pendingModifications} />
                 </div>
-                <div className="mis-stat-value text-3xl font-bold text-left">{stats.kpis.pendingModifications}</div>
-                <p className="text-[10px] mt-1 text-left" style={{ color: 'var(--text-secondary)' }}>Requires processing</p>
-                <TrendDelta current={stats.kpis.pendingModifications} previous={previousStats?.kpis?.pendingModifications} />
+                <div className="p-3.5 rounded-full" style={{ background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b' }}><IconModification /></div>
               </div>
 
-              <div className="mis-stat-card border-l-4 border-emerald-500">
-                <div className="flex justify-between items-start mb-2 text-left">
-                  <span className="mis-stat-label text-xs uppercase tracking-wider font-semibold">Completed Demats</span>
-                  <span className="text-emerald-500 opacity-85"><IconDemat /></span>
+              <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(16, 185, 129, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
+                <div>
+                  <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Completed Demats</div>
+                  <div className="text-3xl font-bold" style={{ color: '#10b981' }}>{stats.kpis.completedDemats}</div>
+                  <div className="text-xs opacity-50 mt-1">Confirmed by RTA</div>
+                  <TrendDelta current={stats.kpis.completedDemats} previous={previousStats?.kpis?.completedDemats} />
                 </div>
-                <div className="mis-stat-value text-3xl font-bold text-left">{stats.kpis.completedDemats}</div>
-                <p className="text-[10px] mt-1 text-left" style={{ color: 'var(--text-secondary)' }}>Confirmed by RTA</p>
-                <TrendDelta current={stats.kpis.completedDemats} previous={previousStats?.kpis?.completedDemats} />
+                <div className="p-3.5 rounded-full" style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10b981' }}><IconDemat /></div>
               </div>
 
-              <div className="mis-stat-card border-l-4 border-purple-500">
-                <div className="flex justify-between items-start mb-2 text-left">
-                  <span className="mis-stat-label text-xs uppercase tracking-wider font-semibold">Active Queries</span>
-                  <span className="text-purple-500 opacity-85"><IconQuery /></span>
+              <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(168, 85, 247, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
+                <div>
+                  <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Active Queries</div>
+                  <div className="text-3xl font-bold" style={{ color: '#a855f7' }}>{stats.kpis.activeQueries}</div>
+                  <div className="text-xs opacity-50 mt-1">Open support tickets</div>
+                  <TrendDelta current={stats.kpis.activeQueries} previous={previousStats?.kpis?.activeQueries} />
                 </div>
-                <div className="mis-stat-value text-3xl font-bold text-left">{stats.kpis.activeQueries}</div>
-                <p className="text-[10px] mt-1 text-left" style={{ color: 'var(--text-secondary)' }}>Open support tickets</p>
-                <TrendDelta current={stats.kpis.activeQueries} previous={previousStats?.kpis?.activeQueries} />
+                <div className="p-3.5 rounded-full" style={{ background: 'rgba(168, 85, 247, 0.1)', color: '#a855f7' }}><IconQuery /></div>
               </div>
 
-              <div className="mis-stat-card border-l-4 border-red-500">
-                <div className="flex justify-between items-start mb-2 text-left">
-                  <span className="mis-stat-label text-xs uppercase tracking-wider font-semibold">Open Audits</span>
-                  <span className="text-red-500 opacity-85"><IconAudit /></span>
+              <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(239, 68, 68, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
+                <div>
+                  <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Open Audits</div>
+                  <div className="text-3xl font-bold" style={{ color: '#ef4444' }}>{stats.kpis.openAudits}</div>
+                  <div className="text-xs opacity-50 mt-1">Action pending</div>
+                  <TrendDelta current={stats.kpis.openAudits} previous={previousStats?.kpis?.openAudits} />
                 </div>
-                <div className="mis-stat-value text-3xl font-bold text-left">{stats.kpis.openAudits}</div>
-                <p className="text-[10px] mt-1 text-left" style={{ color: 'var(--text-secondary)' }}>Action pending</p>
-                <TrendDelta current={stats.kpis.openAudits} previous={previousStats?.kpis?.openAudits} />
+                <div className="p-3.5 rounded-full" style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444' }}><IconAudit /></div>
               </div>
 
             </section>

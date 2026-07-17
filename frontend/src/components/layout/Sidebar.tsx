@@ -421,6 +421,14 @@ const Sidebar: React.FC = () => {
             )}
             {showHRDashboard && (
               <NavItem
+                to={ROUTES.HR_DATA_ENTRY}
+                icon={<IconIEPFEntry />}
+                label="HR Entry"
+                onClick={closeOnMobile}
+              />
+            )}
+            {showHRDashboard && (
+              <NavItem
                 to={ROUTES.DASHBOARD}
                 icon={<IconIEPFDashboard />}
                 label="HR Dashboard"

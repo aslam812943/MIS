@@ -4,6 +4,7 @@ import DashboardLayout from '../components/layout/DashboardLayout';
 import PeriodFilter from '../components/common/PeriodFilter';
 import TrendDelta from '../components/common/TrendDelta';
 import { orgService } from '../services/org.service';
+import { hrService } from '../services/hr.service';
 import { authService } from '../services/auth.service';
 import { useTheme } from '../context/ThemeContext';
 import type { DateRange } from '../utils/periodRange';
@@ -68,6 +69,30 @@ const IconClockHistory = () => (
   </svg>
 );
 
+const IconBriefcase = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
+    <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+  </svg>
+);
+
+const IconUserSearch = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="10" cy="8" r="4" />
+    <path d="M2 21c0-4 3.6-7 8-7" />
+    <circle cx="17" cy="17" r="3" />
+    <line x1="21" y1="21" x2="19.2" y2="19.2" />
+  </svg>
+);
+
+const IconFileCheck = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+    <polyline points="14 2 14 8 20 8" />
+    <path d="m9 15 2 2 4-4" />
+  </svg>
+);
+
 /**
  * Main Dashboard landing page.
  */
@@ -79,6 +104,9 @@ const DashboardPage: React.FC = () => {
   const [stats, setStats] = useState({ branches: 0, departments: 0, users: 0, modules: 0 });
   const [hrData, setHRData] = useState<any>(null);
   const [previousHrData, setPreviousHrData] = useState<any>(null);
+  // Recruitment/policy aggregates — separate from hrData (which owns
+  // employee-headcount KPIs), fetched from HRService.getDashboardStats.
+  const [hrOpsData, setHROpsData] = useState<any>(null);
   const [dashboardTab, setDashboardTab] = useState<'system' | 'hr'>(showHRDashboard ? 'hr' : 'system');
   const [loading, setLoading] = useState(true);
   const [hrLoading, setHRLoading] = useState(false);
@@ -92,12 +120,14 @@ const DashboardPage: React.FC = () => {
   const deptCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const resignReasonCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const roleCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const candidateStageCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const growthChartInstance = useRef<Chart | null>(null);
   const branchChartInstance = useRef<Chart | null>(null);
   const deptChartInstance = useRef<Chart | null>(null);
   const resignReasonChartInstance = useRef<Chart | null>(null);
   const roleChartInstance = useRef<Chart | null>(null);
+  const candidateStageChartInstance = useRef<Chart | null>(null);
 
   const fetchHRData = async (range: { current: DateRange; previous: DateRange }) => {
     if (!showHRDashboard) return;
@@ -108,6 +138,7 @@ const DashboardPage: React.FC = () => {
     // waiting on the previous-period comparison too.
     const currentPromise = orgService.getHRDashboardData({ range: 'custom', startDate: range.current.start, endDate: range.current.end });
     const previousPromise = orgService.getHRDashboardData({ range: 'custom', startDate: range.previous.start, endDate: range.previous.end });
+    const opsPromise = hrService.getDashboardData(range.current.start, range.current.end);
 
     try {
       setHRData(await currentPromise);
@@ -118,6 +149,7 @@ const DashboardPage: React.FC = () => {
     }
 
     previousPromise.then(setPreviousHrData).catch(() => {});
+    opsPromise.then(setHROpsData).catch(err => console.error(err));
   };
 
   useEffect(() => {
@@ -399,6 +431,44 @@ const DashboardPage: React.FC = () => {
       }
     }
 
+    // ── 6. CANDIDATES BY STAGE (HORIZONTAL BAR) ───────────
+    if (candidateStageCanvasRef.current && hrOpsData?.charts?.candidatesByStage) {
+      if (candidateStageChartInstance.current) candidateStageChartInstance.current.destroy();
+      const ctx = candidateStageCanvasRef.current.getContext('2d');
+      if (ctx) {
+        const labels = hrOpsData.charts.candidatesByStage.map((d: any) => d.name);
+        const dataValues = hrOpsData.charts.candidatesByStage.map((d: any) => d.value);
+        candidateStageChartInstance.current = new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels,
+            datasets: [{
+              label: 'Candidates',
+              data: dataValues,
+              backgroundColor: 'rgba(6, 182, 212, 0.85)',
+              hoverBackgroundColor: 'rgba(6, 182, 212, 1)',
+              borderColor: '#06b6d4',
+              borderWidth: 1.5,
+              borderRadius: 6
+            }]
+          },
+          options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: { backgroundColor: tooltipBg, titleColor: tooltipTitleColor, borderColor: tooltipBorderColor, borderWidth: 1, padding: 10 }
+            },
+            scales: {
+              x: { grid: { color: gridColor }, ticks: { color: tickColor, stepSize: 1, font: { family: 'inherit' } }, beginAtZero: true },
+              y: { grid: { display: false }, ticks: { color: tickColor, font: { family: 'inherit', size: 10 } } }
+            }
+          }
+        });
+      }
+    }
+
     });
 
     return () => {
@@ -408,8 +478,9 @@ const DashboardPage: React.FC = () => {
       if (deptChartInstance.current) deptChartInstance.current.destroy();
       if (resignReasonChartInstance.current) resignReasonChartInstance.current.destroy();
       if (roleChartInstance.current) roleChartInstance.current.destroy();
+      if (candidateStageChartInstance.current) candidateStageChartInstance.current.destroy();
     };
-  }, [hrData, dashboardTab, theme]);
+  }, [hrData, hrOpsData, dashboardTab, theme]);
 
   return (
     <DashboardLayout>
@@ -537,7 +608,57 @@ const DashboardPage: React.FC = () => {
                       <IconUserMinus />
                     </div>
                   </div>
+
+                  {hrOpsData && (
+                    <>
+                      <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(20, 184, 166, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
+                        <div>
+                          <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Open Positions</div>
+                          <div className="text-3xl font-bold" style={{ color: '#14b8a6' }}>{hrOpsData.kpis.openPositions}</div>
+                          <div className="text-xs opacity-50 mt-1">Currently hiring for</div>
+                        </div>
+                        <div className="p-3.5 rounded-full" style={{ background: 'rgba(20, 184, 166, 0.1)', color: '#14b8a6' }}>
+                          <IconBriefcase />
+                        </div>
+                      </div>
+
+                      <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(6, 182, 212, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
+                        <div>
+                          <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Candidates in Pipeline</div>
+                          <div className="text-3xl font-bold" style={{ color: '#06b6d4' }}>{hrOpsData.kpis.candidatesInPipeline}</div>
+                          <div className="text-xs opacity-50 mt-1">Not yet Joined or Rejected</div>
+                        </div>
+                        <div className="p-3.5 rounded-full" style={{ background: 'rgba(6, 182, 212, 0.1)', color: '#06b6d4' }}>
+                          <IconUserSearch />
+                        </div>
+                      </div>
+
+                      <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(132, 204, 22, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
+                        <div>
+                          <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Active Policies</div>
+                          <div className="text-3xl font-bold" style={{ color: '#84cc16' }}>{hrOpsData.kpis.activePolicies}</div>
+                          <div className="text-xs opacity-50 mt-1">Currently in effect</div>
+                        </div>
+                        <div className="p-3.5 rounded-full" style={{ background: 'rgba(132, 204, 22, 0.1)', color: '#84cc16' }}>
+                          <IconFileCheck />
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
+
+                {/* Recruitment pipeline */}
+                {hrOpsData?.charts?.candidatesByStage?.length > 0 && (
+                  <div className="mis-card p-6">
+                    <div>
+                      <h3 className="font-bold text-lg mb-1" style={{ color: 'var(--text-primary)' }}>Candidates by Stage</h3>
+                      <p className="text-xs opacity-75 mb-6" style={{ color: 'var(--text-secondary)' }}>Where candidates are stuck in the hiring pipeline, and for how long.</p>
+                    </div>
+                    <div className="h-[280px] w-full relative">
+                      <canvas ref={candidateStageCanvasRef} />
+                    </div>
+                  </div>
+                )}
 
                 {/* Growth & Distribution charts */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

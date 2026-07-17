@@ -347,61 +347,61 @@ const SettlementsDashboardPage: React.FC = () => {
         ) : (
         <>
         {/* ── KPI Card Grid ─────────────────────────────────── */}
-        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
 
-          <div className="mis-stat-card border-l-4 border-teal-500">
-            <div className="flex justify-between items-start mb-2">
-              <span className="mis-stat-label text-xs uppercase tracking-wider font-semibold">Securities Volume</span>
-              <span className="text-teal-500 opacity-85"><IconSecurity /></span>
+          <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(20, 184, 166, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
+            <div>
+              <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Securities Volume</div>
+              <div className="text-3xl font-bold" style={{ color: '#14b8a6' }}>
+                {(payinPayout.totalBuyQty + payinPayout.totalSellQty).toLocaleString()}
+              </div>
+              <div className="text-xs opacity-50 mt-1">
+                Buy: {payinPayout.totalBuyQty.toLocaleString()} | Sell: {payinPayout.totalSellQty.toLocaleString()}
+              </div>
+              <TrendDelta
+                current={payinPayout.totalBuyQty + payinPayout.totalSellQty}
+                previous={prevPayinPayout ? prevPayinPayout.totalBuyQty + prevPayinPayout.totalSellQty : undefined}
+              />
             </div>
-            <div className="mis-stat-value text-3xl font-bold">
-              {(payinPayout.totalBuyQty + payinPayout.totalSellQty).toLocaleString()}
-            </div>
-            <p className="text-[10px] mt-1" style={{ color: 'var(--text-secondary)' }}>
-              Buy: {payinPayout.totalBuyQty.toLocaleString()} | Sell: {payinPayout.totalSellQty.toLocaleString()}
-            </p>
-            <TrendDelta
-              current={payinPayout.totalBuyQty + payinPayout.totalSellQty}
-              previous={prevPayinPayout ? prevPayinPayout.totalBuyQty + prevPayinPayout.totalSellQty : undefined}
-            />
+            <div className="p-3.5 rounded-full" style={{ background: 'rgba(20, 184, 166, 0.1)', color: '#14b8a6' }}><IconSecurity /></div>
           </div>
 
-          <div className="mis-stat-card border-l-4 border-amber-500">
-            <div className="flex justify-between items-start mb-2">
-              <span className="mis-stat-label text-xs uppercase tracking-wider font-semibold">Service Tickets</span>
-              <span className="text-amber-500 opacity-85"><IconTicket /></span>
+          <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(245, 158, 11, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
+            <div>
+              <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Service Tickets</div>
+              <div className="text-3xl font-bold" style={{ color: '#f59e0b' }}>{clientRequests.totalRecords}</div>
+              <div className="text-xs opacity-50 mt-1">
+                Open: {clientRequests.statusCounts.Received + clientRequests.statusCounts['In Process'] + clientRequests.statusCounts.Pending} | Solved: {clientRequests.statusCounts.Completed}
+              </div>
+              <TrendDelta current={clientRequests.totalRecords} previous={prevClientRequests?.totalRecords} />
             </div>
-            <div className="mis-stat-value text-3xl font-bold">{clientRequests.totalRecords}</div>
-            <p className="text-[10px] mt-1" style={{ color: 'var(--text-secondary)' }}>
-              Open: {clientRequests.statusCounts.Received + clientRequests.statusCounts['In Process'] + clientRequests.statusCounts.Pending} | Solved: {clientRequests.statusCounts.Completed}
-            </p>
-            <TrendDelta current={clientRequests.totalRecords} previous={prevClientRequests?.totalRecords} />
+            <div className="p-3.5 rounded-full" style={{ background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b' }}><IconTicket /></div>
           </div>
 
-          <div className="mis-stat-card border-l-4 border-indigo-500">
-            <div className="flex justify-between items-start mb-2">
-              <span className="mis-stat-label text-xs uppercase tracking-wider font-semibold">IPO Allotment Rate</span>
-              <span className="text-indigo-500 opacity-85"><IconIpo /></span>
+          <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(99, 102, 241, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
+            <div>
+              <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>IPO Allotment Rate</div>
+              <div className="text-3xl font-bold" style={{ color: '#6366f1' }}>{ipoAllotmentRate}%</div>
+              <div className="text-xs opacity-50 mt-1">
+                Allotted: {ipoAllocation.totalAllottedQty.toLocaleString()} / {ipoAllocation.totalAppliedQty.toLocaleString()}
+              </div>
+              <TrendDelta current={ipoAllotmentRate} previous={prevIpoAllotmentRate} isPercentagePoint />
             </div>
-            <div className="mis-stat-value text-3xl font-bold">{ipoAllotmentRate}%</div>
-            <p className="text-[10px] mt-1" style={{ color: 'var(--text-secondary)' }}>
-              Allotted: {ipoAllocation.totalAllottedQty.toLocaleString()} / {ipoAllocation.totalAppliedQty.toLocaleString()}
-            </p>
-            <TrendDelta current={ipoAllotmentRate} previous={prevIpoAllotmentRate} isPercentagePoint />
+            <div className="p-3.5 rounded-full" style={{ background: 'rgba(99, 102, 241, 0.1)', color: '#6366f1' }}><IconIpo /></div>
           </div>
 
-          <div className="mis-stat-card border-l-4 border-purple-500">
-            <div className="flex justify-between items-start mb-2">
-              <span className="mis-stat-label text-xs uppercase tracking-wider font-semibold">Corp Action Payout</span>
-              <span className="text-purple-500 opacity-85"><IconCorporate /></span>
+          <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(168, 85, 247, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
+            <div>
+              <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Corp Action Payout</div>
+              <div className="text-3xl font-bold" style={{ color: '#a855f7' }}>
+                {corporateActions.totalEntitlementAmt > 0 ? `₹${corporateActions.totalEntitlementAmt.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}` : '—'}
+              </div>
+              <div className="text-xs opacity-50 mt-1">
+                Allocations Count: {corporateActions.totalRecords}
+              </div>
+              <TrendDelta current={corporateActions.totalEntitlementAmt} previous={prevCorporateActions?.totalEntitlementAmt} />
             </div>
-            <div className="mis-stat-value text-3xl font-bold">
-              {corporateActions.totalEntitlementAmt > 0 ? `₹${corporateActions.totalEntitlementAmt.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}` : '—'}
-            </div>
-            <p className="text-[10px] mt-1" style={{ color: 'var(--text-secondary)' }}>
-              Allocations Count: {corporateActions.totalRecords}
-            </p>
-            <TrendDelta current={corporateActions.totalEntitlementAmt} previous={prevCorporateActions?.totalEntitlementAmt} />
+            <div className="p-3.5 rounded-full" style={{ background: 'rgba(168, 85, 247, 0.1)', color: '#a855f7' }}><IconCorporate /></div>
           </div>
 
         </section>

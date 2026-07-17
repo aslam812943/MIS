@@ -315,116 +315,116 @@ const ITDashboardPage: React.FC = () => {
         ) : (
           <>
             {/* KPI statistics cards */}
-            <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
+            <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
 
-              <div className="mis-stat-card border-l-4 border-cyan-500">
-                <div className="flex justify-between items-start mb-2 text-left">
-                  <span className="mis-stat-label text-[10px] uppercase tracking-wider font-semibold leading-tight block min-h-[26px] pr-1">Total Users</span>
-                  <span className="text-cyan-500 opacity-80"><IconUsers /></span>
+              <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(6, 182, 212, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
+                <div>
+                  <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Total Users</div>
+                  <div className="text-3xl font-bold" style={{ color: '#06b6d4' }}>{stats.kpis.totalUsers}</div>
+                  <div className="text-xs opacity-50 mt-1">Active personnel</div>
+                  <TrendDelta current={stats.kpis.totalUsers} previous={previousStats?.kpis?.totalUsers} />
                 </div>
-                <div className="mis-stat-value text-2.5xl font-bold text-left">{stats.kpis.totalUsers}</div>
-                <p className="text-[9px] mt-1 text-left" style={{ color: 'var(--text-secondary)' }}>Active personnel</p>
-                <TrendDelta current={stats.kpis.totalUsers} previous={previousStats?.kpis?.totalUsers} />
+                <div className="p-3.5 rounded-full" style={{ background: 'rgba(6, 182, 212, 0.1)', color: '#06b6d4' }}><IconUsers /></div>
               </div>
 
-              <div className="mis-stat-card border-l-4 border-emerald-500">
-                <div className="flex justify-between items-start mb-2 text-left">
-                  <span className="mis-stat-label text-[10px] uppercase tracking-wider font-semibold leading-tight block min-h-[26px] pr-1">Active Devices</span>
-                  <span className="text-emerald-500 opacity-80"><IconDevice /></span>
+              <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(16, 185, 129, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
+                <div>
+                  <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Active Devices</div>
+                  <div className="text-3xl font-bold" style={{ color: '#10b981' }}>{stats.kpis.activeDevices}</div>
+                  <div className="text-xs opacity-50 mt-1">Monitored assets</div>
+                  <TrendDelta current={stats.kpis.activeDevices} previous={previousStats?.kpis?.activeDevices} />
                 </div>
-                <div className="mis-stat-value text-2.5xl font-bold text-left">{stats.kpis.activeDevices}</div>
-                <p className="text-[9px] mt-1 text-left" style={{ color: 'var(--text-secondary)' }}>Monitored assets</p>
-                <TrendDelta current={stats.kpis.activeDevices} previous={previousStats?.kpis?.activeDevices} />
+                <div className="p-3.5 rounded-full" style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10b981' }}><IconDevice /></div>
               </div>
 
-              <div className="mis-stat-card border-l-4 border-amber-500">
-                <div className="flex justify-between items-start mb-2 text-left">
-                  <span className="mis-stat-label text-[10px] uppercase tracking-wider font-semibold leading-tight block min-h-[26px] pr-1">Open Tickets</span>
-                  <span className="text-amber-500 opacity-80"><IconTicket /></span>
+              <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(245, 158, 11, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
+                <div>
+                  <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Open Tickets</div>
+                  <div className="text-3xl font-bold" style={{ color: '#f59e0b' }}>{stats.kpis.openTickets}</div>
+                  <div className="text-xs mt-1 text-amber-400 animate-pulse">Action pending</div>
+                  <TrendDelta current={stats.kpis.openTickets} previous={previousStats?.kpis?.openTickets} />
                 </div>
-                <div className="mis-stat-value text-2.5xl font-bold text-left">{stats.kpis.openTickets}</div>
-                <p className="text-[9px] mt-1 text-left text-amber-400 animate-pulse">Action pending</p>
-                <TrendDelta current={stats.kpis.openTickets} previous={previousStats?.kpis?.openTickets} />
+                <div className="p-3.5 rounded-full" style={{ background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b' }}><IconTicket /></div>
               </div>
 
-              <div className="mis-stat-card border-l-4 border-red-500">
-                <div className="flex justify-between items-start mb-2 text-left">
-                  <span className="mis-stat-label text-[10px] uppercase tracking-wider font-semibold leading-tight block min-h-[26px] pr-1">Critical Incidents</span>
-                  <span className="text-red-500 opacity-80"><IconIncident /></span>
+              <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(239, 68, 68, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
+                <div>
+                  <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Critical Incidents</div>
+                  <div className="text-3xl font-bold" style={{ color: '#ef4444' }}>{stats.kpis.criticalIncidents}</div>
+                  <div className="text-xs opacity-50 mt-1">Unresolved CSCRF</div>
+                  <TrendDelta current={stats.kpis.criticalIncidents} previous={previousStats?.kpis?.criticalIncidents} />
                 </div>
-                <div className="mis-stat-value text-2.5xl font-bold text-left">{stats.kpis.criticalIncidents}</div>
-                <p className="text-[9px] mt-1 text-left" style={{ color: 'var(--text-secondary)' }}>Unresolved CSCRF</p>
-                <TrendDelta current={stats.kpis.criticalIncidents} previous={previousStats?.kpis?.criticalIncidents} />
+                <div className="p-3.5 rounded-full" style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444' }}><IconIncident /></div>
               </div>
 
-              <div className="mis-stat-card border-l-4 border-blue-500">
-                <div className="flex justify-between items-start mb-2 text-left">
-                  <span className="mis-stat-label text-[10px] uppercase tracking-wider font-semibold leading-tight block min-h-[26px] pr-1">System Uptime</span>
-                  <span className="text-blue-500 opacity-80"><IconAvailability /></span>
+              <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(59, 130, 246, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
+                <div>
+                  <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>System Uptime</div>
+                  <div className="text-3xl font-bold" style={{ color: '#3b82f6' }}>{stats.kpis.systemAvailability}%</div>
+                  <div className="text-xs opacity-50 mt-1">Calculated average</div>
+                  <TrendDelta current={stats.kpis.systemAvailability} previous={previousStats?.kpis?.systemAvailability} isPercentagePoint />
                 </div>
-                <div className="mis-stat-value text-2.5xl font-bold text-left">{stats.kpis.systemAvailability}%</div>
-                <p className="text-[9px] mt-1 text-left" style={{ color: 'var(--text-secondary)' }}>Calculated average</p>
-                <TrendDelta current={stats.kpis.systemAvailability} previous={previousStats?.kpis?.systemAvailability} isPercentagePoint />
+                <div className="p-3.5 rounded-full" style={{ background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6' }}><IconAvailability /></div>
               </div>
 
-              <div className="mis-stat-card border-l-4 border-indigo-500">
-                <div className="flex justify-between items-start mb-2 text-left">
-                  <span className="mis-stat-label text-[10px] uppercase tracking-wider font-semibold leading-tight block min-h-[26px] pr-1">SLA Met</span>
-                  <span className="text-indigo-500 opacity-80"><IconCompliance /></span>
+              <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(99, 102, 241, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
+                <div>
+                  <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>SLA Met</div>
+                  <div className="text-3xl font-bold" style={{ color: '#6366f1' }}>{stats.kpis.slaCompliance}%</div>
+                  <div className="text-xs opacity-50 mt-1">Compliance target</div>
+                  <TrendDelta current={stats.kpis.slaCompliance} previous={previousStats?.kpis?.slaCompliance} isPercentagePoint />
                 </div>
-                <div className="mis-stat-value text-2.5xl font-bold text-left">{stats.kpis.slaCompliance}%</div>
-                <p className="text-[9px] mt-1 text-left" style={{ color: 'var(--text-secondary)' }}>Compliance target</p>
-                <TrendDelta current={stats.kpis.slaCompliance} previous={previousStats?.kpis?.slaCompliance} isPercentagePoint />
+                <div className="p-3.5 rounded-full" style={{ background: 'rgba(99, 102, 241, 0.1)', color: '#6366f1' }}><IconCompliance /></div>
               </div>
 
-              <div className="mis-stat-card border-l-4 border-purple-500">
-                <div className="flex justify-between items-start mb-2 text-left">
-                  <span className="mis-stat-label text-[10px] uppercase tracking-wider font-semibold leading-tight block min-h-[26px] pr-1">Ongoing Projects</span>
-                  <span className="text-purple-500 opacity-80"><IconProject /></span>
+              <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(168, 85, 247, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
+                <div>
+                  <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Ongoing Projects</div>
+                  <div className="text-3xl font-bold" style={{ color: '#a855f7' }}>{stats.kpis.ongoingProjects}</div>
+                  <div className="text-xs opacity-50 mt-1">Delivery cycle</div>
+                  <TrendDelta current={stats.kpis.ongoingProjects} previous={previousStats?.kpis?.ongoingProjects} />
                 </div>
-                <div className="mis-stat-value text-2.5xl font-bold text-left">{stats.kpis.ongoingProjects}</div>
-                <p className="text-[9px] mt-1 text-left" style={{ color: 'var(--text-secondary)' }}>Delivery cycle</p>
-                <TrendDelta current={stats.kpis.ongoingProjects} previous={previousStats?.kpis?.ongoingProjects} />
+                <div className="p-3.5 rounded-full" style={{ background: 'rgba(168, 85, 247, 0.1)', color: '#a855f7' }}><IconProject /></div>
               </div>
 
-              <div className="mis-stat-card border-l-4 border-red-500">
-                <div className="flex justify-between items-start mb-2 text-left">
-                  <span className="mis-stat-label text-[10px] uppercase tracking-wider font-semibold leading-tight block min-h-[26px] pr-1">Audits Overdue</span>
-                  <span className="text-red-500 opacity-80"><IconClock /></span>
+              <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(239, 68, 68, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
+                <div>
+                  <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Audits Overdue</div>
+                  <div className="text-3xl font-bold" style={{ color: '#ef4444' }}>{stats.kpis.auditsOverdue}</div>
+                  <div className="text-xs mt-1 text-red-400 animate-pulse">Past next due date</div>
+                  <TrendDelta current={stats.kpis.auditsOverdue} previous={previousStats?.kpis?.auditsOverdue} />
                 </div>
-                <div className="mis-stat-value text-2.5xl font-bold text-left">{stats.kpis.auditsOverdue}</div>
-                <p className="text-[9px] mt-1 text-left text-red-400 animate-pulse">Past next due date</p>
-                <TrendDelta current={stats.kpis.auditsOverdue} previous={previousStats?.kpis?.auditsOverdue} />
+                <div className="p-3.5 rounded-full" style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444' }}><IconClock /></div>
               </div>
 
-              <div className="mis-stat-card border-l-4 border-amber-500">
-                <div className="flex justify-between items-start mb-2 text-left">
-                  <span className="mis-stat-label text-[10px] uppercase tracking-wider font-semibold leading-tight block min-h-[26px] pr-1">AMC Due (30d)</span>
-                  <span className="text-amber-500 opacity-80"><IconClock /></span>
+              <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(245, 158, 11, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
+                <div>
+                  <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>AMC Due (30d)</div>
+                  <div className="text-3xl font-bold" style={{ color: '#f59e0b' }}>{stats.kpis.amcDueSoon}</div>
+                  <div className="text-xs opacity-50 mt-1">Renewals approaching</div>
+                  <TrendDelta current={stats.kpis.amcDueSoon} previous={previousStats?.kpis?.amcDueSoon} />
                 </div>
-                <div className="mis-stat-value text-2.5xl font-bold text-left">{stats.kpis.amcDueSoon}</div>
-                <p className="text-[9px] mt-1 text-left" style={{ color: 'var(--text-secondary)' }}>Renewals approaching</p>
-                <TrendDelta current={stats.kpis.amcDueSoon} previous={previousStats?.kpis?.amcDueSoon} />
+                <div className="p-3.5 rounded-full" style={{ background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b' }}><IconClock /></div>
               </div>
 
-              <div className="mis-stat-card border-l-4 border-teal-500">
-                <div className="flex justify-between items-start mb-2 text-left">
-                  <span className="mis-stat-label text-[10px] uppercase tracking-wider font-semibold leading-tight block min-h-[26px] pr-1">POs Raised</span>
-                  <span className="text-teal-500 opacity-80"><IconReceipt /></span>
+              <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(20, 184, 166, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
+                <div>
+                  <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>POs Raised</div>
+                  <div className="text-3xl font-bold" style={{ color: '#14b8a6' }}>{stats.kpis.posRaised}</div>
+                  <div className="text-xs opacity-50 mt-1">Logged this period</div>
+                  <TrendDelta current={stats.kpis.posRaised} previous={previousStats?.kpis?.posRaised} />
                 </div>
-                <div className="mis-stat-value text-2.5xl font-bold text-left">{stats.kpis.posRaised}</div>
-                <p className="text-[9px] mt-1 text-left" style={{ color: 'var(--text-secondary)' }}>Logged this period</p>
-                <TrendDelta current={stats.kpis.posRaised} previous={previousStats?.kpis?.posRaised} />
+                <div className="p-3.5 rounded-full" style={{ background: 'rgba(20, 184, 166, 0.1)', color: '#14b8a6' }}><IconReceipt /></div>
               </div>
 
-              <div className="mis-stat-card border-l-4 border-emerald-500">
-                <div className="flex justify-between items-start mb-2 text-left">
-                  <span className="mis-stat-label text-[10px] uppercase tracking-wider font-semibold leading-tight block min-h-[26px] pr-1">Total PO Value</span>
-                  <span className="text-emerald-500 opacity-80"><IconReceipt /></span>
+              <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(16, 185, 129, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
+                <div>
+                  <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Total PO Value</div>
+                  <div className="text-3xl font-bold" style={{ color: '#10b981' }}>₹{stats.kpis.totalPoValue.toLocaleString('en-IN')}</div>
+                  <div className="text-xs opacity-50 mt-1">Sum of logged POs</div>
+                  <TrendDelta current={stats.kpis.totalPoValue} previous={previousStats?.kpis?.totalPoValue} />
                 </div>
-                <div className="mis-stat-value text-2.5xl font-bold text-left">₹{stats.kpis.totalPoValue.toLocaleString('en-IN')}</div>
-                <p className="text-[9px] mt-1 text-left" style={{ color: 'var(--text-secondary)' }}>Sum of logged POs</p>
-                <TrendDelta current={stats.kpis.totalPoValue} previous={previousStats?.kpis?.totalPoValue} />
+                <div className="p-3.5 rounded-full" style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10b981' }}><IconReceipt /></div>
               </div>
 
             </section>

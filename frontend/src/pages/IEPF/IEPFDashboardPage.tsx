@@ -341,58 +341,58 @@ const IEPFDashboardPage: React.FC = () => {
         ) : (
         <>
         {/* ── KPI Grid ──────────────────────────────────────── */}
-        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
 
-          <div className="mis-stat-card border-l-4 border-cyan-500">
-            <div className="flex justify-between items-start mb-2">
-              <span className="mis-stat-label text-xs uppercase tracking-wider font-semibold">Total Active Claims</span>
-              <span className="text-cyan-500 opacity-85"><IconActivity /></span>
+          <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(6, 182, 212, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
+            <div>
+              <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Total Active Claims</div>
+              <div className="text-3xl font-bold" style={{ color: '#06b6d4' }}>{kpis.activeClaims}</div>
+              <div className="text-xs opacity-50 mt-1">Processing files</div>
+              <TrendDelta current={kpis.activeClaims} previous={previousKpis.activeClaims} />
             </div>
-            <div className="mis-stat-value text-3xl font-bold">{kpis.activeClaims}</div>
-            <p className="text-[10px] mt-1" style={{ color: 'var(--text-secondary)' }}>Processing files</p>
-            <TrendDelta current={kpis.activeClaims} previous={previousKpis.activeClaims} />
+            <div className="p-3.5 rounded-full" style={{ background: 'rgba(6, 182, 212, 0.1)', color: '#06b6d4' }}><IconActivity /></div>
           </div>
 
-          <div className="mis-stat-card border-l-4 border-emerald-500">
-            <div className="flex justify-between items-start mb-2">
-              <span className="mis-stat-label text-xs uppercase tracking-wider font-semibold">Closed Cases (Year)</span>
-              <span className="text-emerald-500 opacity-85"><IconFolderCheck /></span>
+          <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(16, 185, 129, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
+            <div>
+              <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Closed Cases (Year)</div>
+              <div className="text-3xl font-bold" style={{ color: '#10b981' }}>{kpis.closedThisYear}</div>
+              <div className="text-xs opacity-50 mt-1">Resolved this year</div>
+              <TrendDelta current={kpis.closedThisYear} previous={previousKpis.closedThisYear} />
             </div>
-            <div className="mis-stat-value text-3xl font-bold">{kpis.closedThisYear}</div>
-            <p className="text-[10px] mt-1" style={{ color: 'var(--text-secondary)' }}>Resolved this year</p>
-            <TrendDelta current={kpis.closedThisYear} previous={previousKpis.closedThisYear} />
+            <div className="p-3.5 rounded-full" style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10b981' }}><IconFolderCheck /></div>
           </div>
 
-          <div className="mis-stat-card border-l-4 border-amber-500">
-            <div className="flex justify-between items-start mb-2">
-              <span className="mis-stat-label text-xs uppercase tracking-wider font-semibold">Pending Claims</span>
-              <span className="text-amber-500 opacity-85"><IconAlertTriangle /></span>
+          <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(245, 158, 11, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
+            <div>
+              <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Pending Claims</div>
+              <div className="text-3xl font-bold" style={{ color: '#f59e0b' }}>{kpis.pendingClaims}</div>
+              <div className="text-xs opacity-50 mt-1">Held for documents/KYC</div>
+              <TrendDelta current={kpis.pendingClaims} previous={previousKpis.pendingClaims} />
             </div>
-            <div className="mis-stat-value text-3xl font-bold">{kpis.pendingClaims}</div>
-            <p className="text-[10px] mt-1" style={{ color: 'var(--text-secondary)' }}>Held for documents/KYC</p>
-            <TrendDelta current={kpis.pendingClaims} previous={previousKpis.pendingClaims} />
+            <div className="p-3.5 rounded-full" style={{ background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b' }}><IconAlertTriangle /></div>
           </div>
 
-          <div className="mis-stat-card border-l-4 border-teal-500">
-            <div className="flex justify-between items-start mb-2">
-              <span className="mis-stat-label text-xs uppercase tracking-wider font-semibold">Resolved (Month)</span>
-              <span className="text-teal-500 opacity-85"><IconCalendar /></span>
+          <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(20, 184, 166, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
+            <div>
+              <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Resolved (Month)</div>
+              <div className="text-3xl font-bold" style={{ color: '#14b8a6' }}>{kpis.closedThisMonth}</div>
+              <div className="text-xs opacity-50 mt-1">Completed this month</div>
+              <TrendDelta current={kpis.closedThisMonth} previous={previousKpis.closedThisMonth} />
             </div>
-            <div className="mis-stat-value text-3xl font-bold">{kpis.closedThisMonth}</div>
-            <p className="text-[10px] mt-1" style={{ color: 'var(--text-secondary)' }}>Completed this month</p>
-            <TrendDelta current={kpis.closedThisMonth} previous={previousKpis.closedThisMonth} />
+            <div className="p-3.5 rounded-full" style={{ background: 'rgba(20, 184, 166, 0.1)', color: '#14b8a6' }}><IconCalendar /></div>
           </div>
 
-          <div className="mis-stat-card border-l-4 border-purple-500">
-            <div className="flex justify-between items-start mb-2">
-              <span className="mis-stat-label text-xs uppercase tracking-wider font-semibold">Avg Resolution Time</span>
-              <span className="text-purple-500 opacity-85"><IconClock /></span>
+          <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(168, 85, 247, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
+            <div>
+              <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Avg Resolution Time</div>
+              <div className="text-3xl font-bold" style={{ color: '#a855f7' }}>
+                {kpis.averageResolutionTime} <span className="text-sm font-normal opacity-60">Days</span>
+              </div>
+              <div className="text-xs opacity-50 mt-1">Average closure latency</div>
+              <TrendDelta current={kpis.averageResolutionTime} previous={previousKpis.averageResolutionTime} />
             </div>
-            <div className="mis-stat-value text-3xl font-bold">
-              {kpis.averageResolutionTime} <span className="text-sm font-normal" style={{ color: 'var(--text-secondary)' }}>Days</span>
-            </div>
-            <p className="text-[10px] mt-1" style={{ color: 'var(--text-secondary)' }}>Average closure latency</p>
-            <TrendDelta current={kpis.averageResolutionTime} previous={previousKpis.averageResolutionTime} />
+            <div className="p-3.5 rounded-full" style={{ background: 'rgba(168, 85, 247, 0.1)', color: '#a855f7' }}><IconClock /></div>
           </div>
 
         </section>
