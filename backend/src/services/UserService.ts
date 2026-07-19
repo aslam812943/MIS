@@ -195,8 +195,13 @@ export class UserService {
         }
       }
 
-      // 3. Send welcome email
-      await this.emailService.sendWelcomeEmail(sanitizedEmail, sanitizedName || sanitizedEmail, password);
+      // 3. Send welcome email without blocking the response — the account
+      // is already fully created at this point, and slow/hung SMTP delivery
+      // (e.g. Gmail SMTP from hosted infra) must not delay the API response
+      // or leave the request hanging. Failures here are logged only.
+      this.emailService
+        .sendWelcomeEmail(sanitizedEmail, sanitizedName || sanitizedEmail, password)
+        .catch((err) => console.error('Welcome email failed to send:', err));
 
       return profile;
     } catch (error) {
