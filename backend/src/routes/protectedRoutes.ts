@@ -34,6 +34,8 @@ import { FinanceService } from '../services/FinanceService.js';
 import { FinanceController } from '../controllers/FinanceController.js';
 import { NotificationService } from '../services/NotificationService.js';
 import { NotificationController } from '../controllers/NotificationController.js';
+import { DashboardPermissionService } from '../services/DashboardPermissionService.js';
+import { DashboardPermissionController } from '../controllers/DashboardPermissionController.js';
 import multer from 'multer';
 
 const router = Router();
@@ -79,6 +81,9 @@ const financeController = new FinanceController(financeService);
 
 export const notificationService = new NotificationService(emailService);
 const notificationController = new NotificationController(notificationService);
+
+const dashboardPermissionService = new DashboardPermissionService();
+const dashboardPermissionController = new DashboardPermissionController(dashboardPermissionService);
 
 /**
 
@@ -129,6 +134,16 @@ router.patch('/users/:id/status', requireAuth, requireAdminOrHR, userController.
 router.delete('/users/:id', requireAuth, requireAdmin, userController.deleteUser);
 
 /**
+ * Dashboard widget permissions — admin controls which KPI cards/charts each
+ * (role, department) position sees. `me` resolves the caller's own position
+ * server-side; the rest are admin-only configuration endpoints.
+ */
+router.get('/dashboard-permissions/me', requireAuth, dashboardPermissionController.getMyHiddenWidgets);
+router.get('/dashboard-permissions/positions', requireAuth, requireAdmin, dashboardPermissionController.getPositions);
+router.get('/dashboard-permissions/:role/:departmentId', requireAuth, requireAdmin, dashboardPermissionController.getPositionPermissions);
+router.put('/dashboard-permissions/:role/:departmentId', requireAuth, requireAdmin, dashboardPermissionController.savePositionPermissions);
+
+/**
  * Data entry endpoints
  */
 router.get('/data-entries', requireAuth, dataEntryController.getEntry);
@@ -142,6 +157,7 @@ router.post('/data-entries/:id/verify', requireAuth, dataEntryController.verifyE
 router.get('/iepf/claims', requireAuth, iepfController.getClaims);
 router.post('/iepf/claims', requireAuth, iepfController.createClaim);
 router.patch('/iepf/claims/:id', requireAuth, iepfController.updateClaim);
+router.delete('/iepf/claims/:id', requireAuth, iepfController.deleteClaim);
 router.get('/iepf/dashboard', requireAuth, iepfController.getDashboardData);
 router.get('/iepf/staff', requireAuth, iepfController.getIEPFStaff);
 router.get('/iepf/investors', requireAuth, iepfController.getVerifiedInvestors);
@@ -163,6 +179,7 @@ router.post('/settlements/corporate-actions', requireAuth, settlementController.
 router.patch('/settlements/corporate-actions/:id', requireAuth, settlementController.updateCorporateActionRecord);
 router.get('/settlements/dashboard', requireAuth, settlementController.getDashboardStats);
 router.get('/settlements/clients', requireAuth, settlementController.getVerifiedClients);
+router.delete('/settlements/:sheet/:id', requireAuth, settlementController.deleteEntry);
 
 /**
  * KYC Department endpoints
@@ -215,6 +232,8 @@ router.patch('/kyc/closures/:id', requireAuth, kycController.updateClosure);
 router.get('/kyc/compliance', requireAuth, kycController.getCompliances);
 router.post('/kyc/compliance', requireAuth, kycController.createCompliance);
 router.patch('/kyc/compliance/:id', requireAuth, kycController.updateCompliance);
+
+router.delete('/kyc/:sheet/:id', requireAuth, kycController.deleteEntry);
 
 /**
  * DP Department endpoints

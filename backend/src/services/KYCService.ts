@@ -19,6 +19,24 @@ const SHEET_STATUS_OPTIONS: { [key: string]: string[] } = {
   'compliance': ['Compliant', 'Non-Compliant', 'Due'],
 };
 
+// Maps each sheet slug to its table name, for the shared deleteEntry() below.
+// Every other operation on this service uses per-sheet named methods, but
+// delete logic is identical across all sheets so one generic method (mirroring
+// ITService/DPService's deleteEntry) avoids 11 near-duplicate methods.
+const KYC_SHEET_TABLE_MAPPING: { [key: string]: string } = {
+  'new-accounts': 'kyc_new_account',
+  'ucc-allotments': 'kyc_ucc_allotment',
+  'registry-updates': 'kyc_registry_updation',
+  'ap-sharings': 'kyc_ap_sharing',
+  'demise-reports': 'kyc_demise_reporting',
+  'ap-codes': 'kyc_ap_code_exchange',
+  'communications': 'kyc_onboarding_communication',
+  'modifications': 'kyc_modification_requests',
+  'reactivations': 'kyc_reactivation_requests',
+  'closures': 'kyc_account_closure',
+  'compliance': 'kyc_exchange_compliance',
+};
+
 export class KYCService {
   /**
    * Helper method to verify if a user is authorized to perform KYC actions.
@@ -47,8 +65,11 @@ export class KYCService {
 
     let isAuthorized = false;
     if (requiresDashboard) {
-      // Dashboard requires Admin/Mgmt or KYC HOD
-      isAuthorized = isAdminOrMgmt || (isKYCDept && role === 'hod');
+      // Dashboard requires Admin/Mgmt, KYC HOD, or KYC Employee (employees
+      // now get their own dashboard too — restricted per-widget client-side
+      // via DashboardPermissionService, defaulting to nothing visible until
+      // admin opts specific widgets in).
+      isAuthorized = isAdminOrMgmt || (isKYCDept && (role === 'hod' || role === 'employee'));
     } else {
       // Data entry requires Admin/Mgmt or KYC Staff (HOD, Employee, etc.)
       isAuthorized = isAdminOrMgmt || isKYCDept;
@@ -1262,6 +1283,31 @@ export class KYCService {
   }
 
   // ═══════════════════════════════════════════════
+  // DELETE (shared across all sheets)
+  // ═══════════════════════════════════════════════
+
+  async deleteEntry(requesterId: string, sheet: string, id: string): Promise<void> {
+    const client = supabaseAdmin;
+    if (!client) throw new Error('Supabase client not configured.');
+
+    const access = await this.verifyAccess(requesterId);
+    if (!access.authorized) throw new Error('Unauthorized.');
+
+    const table = KYC_SHEET_TABLE_MAPPING[sheet];
+    if (!table) throw new Error('Invalid sheet mapping.');
+
+    const { data: record, error: fetchError } = await client.from(table).select('branch_id').eq('id', id).single();
+    if (fetchError || !record) throw new Error('Record not found.');
+
+    if ((access.role === 'employee' || access.role === 'hod') && access.branchId && (record as any).branch_id !== access.branchId) {
+      throw new Error('Unauthorized branch access.');
+    }
+
+    const { error } = await client.from(table).delete().eq('id', id);
+    if (error) throw new Error(`Delete failed: ${error.message}`);
+  }
+
+  // ═══════════════════════════════════════════════
   // DASHBOARD AGGREGATIONS
   // ═══════════════════════════════════════════════
 
@@ -1274,7 +1320,12 @@ export class KYCService {
 
     let targetBranchId: string | undefined = branchIdFilter;
     if (access.role === 'employee') {
-      targetBranchId = access.branchId || undefined;
+      // Deny rather than silently show unfiltered company-wide data if this
+      // employee has no branch assigned (e.g. their branch was deleted,
+      // which nulls branch_id via ON DELETE SET NULL) — falling through to
+      // "no filter" here would leak every branch's aggregate KPIs to them.
+      if (!access.branchId) throw new Error('Unauthorized: No branch assigned — dashboard unavailable.');
+      targetBranchId = access.branchId;
     }
 
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;

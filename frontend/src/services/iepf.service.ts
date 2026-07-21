@@ -28,6 +28,14 @@ export const iepfService = {
   },
 
   /**
+   * Deletes a claim.
+   */
+  deleteClaim: async (id: string) => {
+    const response = await api.delete(`/admin/iepf/claims/${id}`);
+    return response.data;
+  },
+
+  /**
    * Fetches dashboard metrics (KPIs and graphs).
    */
   getDashboardData: async (branchId?: string, startDate?: string, endDate?: string) => {

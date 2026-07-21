@@ -30,6 +30,25 @@ export class KYCController {
   }
 
   /**
+   * Recognized validation/authorization errors (400/403) carry a specific
+   * message that's safe to show the user. Anything that falls through to
+   * 500 is an unexpected failure — e.g. a raw Postgres FK-constraint error —
+   * which must not be forwarded to the client verbatim.
+   */
+  private respondError(res: Response, error: unknown, fallbackMessage: string): void {
+    const status = this.getErrorStatus(error);
+    const rawMessage = error instanceof Error ? error.message : fallbackMessage;
+
+    if (status === HttpStatus.INTERNAL_SERVER_ERROR) {
+      console.error('[KYCController]', rawMessage);
+      res.status(status).json({ message: fallbackMessage });
+      return;
+    }
+
+    res.status(status).json({ message: rawMessage });
+  }
+
+  /**
    * Upload supporting files
    */
   uploadDocument = async (req: Request, res: Response): Promise<void> => {
@@ -548,6 +567,34 @@ export class KYCController {
       res.status(HttpStatus.OK).json(record);
     } catch (error) {
       res.status(this.getErrorStatus(error)).json({ message: error instanceof Error ? error.message : 'Error' });
+    }
+  };
+
+  deleteEntry = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const requesterId = (req as any).user.id;
+      const { sheet, id } = req.params;
+
+      await this.kycService.deleteEntry(requesterId, sheet as string, id as string);
+
+      const tableNameMap: { [key: string]: string } = {
+        'new-accounts': 'kyc_new_account',
+        'ucc-allotments': 'kyc_ucc_allotment',
+        'registry-updates': 'kyc_registry_updation',
+        'ap-sharings': 'kyc_ap_sharing',
+        'demise-reports': 'kyc_demise_reporting',
+        'ap-codes': 'kyc_ap_code_exchange',
+        'communications': 'kyc_onboarding_communication',
+        'modifications': 'kyc_modification_requests',
+        'reactivations': 'kyc_reactivation_requests',
+        'closures': 'kyc_account_closure',
+        'compliance': 'kyc_exchange_compliance',
+      };
+      logAudit(req, 'DELETE', tableNameMap[sheet as string] || 'kyc_unknown', id as string, null, null);
+
+      res.status(HttpStatus.NO_CONTENT).send();
+    } catch (error) {
+      this.respondError(res, error, 'Failed to delete entry.');
     }
   };
 

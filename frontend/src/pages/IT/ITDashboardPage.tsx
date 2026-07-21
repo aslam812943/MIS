@@ -10,6 +10,7 @@ import { itService } from '../../services/it.service';
 import { orgService } from '../../services/org.service';
 import { authService } from '../../services/auth.service';
 import { useTheme } from '../../context/ThemeContext';
+import { useDashboardPermissions } from '../../hooks/useDashboardPermissions';
 import type { DateRange } from '../../utils/periodRange';
 
 Chart.register(...registerables);
@@ -88,6 +89,7 @@ const IconReceipt = () => (
 const ITDashboardPage: React.FC = () => {
   const currentUser = authService.getCurrentUser();
   const { theme } = useTheme();
+  const { isVisible } = useDashboardPermissions();
   const isAdmin = currentUser?.role === 'admin';
   const hasMultiBranchAccess = isAdmin || ['ceo', 'managing_director', 'director', 'executive', 'hod'].includes(currentUser?.role || '');
 
@@ -317,6 +319,7 @@ const ITDashboardPage: React.FC = () => {
             {/* KPI statistics cards */}
             <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
 
+              {isVisible('it.kpi.total_users') && (
               <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(6, 182, 212, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
                 <div>
                   <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Total Users</div>
@@ -326,7 +329,9 @@ const ITDashboardPage: React.FC = () => {
                 </div>
                 <div className="p-3.5 rounded-full" style={{ background: 'rgba(6, 182, 212, 0.1)', color: '#06b6d4' }}><IconUsers /></div>
               </div>
+              )}
 
+              {isVisible('it.kpi.active_devices') && (
               <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(16, 185, 129, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
                 <div>
                   <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Active Devices</div>
@@ -336,7 +341,9 @@ const ITDashboardPage: React.FC = () => {
                 </div>
                 <div className="p-3.5 rounded-full" style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10b981' }}><IconDevice /></div>
               </div>
+              )}
 
+              {isVisible('it.kpi.open_tickets') && (
               <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(245, 158, 11, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
                 <div>
                   <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Open Tickets</div>
@@ -346,7 +353,9 @@ const ITDashboardPage: React.FC = () => {
                 </div>
                 <div className="p-3.5 rounded-full" style={{ background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b' }}><IconTicket /></div>
               </div>
+              )}
 
+              {isVisible('it.kpi.critical_incidents') && (
               <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(239, 68, 68, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
                 <div>
                   <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Critical Incidents</div>
@@ -356,7 +365,9 @@ const ITDashboardPage: React.FC = () => {
                 </div>
                 <div className="p-3.5 rounded-full" style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444' }}><IconIncident /></div>
               </div>
+              )}
 
+              {isVisible('it.kpi.system_uptime') && (
               <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(59, 130, 246, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
                 <div>
                   <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>System Uptime</div>
@@ -366,7 +377,9 @@ const ITDashboardPage: React.FC = () => {
                 </div>
                 <div className="p-3.5 rounded-full" style={{ background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6' }}><IconAvailability /></div>
               </div>
+              )}
 
+              {isVisible('it.kpi.sla_met') && (
               <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(99, 102, 241, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
                 <div>
                   <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>SLA Met</div>
@@ -376,7 +389,9 @@ const ITDashboardPage: React.FC = () => {
                 </div>
                 <div className="p-3.5 rounded-full" style={{ background: 'rgba(99, 102, 241, 0.1)', color: '#6366f1' }}><IconCompliance /></div>
               </div>
+              )}
 
+              {isVisible('it.kpi.ongoing_projects') && (
               <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(168, 85, 247, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
                 <div>
                   <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Ongoing Projects</div>
@@ -386,7 +401,9 @@ const ITDashboardPage: React.FC = () => {
                 </div>
                 <div className="p-3.5 rounded-full" style={{ background: 'rgba(168, 85, 247, 0.1)', color: '#a855f7' }}><IconProject /></div>
               </div>
+              )}
 
+              {isVisible('it.kpi.audits_overdue') && (
               <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(239, 68, 68, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
                 <div>
                   <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Audits Overdue</div>
@@ -396,7 +413,9 @@ const ITDashboardPage: React.FC = () => {
                 </div>
                 <div className="p-3.5 rounded-full" style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444' }}><IconClock /></div>
               </div>
+              )}
 
+              {isVisible('it.kpi.amc_due_30d') && (
               <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(245, 158, 11, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
                 <div>
                   <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>AMC Due (30d)</div>
@@ -406,7 +425,9 @@ const ITDashboardPage: React.FC = () => {
                 </div>
                 <div className="p-3.5 rounded-full" style={{ background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b' }}><IconClock /></div>
               </div>
+              )}
 
+              {isVisible('it.kpi.pos_raised') && (
               <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(20, 184, 166, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
                 <div>
                   <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>POs Raised</div>
@@ -416,7 +437,9 @@ const ITDashboardPage: React.FC = () => {
                 </div>
                 <div className="p-3.5 rounded-full" style={{ background: 'rgba(20, 184, 166, 0.1)', color: '#14b8a6' }}><IconReceipt /></div>
               </div>
+              )}
 
+              {isVisible('it.kpi.total_po_value') && (
               <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(16, 185, 129, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
                 <div>
                   <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Total PO Value</div>
@@ -426,6 +449,7 @@ const ITDashboardPage: React.FC = () => {
                 </div>
                 <div className="p-3.5 rounded-full" style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10b981' }}><IconReceipt /></div>
               </div>
+              )}
 
             </section>
 
@@ -433,6 +457,7 @@ const ITDashboardPage: React.FC = () => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
               {/* Recurring audit schedule cards */}
+              {isVisible('it.chart.audit_filing_countdown') && (
               <div className="mis-card p-5 lg:col-span-1">
                 <h3 className="text-sm font-bold mb-4 text-left border-b pb-2" style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
                   🗓️ Audit Filing Countdown (HO)
@@ -455,8 +480,10 @@ const ITDashboardPage: React.FC = () => {
                   <p className="text-xs text-center py-6" style={{ color: 'var(--text-secondary)' }}>No audit schedule entries yet.</p>
                 )}
               </div>
+              )}
 
               {/* Upcoming AMC renewals */}
+              {isVisible('it.chart.upcoming_amc_renewals') && (
               <div className="mis-card p-5 lg:col-span-1">
                 <h3 className="text-sm font-bold mb-4 text-left border-b pb-2" style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
                   🛠️ Upcoming AMC Renewals
@@ -477,8 +504,10 @@ const ITDashboardPage: React.FC = () => {
                   <p className="text-xs text-center py-6" style={{ color: 'var(--text-secondary)' }}>No AMC contracts recorded yet.</p>
                 )}
               </div>
+              )}
 
               {/* Expiring software licenses */}
+              {isVisible('it.chart.software_licenses_expiring') && (
               <div className="mis-card p-5 lg:col-span-1">
                 <h3 className="text-sm font-bold mb-4 text-left border-b pb-2" style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
                   💿 Software Licenses Expiring
@@ -499,6 +528,7 @@ const ITDashboardPage: React.FC = () => {
                   <p className="text-xs text-center py-6" style={{ color: 'var(--text-secondary)' }}>No software licenses recorded yet.</p>
                 )}
               </div>
+              )}
 
             </div>
 
@@ -506,6 +536,7 @@ const ITDashboardPage: React.FC = () => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               
               {/* Bar distribution chart: Asset useful age */}
+              {isVisible('it.chart.asset_life_age_brackets') && (
               <div className="mis-card p-5 lg:col-span-2">
                 <h3 className="text-sm font-bold mb-4 text-left border-b pb-2" style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
                   📊 Useful Asset Life Age brackets
@@ -514,8 +545,10 @@ const ITDashboardPage: React.FC = () => {
                   <canvas ref={ageCanvasRef}></canvas>
                 </div>
               </div>
+              )}
 
               {/* Donut chart: Categories */}
+              {isVisible('it.chart.device_category_distribution') && (
               <div className="mis-card p-5">
                 <h3 className="text-sm font-bold mb-4 text-left border-b pb-2" style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
                   🍩 Device Category Distribution
@@ -524,8 +557,10 @@ const ITDashboardPage: React.FC = () => {
                   <canvas ref={categoryCanvasRef}></canvas>
                 </div>
               </div>
+              )}
 
               {/* Line trend chart: Expiries */}
+              {isVisible('it.chart.warranty_expiries') && (
               <div className="mis-card p-5 lg:col-span-3">
                 <h3 className="text-sm font-bold mb-4 text-left border-b pb-2" style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
                   📈 Upcoming Hardware & Software Warranty Expiries (Next 12 Months)
@@ -534,6 +569,7 @@ const ITDashboardPage: React.FC = () => {
                   <canvas ref={warrantyCanvasRef}></canvas>
                 </div>
               </div>
+              )}
 
             </div>
           </>

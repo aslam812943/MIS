@@ -9,6 +9,7 @@ import { financeService } from '../../services/finance.service';
 import { orgService } from '../../services/org.service';
 import { authService } from '../../services/auth.service';
 import { useTheme } from '../../context/ThemeContext';
+import { useDashboardPermissions } from '../../hooks/useDashboardPermissions';
 import type { DateRange } from '../../utils/periodRange';
 
 Chart.register(...registerables);
@@ -68,6 +69,7 @@ const IconRequests = () => (
 const FinanceDashboardPage: React.FC = () => {
   const currentUser = authService.getCurrentUser();
   const { theme } = useTheme();
+  const { isVisible } = useDashboardPermissions();
   const isAdmin = currentUser?.role === 'admin';
   const hasMultiBranchAccess = isAdmin || ['ceo', 'managing_director', 'director', 'executive', 'hod'].includes(currentUser?.role || '');
 
@@ -294,6 +296,7 @@ const FinanceDashboardPage: React.FC = () => {
             {/* KPI statistics cards */}
             <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
 
+              {isVisible('finance.kpi.brokerage_revenue') && (
               <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(16, 185, 129, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
                 <div>
                   <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Brokerage Revenue</div>
@@ -303,7 +306,9 @@ const FinanceDashboardPage: React.FC = () => {
                 </div>
                 <div className="p-3.5 rounded-full" style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10b981' }}><IconRevenue /></div>
               </div>
+              )}
 
+              {isVisible('finance.kpi.net_profit') && (
               <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(6, 182, 212, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
                 <div>
                   <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Net Profit</div>
@@ -313,7 +318,9 @@ const FinanceDashboardPage: React.FC = () => {
                 </div>
                 <div className="p-3.5 rounded-full" style={{ background: 'rgba(6, 182, 212, 0.1)', color: '#06b6d4' }}><IconProfit /></div>
               </div>
+              )}
 
+              {isVisible('finance.kpi.ebitda_margin') && (
               <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(99, 102, 241, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
                 <div>
                   <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>EBITDA Margin</div>
@@ -323,7 +330,9 @@ const FinanceDashboardPage: React.FC = () => {
                 </div>
                 <div className="p-3.5 rounded-full" style={{ background: 'rgba(99, 102, 241, 0.1)', color: '#6366f1' }}><IconMargin /></div>
               </div>
+              )}
 
+              {isVisible('finance.kpi.cost_to_income') && (
               <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(245, 158, 11, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
                 <div>
                   <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Cost-to-Income</div>
@@ -333,7 +342,9 @@ const FinanceDashboardPage: React.FC = () => {
                 </div>
                 <div className="p-3.5 rounded-full" style={{ background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b' }}><IconCostRatio /></div>
               </div>
+              )}
 
+              {isVisible('finance.kpi.total_liquidity') && (
               <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(59, 130, 246, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
                 <div>
                   <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Total Liquidity</div>
@@ -343,7 +354,9 @@ const FinanceDashboardPage: React.FC = () => {
                 </div>
                 <div className="p-3.5 rounded-full" style={{ background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6' }}><IconLiquidity /></div>
               </div>
+              )}
 
+              {isVisible('finance.kpi.renewals_due_soon') && (
               <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(239, 68, 68, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
                 <div>
                   <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Renewals Due Soon</div>
@@ -353,7 +366,9 @@ const FinanceDashboardPage: React.FC = () => {
                 </div>
                 <div className="p-3.5 rounded-full" style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444' }}><IconRenewals /></div>
               </div>
+              )}
 
+              {isVisible('finance.kpi.open_client_requests') && (
               <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(168, 85, 247, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
                 <div>
                   <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Open Client Requests</div>
@@ -363,6 +378,7 @@ const FinanceDashboardPage: React.FC = () => {
                 </div>
                 <div className="p-3.5 rounded-full" style={{ background: 'rgba(168, 85, 247, 0.1)', color: '#a855f7' }}><IconRequests /></div>
               </div>
+              )}
 
             </section>
 
@@ -370,6 +386,7 @@ const FinanceDashboardPage: React.FC = () => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
               {/* Stacked bar chart: Monthly revenue trend */}
+              {isVisible('finance.chart.monthly_revenue_trend') && (
               <div className="mis-card p-5 lg:col-span-2">
                 <h3 className="text-sm font-bold mb-4 text-left border-b pb-2" style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
                   📊 Monthly Revenue Trend (Last 12 Months)
@@ -379,8 +396,10 @@ const FinanceDashboardPage: React.FC = () => {
                   <canvas ref={revenueTrendCanvasRef}></canvas>
                 </div>
               </div>
+              )}
 
               {/* Donut chart: Revenue composition */}
+              {isVisible('finance.chart.revenue_composition') && (
               <div className="mis-card p-5">
                 <h3 className="text-sm font-bold mb-4 text-left border-b pb-2" style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
                   🍩 Revenue Composition
@@ -389,8 +408,10 @@ const FinanceDashboardPage: React.FC = () => {
                   <canvas ref={compositionCanvasRef}></canvas>
                 </div>
               </div>
+              )}
 
               {/* Line trend chart: Upcoming dues */}
+              {isVisible('finance.chart.upcoming_statutory_renewals') && (
               <div className="mis-card p-5 lg:col-span-3">
                 <h3 className="text-sm font-bold mb-4 text-left border-b pb-2" style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
                   📈 Upcoming Statutory Renewals & Filings (Next 12 Months)
@@ -399,6 +420,7 @@ const FinanceDashboardPage: React.FC = () => {
                   <canvas ref={duesCanvasRef}></canvas>
                 </div>
               </div>
+              )}
 
             </div>
           </>

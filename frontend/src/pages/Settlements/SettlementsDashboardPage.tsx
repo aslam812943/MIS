@@ -9,6 +9,7 @@ import { settlementService } from '../../services/settlement.service';
 import { orgService } from '../../services/org.service';
 import { authService } from '../../services/auth.service';
 import { useTheme } from '../../context/ThemeContext';
+import { useDashboardPermissions } from '../../hooks/useDashboardPermissions';
 import type { DateRange } from '../../utils/periodRange';
 import { getDefaultPeriod } from '../../utils/periodRange';
 
@@ -47,6 +48,7 @@ const IconCorporate = () => (
 const SettlementsDashboardPage: React.FC = () => {
   const currentUser = authService.getCurrentUser();
   const { theme } = useTheme();
+  const { isVisible } = useDashboardPermissions();
   const isAdmin = currentUser?.role === 'admin';
   const hasMultiBranchAccess = isAdmin || ['ceo', 'managing_director', 'director', 'executive', 'hod'].includes(currentUser?.role || '');
   const userBranchId = currentUser?.branch_id || '';
@@ -349,6 +351,7 @@ const SettlementsDashboardPage: React.FC = () => {
         {/* ── KPI Card Grid ─────────────────────────────────── */}
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
 
+          {isVisible('settlements.kpi.securities_volume') && (
           <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(20, 184, 166, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
             <div>
               <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Securities Volume</div>
@@ -365,7 +368,9 @@ const SettlementsDashboardPage: React.FC = () => {
             </div>
             <div className="p-3.5 rounded-full" style={{ background: 'rgba(20, 184, 166, 0.1)', color: '#14b8a6' }}><IconSecurity /></div>
           </div>
+          )}
 
+          {isVisible('settlements.kpi.service_tickets') && (
           <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(245, 158, 11, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
             <div>
               <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Service Tickets</div>
@@ -377,7 +382,9 @@ const SettlementsDashboardPage: React.FC = () => {
             </div>
             <div className="p-3.5 rounded-full" style={{ background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b' }}><IconTicket /></div>
           </div>
+          )}
 
+          {isVisible('settlements.kpi.ipo_allotment_rate') && (
           <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(99, 102, 241, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
             <div>
               <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>IPO Allotment Rate</div>
@@ -389,7 +396,9 @@ const SettlementsDashboardPage: React.FC = () => {
             </div>
             <div className="p-3.5 rounded-full" style={{ background: 'rgba(99, 102, 241, 0.1)', color: '#6366f1' }}><IconIpo /></div>
           </div>
+          )}
 
+          {isVisible('settlements.kpi.corp_action_payout') && (
           <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(168, 85, 247, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
             <div>
               <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Corp Action Payout</div>
@@ -403,6 +412,7 @@ const SettlementsDashboardPage: React.FC = () => {
             </div>
             <div className="p-3.5 rounded-full" style={{ background: 'rgba(168, 85, 247, 0.1)', color: '#a855f7' }}><IconCorporate /></div>
           </div>
+          )}
 
         </section>
 
@@ -463,6 +473,7 @@ const SettlementsDashboardPage: React.FC = () => {
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
           {/* Doughnut Chart */}
+          {isVisible('settlements.chart.payin_payout_status') && (
           <div className="mis-card p-5 flex flex-col h-[320px]">
             <h3 className="font-semibold text-sm mb-1" style={{ color: 'var(--text-primary)' }}>Pay-in / Pay-out Status</h3>
             <p className="text-xs mb-4" style={{ color: 'var(--text-secondary)' }}>Completed vs Pending vs Shortages</p>
@@ -470,8 +481,10 @@ const SettlementsDashboardPage: React.FC = () => {
               <canvas ref={donutCanvasRef} />
             </div>
           </div>
+          )}
 
           {/* Line Chart */}
+          {isVisible('settlements.chart.monthly_requests_trend') && (
           <div className="mis-card p-5 flex flex-col h-[320px] lg:col-span-2">
             <h3 className="font-semibold text-sm mb-1" style={{ color: 'var(--text-primary)' }}>Monthly Requests Trend</h3>
             <p className="text-xs mb-4" style={{ color: 'var(--text-secondary)' }}>Service tickets received during the current calendar year</p>
@@ -479,8 +492,10 @@ const SettlementsDashboardPage: React.FC = () => {
               <canvas ref={lineCanvasRef} />
             </div>
           </div>
+          )}
 
           {/* Horizontal Bar Chart */}
+          {isVisible('settlements.chart.client_request_types') && (
           <div className="mis-card p-5 flex flex-col h-[300px] lg:col-span-3">
             <h3 className="font-semibold text-sm mb-1" style={{ color: 'var(--text-primary)' }}>Client Request Types</h3>
             <p className="text-xs mb-4" style={{ color: 'var(--text-secondary)' }}>Distribution count per service request ticket category</p>
@@ -488,6 +503,7 @@ const SettlementsDashboardPage: React.FC = () => {
               <canvas ref={barCanvasRef} />
             </div>
           </div>
+          )}
 
         </section>
 
@@ -495,6 +511,7 @@ const SettlementsDashboardPage: React.FC = () => {
         <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           
           {/* Section A: IPO Details */}
+          {isVisible('settlements.chart.ipo_subscriptions_summary') && (
           <div className="mis-card p-6 space-y-4">
             <div>
               <h3 className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>IPO Subscriptions Summary</h3>
@@ -542,8 +559,10 @@ const SettlementsDashboardPage: React.FC = () => {
               </div>
             </div>
           </div>
+          )}
 
           {/* Section B: Corporate Actions Summary */}
+          {isVisible('settlements.chart.corporate_actions_eligibility') && (
           <div className="mis-card p-6 space-y-4">
             <div>
               <h3 className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>Corporate Actions Eligibility</h3>
@@ -579,6 +598,7 @@ const SettlementsDashboardPage: React.FC = () => {
               </div>
             </div>
           </div>
+          )}
 
         </section>
         </>

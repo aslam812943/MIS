@@ -979,6 +979,17 @@ const KYCDataEntryPage: React.FC = () => {
     setActiveTab('register');
   };
 
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('Are you sure you want to delete this record?')) return;
+    try {
+      await kycService.deleteEntry(getBackendSheetName(sheetTab), id);
+      toast.success('Record deleted.');
+      fetchRecords();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Delete operation failed.');
+    }
+  };
+
   // UX Component: Selector populated with clients onboarded/verified in sheet 1
   const renderClientSelectionBlock = () => {
     if (onboardedClients.length === 0) return null;
@@ -1988,6 +1999,7 @@ const KYCDataEntryPage: React.FC = () => {
             <td className="whitespace-nowrap text-xs font-semibold">{branchName}</td>
             <td>
               <button onClick={() => handleEdit(record)} className="hover:underline text-xs font-bold mr-2" style={{ color: 'var(--accent)' }}>Edit</button>
+              <button onClick={() => handleDelete(record.id)} className="hover:underline text-xs font-bold text-red-400 hover:text-red-300">Delete</button>
             </td>
           </tr>
         );
@@ -2005,6 +2017,7 @@ const KYCDataEntryPage: React.FC = () => {
             <td className="whitespace-nowrap text-xs font-semibold">{branchName}</td>
             <td>
               <button onClick={() => handleEdit(record)} className="hover:underline text-xs font-bold mr-2" style={{ color: 'var(--accent)' }}>Edit</button>
+              <button onClick={() => handleDelete(record.id)} className="hover:underline text-xs font-bold text-red-400 hover:text-red-300">Delete</button>
             </td>
           </tr>
         );
@@ -2021,6 +2034,7 @@ const KYCDataEntryPage: React.FC = () => {
             <td className="whitespace-nowrap text-xs font-semibold">{branchName}</td>
             <td>
               <button onClick={() => handleEdit(record)} className="hover:underline text-xs font-bold mr-2" style={{ color: 'var(--accent)' }}>Edit</button>
+              <button onClick={() => handleDelete(record.id)} className="hover:underline text-xs font-bold text-red-400 hover:text-red-300">Delete</button>
             </td>
           </tr>
         );
@@ -2037,6 +2051,7 @@ const KYCDataEntryPage: React.FC = () => {
             <td className="whitespace-nowrap text-xs font-semibold">{branchName}</td>
             <td>
               <button onClick={() => handleEdit(record)} className="hover:underline text-xs font-bold mr-2" style={{ color: 'var(--accent)' }}>Edit</button>
+              <button onClick={() => handleDelete(record.id)} className="hover:underline text-xs font-bold text-red-400 hover:text-red-300">Delete</button>
             </td>
           </tr>
         );
@@ -2061,6 +2076,7 @@ const KYCDataEntryPage: React.FC = () => {
             <td className="whitespace-nowrap text-xs font-semibold">{branchName}</td>
             <td>
               <button onClick={() => handleEdit(record)} className="hover:underline text-xs font-bold mr-2" style={{ color: 'var(--accent)' }}>Edit</button>
+              <button onClick={() => handleDelete(record.id)} className="hover:underline text-xs font-bold text-red-400 hover:text-red-300">Delete</button>
             </td>
           </tr>
         );
@@ -2076,6 +2092,7 @@ const KYCDataEntryPage: React.FC = () => {
             <td className="whitespace-nowrap text-xs font-semibold">{branchName}</td>
             <td>
               <button onClick={() => handleEdit(record)} className="hover:underline text-xs font-bold mr-2" style={{ color: 'var(--accent)' }}>Edit</button>
+              <button onClick={() => handleDelete(record.id)} className="hover:underline text-xs font-bold text-red-400 hover:text-red-300">Delete</button>
             </td>
           </tr>
         );
@@ -2091,6 +2108,7 @@ const KYCDataEntryPage: React.FC = () => {
             <td className="whitespace-nowrap text-xs font-semibold">{branchName}</td>
             <td>
               <button onClick={() => handleEdit(record)} className="hover:underline text-xs font-bold mr-2" style={{ color: 'var(--accent)' }}>Edit</button>
+              <button onClick={() => handleDelete(record.id)} className="hover:underline text-xs font-bold text-red-400 hover:text-red-300">Delete</button>
             </td>
           </tr>
         );
@@ -2121,6 +2139,7 @@ const KYCDataEntryPage: React.FC = () => {
             <td className="whitespace-nowrap text-xs font-semibold">{branchName}</td>
             <td>
               <button onClick={() => handleEdit(record)} className="hover:underline text-xs font-bold mr-2" style={{ color: 'var(--accent)' }}>Edit</button>
+              <button onClick={() => handleDelete(record.id)} className="hover:underline text-xs font-bold text-red-400 hover:text-red-300">Delete</button>
             </td>
           </tr>
         );
@@ -2139,6 +2158,7 @@ const KYCDataEntryPage: React.FC = () => {
             <td className="whitespace-nowrap text-xs font-semibold">{branchName}</td>
             <td>
               <button onClick={() => handleEdit(record)} className="hover:underline text-xs font-bold mr-2" style={{ color: 'var(--accent)' }}>Edit</button>
+              <button onClick={() => handleDelete(record.id)} className="hover:underline text-xs font-bold text-red-400 hover:text-red-300">Delete</button>
             </td>
           </tr>
         );
@@ -2157,6 +2177,7 @@ const KYCDataEntryPage: React.FC = () => {
             <td className="whitespace-nowrap text-xs font-semibold">{branchName}</td>
             <td>
               <button onClick={() => handleEdit(record)} className="hover:underline text-xs font-bold mr-2" style={{ color: 'var(--accent)' }}>Edit</button>
+              <button onClick={() => handleDelete(record.id)} className="hover:underline text-xs font-bold text-red-400 hover:text-red-300">Delete</button>
             </td>
           </tr>
         );
@@ -2172,6 +2193,7 @@ const KYCDataEntryPage: React.FC = () => {
             <td className="whitespace-nowrap text-xs font-semibold">{branchName}</td>
             <td>
               <button onClick={() => handleEdit(record)} className="hover:underline text-xs font-bold mr-2" style={{ color: 'var(--accent)' }}>Edit</button>
+              <button onClick={() => handleDelete(record.id)} className="hover:underline text-xs font-bold text-red-400 hover:text-red-300">Delete</button>
             </td>
           </tr>
         );

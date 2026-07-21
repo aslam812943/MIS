@@ -491,6 +491,24 @@ const SettlementsDataEntryPage: React.FC = () => {
     setActiveTab('register');
   };
 
+  const SETTLEMENTS_SHEET_URL_SLUG: Record<typeof sheetTab, string> = {
+    payin_payout: 'payin-payout',
+    client_requests: 'client-requests',
+    ipo_allocation: 'ipo-allocation',
+    corporate_actions: 'corporate-actions',
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('Are you sure you want to delete this record?')) return;
+    try {
+      await settlementService.deleteEntry(SETTLEMENTS_SHEET_URL_SLUG[sheetTab], id);
+      toast.success('Record deleted.');
+      fetchRecords();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Delete operation failed.');
+    }
+  };
+
   // Plain-English "why are we collecting this" panel shown beside the entry
   // form — same content for every employee, sheet by sheet.
   const renderHelpPanel = () => {
@@ -958,6 +976,13 @@ const SettlementsDataEntryPage: React.FC = () => {
                                 >
                                   Edit Row
                                 </button>
+                                <button
+                                  onClick={() => handleDelete(record.id)}
+                                  className="mis-btn mis-btn-ghost mis-btn-sm"
+                                  style={{ color: '#ef4444', marginLeft: '0.5rem' }}
+                                >
+                                  Delete
+                                </button>
                               </td>
                             </tr>
                           );
@@ -1239,6 +1264,13 @@ const SettlementsDataEntryPage: React.FC = () => {
                                   className="mis-btn mis-btn-ghost mis-btn-sm"
                                 >
                                   Edit Row
+                                </button>
+                                <button
+                                  onClick={() => handleDelete(record.id)}
+                                  className="mis-btn mis-btn-ghost mis-btn-sm"
+                                  style={{ color: '#ef4444', marginLeft: '0.5rem' }}
+                                >
+                                  Delete
                                 </button>
                               </td>
                             </tr>
@@ -1584,6 +1616,13 @@ const SettlementsDataEntryPage: React.FC = () => {
                                 >
                                   Edit Row
                                 </button>
+                                <button
+                                  onClick={() => handleDelete(record.id)}
+                                  className="mis-btn mis-btn-ghost mis-btn-sm"
+                                  style={{ color: '#ef4444', marginLeft: '0.5rem' }}
+                                >
+                                  Delete
+                                </button>
                               </td>
                             </tr>
                           );
@@ -1911,6 +1950,13 @@ const SettlementsDataEntryPage: React.FC = () => {
                                   className="mis-btn mis-btn-ghost mis-btn-sm"
                                 >
                                   Edit Row
+                                </button>
+                                <button
+                                  onClick={() => handleDelete(record.id)}
+                                  className="mis-btn mis-btn-ghost mis-btn-sm"
+                                  style={{ color: '#ef4444', marginLeft: '0.5rem' }}
+                                >
+                                  Delete
                                 </button>
                               </td>
                             </tr>

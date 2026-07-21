@@ -111,6 +111,28 @@ export class IEPFController {
   };
 
   /**
+   * Delete an existing claim.
+   */
+  deleteClaim = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const requesterId = (req as any).user.id;
+      const id = req.params.id as string;
+
+      // Get current version for audit logs before it's gone
+      const allClaims = await this.iepfService.getClaims(requesterId, {});
+      const oldClaim = allClaims.find(c => c.id === id);
+
+      await this.iepfService.deleteClaim(id, requesterId);
+
+      logAudit(req, 'DELETE', 'iepf_claims', id, oldClaim || null, null);
+
+      res.status(HttpStatus.NO_CONTENT).send();
+    } catch (error) {
+      this.respondError(res, error, 'Failed to delete claim.');
+    }
+  };
+
+  /**
    * Get HOD dashboard data.
    */
   getDashboardData = async (req: Request, res: Response): Promise<void> => {
