@@ -9,6 +9,7 @@ import DashboardLayout from '../../components/layout/DashboardLayout';
 import PeriodFilter from '../../components/common/PeriodFilter';
 import TrendDelta from '../../components/common/TrendDelta';
 import { useTheme } from '../../context/ThemeContext';
+import { useDashboardPermissions } from '../../hooks/useDashboardPermissions';
 import type { DateRange } from '../../utils/periodRange';
 import { getDefaultPeriod } from '../../utils/periodRange';
 
@@ -51,6 +52,7 @@ const IconClock = () => (
 const IEPFDashboardPage: React.FC = () => {
   const currentUser = authService.getCurrentUser();
   const { theme } = useTheme();
+  const { isVisible } = useDashboardPermissions();
   const isAdmin = currentUser?.role === 'admin';
   const hasMultiBranchAccess = isAdmin || ['ceo', 'managing_director', 'director', 'executive', 'hod'].includes(currentUser?.role || '');
   const userBranchId = currentUser?.branch_id || '';
@@ -343,6 +345,7 @@ const IEPFDashboardPage: React.FC = () => {
         {/* ── KPI Grid ──────────────────────────────────────── */}
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
 
+          {isVisible('iepf.kpi.total_active_claims') && (
           <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(6, 182, 212, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
             <div>
               <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Total Active Claims</div>
@@ -352,7 +355,9 @@ const IEPFDashboardPage: React.FC = () => {
             </div>
             <div className="p-3.5 rounded-full" style={{ background: 'rgba(6, 182, 212, 0.1)', color: '#06b6d4' }}><IconActivity /></div>
           </div>
+          )}
 
+          {isVisible('iepf.kpi.closed_cases_year') && (
           <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(16, 185, 129, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
             <div>
               <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Closed Cases (Year)</div>
@@ -362,7 +367,9 @@ const IEPFDashboardPage: React.FC = () => {
             </div>
             <div className="p-3.5 rounded-full" style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10b981' }}><IconFolderCheck /></div>
           </div>
+          )}
 
+          {isVisible('iepf.kpi.pending_claims') && (
           <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(245, 158, 11, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
             <div>
               <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Pending Claims</div>
@@ -372,7 +379,9 @@ const IEPFDashboardPage: React.FC = () => {
             </div>
             <div className="p-3.5 rounded-full" style={{ background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b' }}><IconAlertTriangle /></div>
           </div>
+          )}
 
+          {isVisible('iepf.kpi.resolved_month') && (
           <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(20, 184, 166, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
             <div>
               <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Resolved (Month)</div>
@@ -382,7 +391,9 @@ const IEPFDashboardPage: React.FC = () => {
             </div>
             <div className="p-3.5 rounded-full" style={{ background: 'rgba(20, 184, 166, 0.1)', color: '#14b8a6' }}><IconCalendar /></div>
           </div>
+          )}
 
+          {isVisible('iepf.kpi.avg_resolution_time') && (
           <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(168, 85, 247, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
             <div>
               <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Avg Resolution Time</div>
@@ -394,12 +405,14 @@ const IEPFDashboardPage: React.FC = () => {
             </div>
             <div className="p-3.5 rounded-full" style={{ background: 'rgba(168, 85, 247, 0.1)', color: '#a855f7' }}><IconClock /></div>
           </div>
+          )}
 
         </section>
 
         {/* ── Charts Section ────────────────────────────────── */}
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
+          {isVisible('iepf.chart.claim_status_breakdown') && (
           <div className="mis-card p-5 flex flex-col h-[320px]">
             <h3 className="font-semibold text-sm mb-1" style={{ color: 'var(--text-primary)' }}>Claim Status breakdown</h3>
             <p className="text-xs mb-4" style={{ color: 'var(--text-secondary)' }}>Active vs Closed vs Holds</p>
@@ -407,7 +420,9 @@ const IEPFDashboardPage: React.FC = () => {
               <canvas ref={donutCanvasRef} />
             </div>
           </div>
+          )}
 
+          {isVisible('iepf.chart.monthly_claims_trend') && (
           <div className="mis-card p-5 flex flex-col h-[320px] lg:col-span-2">
             <h3 className="font-semibold text-sm mb-1" style={{ color: 'var(--text-primary)' }}>Monthly Claims Trend</h3>
             <p className="text-xs mb-4" style={{ color: 'var(--text-secondary)' }}>Claim registrations submitted this year</p>
@@ -415,7 +430,9 @@ const IEPFDashboardPage: React.FC = () => {
               <canvas ref={lineCanvasRef} />
             </div>
           </div>
+          )}
 
+          {isVisible('iepf.chart.pending_reason_analysis') && (
           <div className="mis-card p-5 flex flex-col h-[300px] lg:col-span-3">
             <h3 className="font-semibold text-sm mb-1" style={{ color: 'var(--text-primary)' }}>Pending Reason Analysis</h3>
             <p className="text-xs mb-4" style={{ color: 'var(--text-secondary)' }}>Frequency of mismatch triggers for files in 'Documents Pending' status</p>
@@ -423,6 +440,7 @@ const IEPFDashboardPage: React.FC = () => {
               <canvas ref={barCanvasRef} />
             </div>
           </div>
+          )}
 
         </section>
 

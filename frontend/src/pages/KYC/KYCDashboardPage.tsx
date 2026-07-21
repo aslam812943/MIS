@@ -9,6 +9,7 @@ import { kycService } from '../../services/kyc.service';
 import { orgService } from '../../services/org.service';
 import { authService } from '../../services/auth.service';
 import { useTheme } from '../../context/ThemeContext';
+import { useDashboardPermissions } from '../../hooks/useDashboardPermissions';
 import type { DateRange } from '../../utils/periodRange';
 import { getDefaultPeriod } from '../../utils/periodRange';
 
@@ -47,6 +48,7 @@ const IconCompliance = () => (
 const KYCDashboardPage: React.FC = () => {
   const currentUser = authService.getCurrentUser();
   const { theme } = useTheme();
+  const { isVisible } = useDashboardPermissions();
   const isAdmin = currentUser?.role === 'admin';
   const hasMultiBranchAccess = isAdmin || ['ceo', 'managing_director', 'director', 'executive', 'hod'].includes(currentUser?.role || '');
   const userBranchId = currentUser?.branch_id || '';
@@ -330,6 +332,7 @@ const KYCDashboardPage: React.FC = () => {
         {/* KPI Cards Grid */}
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
 
+          {isVisible('kyc.kpi.total_onboarded_clients') && (
           <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(20, 184, 166, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
             <div>
               <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Total Onboarded Clients</div>
@@ -338,7 +341,9 @@ const KYCDashboardPage: React.FC = () => {
             </div>
             <div className="p-3.5 rounded-full" style={{ background: 'rgba(20, 184, 166, 0.1)', color: '#14b8a6' }}><IconPeople /></div>
           </div>
+          )}
 
+          {isVisible('kyc.kpi.pending_verifications') && (
           <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(245, 158, 11, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
             <div>
               <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Pending Verifications</div>
@@ -347,7 +352,9 @@ const KYCDashboardPage: React.FC = () => {
             </div>
             <div className="p-3.5 rounded-full" style={{ background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b' }}><IconAlert /></div>
           </div>
+          )}
 
+          {isVisible('kyc.kpi.modifications_applied') && (
           <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(99, 102, 241, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
             <div>
               <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Modifications Applied</div>
@@ -356,7 +363,9 @@ const KYCDashboardPage: React.FC = () => {
             </div>
             <div className="p-3.5 rounded-full" style={{ background: 'rgba(99, 102, 241, 0.1)', color: '#6366f1' }}><IconModify /></div>
           </div>
+          )}
 
+          {isVisible('kyc.kpi.closed_accounts') && (
           <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(244, 63, 94, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
             <div>
               <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Closed Accounts / Closures</div>
@@ -365,6 +374,7 @@ const KYCDashboardPage: React.FC = () => {
             </div>
             <div className="p-3.5 rounded-full" style={{ background: 'rgba(244, 63, 94, 0.1)', color: '#f43f5e' }}><IconCompliance /></div>
           </div>
+          )}
 
         </section>
 
@@ -372,20 +382,24 @@ const KYCDashboardPage: React.FC = () => {
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
           {/* Doughnut Chart */}
+          {isVisible('kyc.chart.verification_status_distribution') && (
           <div className="border p-5 rounded-xl shadow-xs lg:col-span-1 flex flex-col" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
             <h2 className="text-sm font-bold mb-4" style={{ color: 'var(--text-primary)' }}>Verification Status Distribution</h2>
             <div className="flex-1 relative min-h-[220px]">
               <canvas ref={statusCanvasRef} />
             </div>
           </div>
+          )}
 
           {/* Line Chart */}
+          {isVisible('kyc.chart.monthly_onboarding_trend') && (
           <div className="border p-5 rounded-xl shadow-xs lg:col-span-2 flex flex-col" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
             <h2 className="text-sm font-bold mb-4" style={{ color: 'var(--text-primary)' }}>Monthly Onboarding Trend ({new Date().getFullYear()})</h2>
             <div className="flex-1 relative min-h-[220px]">
               <canvas ref={trendCanvasRef} />
             </div>
           </div>
+          )}
 
         </section>
 
@@ -393,17 +407,20 @@ const KYCDashboardPage: React.FC = () => {
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
           {/* Bar Chart */}
+          {isVisible('kyc.chart.modification_categories') && (
           <div className="border p-5 rounded-xl shadow-xs lg:col-span-2 flex flex-col" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
             <h2 className="text-sm font-bold mb-4" style={{ color: 'var(--text-primary)' }}>Modification Request Categories Breakdown</h2>
             <div className="flex-1 relative min-h-[240px]">
               <canvas ref={modCanvasRef} />
             </div>
           </div>
+          )}
 
           {/* Compliance & Registry panels */}
           <div className="border p-5 rounded-xl shadow-xs lg:col-span-1 flex flex-col justify-between space-y-6" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-            
+
             {/* Compliance stats */}
+            {isVisible('kyc.chart.exchange_compliance_stats') && (
             <div>
               <h2 className="text-sm font-bold mb-3" style={{ color: 'var(--text-primary)' }}>Exchange Compliance Stats</h2>
               <div className="space-y-2">
@@ -421,8 +438,10 @@ const KYCDashboardPage: React.FC = () => {
                 </div>
               </div>
             </div>
+            )}
 
             {/* Registry stats */}
+            {isVisible('kyc.chart.registry_updation_stats') && (
             <div>
               <h2 className="text-sm font-bold mb-3" style={{ color: 'var(--text-primary)' }}>Registry Updation Stats (CKYC/KRA)</h2>
               <div className="space-y-2">
@@ -440,6 +459,7 @@ const KYCDashboardPage: React.FC = () => {
                 </div>
               </div>
             </div>
+            )}
 
             {/* Demise / Reactivations count */}
             <div className="pt-4 border-t flex justify-between gap-4" style={{ borderColor: 'var(--border)' }}>

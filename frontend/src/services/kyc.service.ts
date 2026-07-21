@@ -179,6 +179,15 @@ export const kycService = {
     return response.data;
   },
 
+  /**
+   * Deletes an entry from any KYC sheet. `sheet` is the URL slug used by the
+   * matching get / create / update calls above (e.g. 'new-accounts').
+   */
+  deleteEntry: async (sheet: string, id: string) => {
+    const response = await api.delete(`/admin/kyc/${sheet}/${id}`);
+    return response.data;
+  },
+
   bulkImport: async (sheet: string, records: any[]) => {
     const response = await api.post(`/admin/kyc/bulk/${sheet}`, { records });
     return response.data;

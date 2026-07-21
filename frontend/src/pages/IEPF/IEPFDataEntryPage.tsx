@@ -328,6 +328,17 @@ const IEPFDataEntryPage: React.FC = () => {
     toast.success('Loaded claim data for editing.');
   };
 
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('Are you sure you want to delete this claim?')) return;
+    try {
+      await iepfService.deleteClaim(id);
+      toast.success('Claim deleted.');
+      fetchClaims();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Delete operation failed.');
+    }
+  };
+
   const handleCancelEdit = () => {
     setEditingId(null);
     setFormData(INITIAL_FORM_STATE);
@@ -903,6 +914,14 @@ const IEPFDataEntryPage: React.FC = () => {
                                 className="mis-btn mis-btn-ghost mis-btn-sm"
                               >
                                 Edit / Resolve
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDelete(claim.id)}
+                                className="mis-btn mis-btn-ghost mis-btn-sm"
+                                style={{ color: '#ef4444' }}
+                              >
+                                Delete
                               </button>
                             </div>
                           </td>

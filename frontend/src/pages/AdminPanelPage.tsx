@@ -8,6 +8,7 @@ import DashboardLayout from '../components/layout/DashboardLayout';
 import UserTable from '../components/admin/UserTable';
 import ConfirmModal from '../components/common/ConfirmModal';
 import AuditLogsTab from '../components/admin/AuditLogsTab';
+import DashboardPermissionsTab from '../components/admin/DashboardPermissionsTab';
 
 // Roles that operate org-wide rather than belonging to one business
 // department (matches the isAdminOrMgmt check every department backend uses
@@ -27,7 +28,7 @@ const MIN_PASSWORD_LENGTH = 4;
  * Admin Panel Page for managing organizational entities.
  */
 const AdminPanelPage: React.FC = () => {
-  const [mainTab, setMainTab] = useState<'management' | 'audit'>('management');
+  const [mainTab, setMainTab] = useState<'management' | 'audit' | 'permissions'>('management');
   const [listTab, setListTab] = useState<'users' | 'branches' | 'departments' | 'modules'>('users');
   const [branches, setBranches] = useState<Branch[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -538,11 +539,22 @@ const AdminPanelPage: React.FC = () => {
             >
               Audit Logs
             </button>
+            <button
+              id="tab-permissions"
+              type="button"
+              onClick={() => setMainTab('permissions')}
+              className={`mis-tab ${mainTab === 'permissions' ? 'active' : ''}`}
+            >
+              Dashboard Permissions
+            </button>
           </div>
         </header>
 
         {/* ── Audit Logs Tab ─────────────────────────────── */}
         {mainTab === 'audit' && <AuditLogsTab />}
+
+        {/* ── Dashboard Permissions Tab ──────────────────── */}
+        {mainTab === 'permissions' && <DashboardPermissionsTab />}
 
         {/* ── Management Tab ─────────────────────────────── */}
         {mainTab === 'management' && (

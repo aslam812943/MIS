@@ -322,6 +322,50 @@ export class IEPFService {
     return data as any;
   }
 
+  async deleteClaim(id: string, requesterId: string): Promise<void> {
+    const client = supabaseAdmin;
+    if (!client) {
+      throw new Error('Supabase admin client is not configured.');
+    }
+
+    const access = await this.verifyAccess(requesterId);
+    if (!access.authorized) {
+      throw new Error('Unauthorized: You must belong to the IEPF department to delete claims.');
+    }
+
+    const { data: existingClaim, error: fetchError } = await client
+      .from('iepf_claims')
+      .select('branch_id, status, created_by')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !existingClaim) {
+      throw new Error('Claim not found.');
+    }
+
+    const isPrivilegedRole = ['admin', 'ceo', 'managing_director', 'director', 'executive', 'hod'].includes(access.role || '');
+
+    if (access.role === 'employee' || access.role === 'hod') {
+      if (existingClaim.branch_id !== access.branchId) {
+        throw new Error('Unauthorized: You cannot access or modify claims belonging to other branch offices.');
+      }
+    }
+
+    const isFinalized = ['Closed', 'Approved', 'Rejected'].includes(existingClaim.status);
+    if (isFinalized && !isPrivilegedRole) {
+      throw new Error('Locked: Finalized claims (Closed/Approved/Rejected) cannot be deleted by standard employees.');
+    }
+
+    if (access.role === 'employee' && existingClaim.created_by !== requesterId) {
+      throw new Error('Unauthorized: You can only delete claims that you registered.');
+    }
+
+    const { error } = await client.from('iepf_claims').delete().eq('id', id);
+    if (error) {
+      throw new Error(`Delete failed: ${error.message}`);
+    }
+  }
+
   /**
    * Fetches the list of claims.
    */
@@ -393,7 +437,12 @@ export class IEPFService {
     
     let targetBranchId: string | undefined = branchIdFilter;
     if (access.role === 'employee') {
-      targetBranchId = access.branchId || undefined;
+      // Deny rather than silently show unfiltered company-wide data if this
+      // employee has no branch assigned (e.g. their branch was deleted,
+      // which nulls branch_id via ON DELETE SET NULL) — falling through to
+      // "no filter" here would leak every branch's aggregate KPIs to them.
+      if (!access.branchId) throw new Error('Unauthorized: No branch assigned — dashboard unavailable.');
+      targetBranchId = access.branchId;
     }
 
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;

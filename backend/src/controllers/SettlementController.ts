@@ -331,6 +331,28 @@ export class SettlementController {
     }
   };
 
+  private static AUDIT_TABLE_MAPPING: { [key: string]: string } = {
+    'payin-payout': 'settlement_payin_payout',
+    'client-requests': 'settlement_client_requests',
+    'ipo-allocation': 'settlement_ipo_allocation',
+    'corporate-actions': 'settlement_corporate_actions',
+  };
+
+  deleteEntry = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const requesterId = (req as any).user.id;
+      const { sheet, id } = req.params;
+
+      await this.settlementService.deleteEntry(requesterId, sheet as string, id as string);
+
+      logAudit(req, 'DELETE', SettlementController.AUDIT_TABLE_MAPPING[sheet as string] || 'settlement_unknown', id as string, null, null);
+
+      res.status(HttpStatus.NO_CONTENT).send();
+    } catch (error) {
+      this.respondError(res, error, 'Failed to delete entry.');
+    }
+  };
+
   /**
    * Fetch KYC-verified clients for the entry-form lookup dropdown.
    */

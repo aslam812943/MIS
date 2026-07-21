@@ -9,6 +9,7 @@ import { dpService } from '../../services/dp.service';
 import { orgService } from '../../services/org.service';
 import { authService } from '../../services/auth.service';
 import { useTheme } from '../../context/ThemeContext';
+import { useDashboardPermissions } from '../../hooks/useDashboardPermissions';
 import type { DateRange } from '../../utils/periodRange';
 
 Chart.register(...registerables);
@@ -54,6 +55,7 @@ const IconAudit = () => (
 const DPDashboardPage: React.FC = () => {
   const currentUser = authService.getCurrentUser();
   const { theme } = useTheme();
+  const { isVisible } = useDashboardPermissions();
   const isAdmin = currentUser?.role === 'admin';
   const hasMultiBranchAccess = isAdmin || ['ceo', 'managing_director', 'director', 'executive', 'hod'].includes(currentUser?.role || '');
   const userBranchId = currentUser?.branch_id || '';
@@ -295,6 +297,7 @@ const DPDashboardPage: React.FC = () => {
             {/* KPI statistics cards */}
             <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
 
+              {isVisible('dp.kpi.total_dp_accounts') && (
               <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(6, 182, 212, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
                 <div>
                   <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Total DP Accounts</div>
@@ -304,7 +307,9 @@ const DPDashboardPage: React.FC = () => {
                 </div>
                 <div className="p-3.5 rounded-full" style={{ background: 'rgba(6, 182, 212, 0.1)', color: '#06b6d4' }}><IconAccount /></div>
               </div>
+              )}
 
+              {isVisible('dp.kpi.pending_modifications') && (
               <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(245, 158, 11, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
                 <div>
                   <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Pending Modifications</div>
@@ -314,7 +319,9 @@ const DPDashboardPage: React.FC = () => {
                 </div>
                 <div className="p-3.5 rounded-full" style={{ background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b' }}><IconModification /></div>
               </div>
+              )}
 
+              {isVisible('dp.kpi.completed_demats') && (
               <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(16, 185, 129, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
                 <div>
                   <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Completed Demats</div>
@@ -324,7 +331,9 @@ const DPDashboardPage: React.FC = () => {
                 </div>
                 <div className="p-3.5 rounded-full" style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10b981' }}><IconDemat /></div>
               </div>
+              )}
 
+              {isVisible('dp.kpi.active_queries') && (
               <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(168, 85, 247, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
                 <div>
                   <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Active Queries</div>
@@ -334,7 +343,9 @@ const DPDashboardPage: React.FC = () => {
                 </div>
                 <div className="p-3.5 rounded-full" style={{ background: 'rgba(168, 85, 247, 0.1)', color: '#a855f7' }}><IconQuery /></div>
               </div>
+              )}
 
+              {isVisible('dp.kpi.open_audits') && (
               <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(239, 68, 68, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
                 <div>
                   <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Open Audits</div>
@@ -344,6 +355,7 @@ const DPDashboardPage: React.FC = () => {
                 </div>
                 <div className="p-3.5 rounded-full" style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444' }}><IconAudit /></div>
               </div>
+              )}
 
             </section>
 
@@ -351,6 +363,7 @@ const DPDashboardPage: React.FC = () => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               
               {/* Line trend chart */}
+              {isVisible('dp.chart.monthly_account_openings_trend') && (
               <div className="mis-card p-5 lg:col-span-2">
                 <h3 className="text-sm font-bold mb-4 text-left border-b pb-2" style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
                   📈 Monthly Account Openings Trend
@@ -359,8 +372,10 @@ const DPDashboardPage: React.FC = () => {
                   <canvas ref={openingsCanvasRef}></canvas>
                 </div>
               </div>
+              )}
 
               {/* Donut chart */}
+              {isVisible('dp.chart.dis_cdas_scan_upload_status') && (
               <div className="mis-card p-5">
                 <h3 className="text-sm font-bold mb-4 text-left border-b pb-2" style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
                   🍩 DIS CDAS Scan Upload Status
@@ -369,8 +384,10 @@ const DPDashboardPage: React.FC = () => {
                   <canvas ref={disCanvasRef}></canvas>
                 </div>
               </div>
+              )}
 
               {/* Bar distribution chart */}
+              {isVisible('dp.chart.client_support_queries_by_category') && (
               <div className="mis-card p-5 lg:col-span-3">
                 <h3 className="text-sm font-bold mb-4 text-left border-b pb-2" style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
                   📊 Client Support Queries by Category
@@ -379,6 +396,7 @@ const DPDashboardPage: React.FC = () => {
                   <canvas ref={queriesCanvasRef}></canvas>
                 </div>
               </div>
+              )}
 
             </div>
           </>

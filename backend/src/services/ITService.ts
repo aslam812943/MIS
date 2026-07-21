@@ -69,9 +69,13 @@ export class ITService {
     const isAdminOrMgmt = role === 'admin' || ['ceo', 'managing_director', 'director', 'executive'].includes(role);
     const isITDept = departmentName.toUpperCase() === 'IT';
 
+    // Employees now get their own dashboard too (previously HOD-only) — what
+    // they actually see on it is restricted per-widget client-side via
+    // DashboardPermissionService, defaulting to nothing visible until admin
+    // opts specific widgets in.
     let isAuthorized = false;
     if (requiresDashboard) {
-      isAuthorized = isAdminOrMgmt || (isITDept && role === 'hod');
+      isAuthorized = isAdminOrMgmt || (isITDept && (role === 'hod' || role === 'employee'));
     } else {
       isAuthorized = isAdminOrMgmt || isITDept;
     }
@@ -505,7 +509,11 @@ export class ITService {
 
     let targetBranchId: string | undefined = branchIdFilter;
     if (access.role === 'employee' && !NO_BRANCH_SHEETS.has(sheet)) {
-      targetBranchId = access.branchId || undefined;
+      // Deny rather than silently list every branch's raw records if this
+      // employee has no branch assigned (e.g. their branch was deleted,
+      // which nulls branch_id via ON DELETE SET NULL).
+      if (!access.branchId) throw new Error('Unauthorized: No branch assigned.');
+      targetBranchId = access.branchId;
     }
 
     let selectString = '*';
@@ -886,7 +894,12 @@ export class ITService {
 
     let targetBranchId: string | undefined = branchIdFilter;
     if (access.role === 'employee') {
-      targetBranchId = access.branchId || undefined;
+      // Deny rather than silently show unfiltered company-wide data if this
+      // employee has no branch assigned (e.g. their branch was deleted,
+      // which nulls branch_id via ON DELETE SET NULL) — falling through to
+      // "no filter" here would leak every branch's aggregate KPIs to them.
+      if (!access.branchId) throw new Error('Unauthorized: No branch assigned — dashboard unavailable.');
+      targetBranchId = access.branchId;
     }
 
     const applyFilters = <T extends any>(query: T): T => {

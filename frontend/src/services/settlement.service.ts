@@ -136,6 +136,16 @@ export const settlementService = {
   },
 
   /**
+   * Deletes an entry from any settlements record type. `sheet` is the URL
+   * slug used by the matching get / create / update calls above
+   * (e.g. 'payin-payout', 'client-requests', 'ipo-allocation', 'corporate-actions').
+   */
+  deleteEntry: async (sheet: string, id: string) => {
+    const response = await api.delete(`/admin/settlements/${sheet}/${id}`);
+    return response.data;
+  },
+
+  /**
    * Fetches KYC-verified clients for the entry-form lookup dropdown.
    */
   getVerifiedClients: async () => {

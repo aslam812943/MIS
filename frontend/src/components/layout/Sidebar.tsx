@@ -165,20 +165,24 @@ const Sidebar: React.FC = () => {
   // the HR tab on the landing page get a direct link to it here.
   const showHRDashboard = isAdmin || isHR;
   
+  // Employees now get a link to their own department's dashboard too (used
+  // to be HOD-only) — what they actually see on it is controlled per-widget
+  // by admin via Admin Panel > Dashboard Permissions, defaulting to hidden
+  // until admin opts specific widgets in (see useDashboardPermissions).
   const isIEPFUser = user?.department_name?.toUpperCase() === 'IEPF';
-  const showIEPFDashboard = isAdmin || ['ceo', 'managing_director', 'director', 'executive'].includes(user?.role || '') || (isIEPFUser && isHOD);
+  const showIEPFDashboard = isAdmin || ['ceo', 'managing_director', 'director', 'executive'].includes(user?.role || '') || (isIEPFUser && (isHOD || isEmployee));
 
   const isKYCUser = user?.department_name?.toUpperCase() === 'KYC';
-  const showKYCDashboard = isAdmin || ['ceo', 'managing_director', 'director', 'executive'].includes(user?.role || '') || (isKYCUser && isHOD);
+  const showKYCDashboard = isAdmin || ['ceo', 'managing_director', 'director', 'executive'].includes(user?.role || '') || (isKYCUser && (isHOD || isEmployee));
 
   const isDPUser = user?.department_name?.toUpperCase() === 'DP';
-  const showDPDashboard = isAdmin || ['ceo', 'managing_director', 'director', 'executive'].includes(user?.role || '') || (isDPUser && isHOD);
+  const showDPDashboard = isAdmin || ['ceo', 'managing_director', 'director', 'executive'].includes(user?.role || '') || (isDPUser && (isHOD || isEmployee));
 
   const isITUser = user?.department_name?.toUpperCase() === 'IT';
-  const showITDashboard = isAdmin || ['ceo', 'managing_director', 'director', 'executive'].includes(user?.role || '') || (isITUser && isHOD);
+  const showITDashboard = isAdmin || ['ceo', 'managing_director', 'director', 'executive'].includes(user?.role || '') || (isITUser && (isHOD || isEmployee));
 
   const isFinanceUser = user?.department_name?.toUpperCase() === 'FINANCE';
-  const showFinanceDashboard = isAdmin || ['ceo', 'managing_director', 'director', 'executive'].includes(user?.role || '') || (isFinanceUser && isHOD);
+  const showFinanceDashboard = isAdmin || ['ceo', 'managing_director', 'director', 'executive'].includes(user?.role || '') || (isFinanceUser && (isHOD || isEmployee));
 
   const isSettlementsUser = user?.department_name?.toUpperCase() === 'SETTLEMENTS';
 
@@ -293,7 +297,7 @@ const Sidebar: React.FC = () => {
           </>
         )}
 
-        {(isAdmin || ['ceo', 'managing_director', 'director', 'executive'].includes(user?.role || '') || (user?.department_name?.toUpperCase() === 'SETTLEMENTS' && isHOD)) && (
+        {(isAdmin || ['ceo', 'managing_director', 'director', 'executive'].includes(user?.role || '') || (user?.department_name?.toUpperCase() === 'SETTLEMENTS' && (isHOD || isEmployee))) && (
           <>
             {(user?.department_name?.toUpperCase() !== 'SETTLEMENTS' && !isAdmin) && <span className="mis-sidebar-section-label">Settlements Department</span>}
             <NavItem

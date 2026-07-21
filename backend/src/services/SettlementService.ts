@@ -125,7 +125,12 @@ export class SettlementService {
     // Branch locking logic (Only lock standard employees, allow HODs to view other branch stats)
     let targetBranchId: string | undefined = branchIdFilter;
     if (access.role === 'employee') {
-      targetBranchId = access.branchId || undefined;
+      // Deny rather than silently show unfiltered company-wide data if this
+      // employee has no branch assigned (e.g. their branch was deleted,
+      // which nulls branch_id via ON DELETE SET NULL) — falling through to
+      // "no filter" here would leak every branch's aggregate KPIs to them.
+      if (!access.branchId) throw new Error('Unauthorized: No branch assigned — dashboard unavailable.');
+      targetBranchId = access.branchId;
     }
 
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
@@ -1406,6 +1411,39 @@ export class SettlementService {
     }
 
     return data as any;
+  }
+
+  // Maps each record-type slug (as used in the route/URL) to its table name,
+  // for the shared deleteEntry() below. Every other operation on this service
+  // uses per-type named methods, but delete logic is identical across all
+  // four types so one generic method (mirroring ITService/DPService's
+  // deleteEntry) avoids four near-duplicate methods.
+  private static SHEET_TABLE_MAPPING: { [key: string]: string } = {
+    'payin-payout': 'settlement_payin_payout',
+    'client-requests': 'settlement_client_requests',
+    'ipo-allocation': 'settlement_ipo_allocation',
+    'corporate-actions': 'settlement_corporate_actions',
+  };
+
+  async deleteEntry(requesterId: string, sheet: string, id: string): Promise<void> {
+    const client = supabaseAdmin;
+    if (!client) throw new Error('Supabase admin client not configured.');
+
+    const access = await this.verifyAccess(requesterId);
+    if (!access.authorized) throw new Error('Unauthorized: Access denied.');
+
+    const table = SettlementService.SHEET_TABLE_MAPPING[sheet];
+    if (!table) throw new Error('Invalid record type.');
+
+    const { data: record, error: fetchError } = await client.from(table).select('branch_id').eq('id', id).single();
+    if (fetchError || !record) throw new Error('Record not found.');
+
+    if ((access.role === 'employee' || access.role === 'hod') && access.branchId && (record as any).branch_id !== access.branchId) {
+      throw new Error('Unauthorized: Record belongs to a different branch.');
+    }
+
+    const { error } = await client.from(table).delete().eq('id', id);
+    if (error) throw new Error(`Delete failed: ${error.message}`);
   }
 
   /**

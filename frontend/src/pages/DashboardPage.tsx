@@ -7,6 +7,7 @@ import { orgService } from '../services/org.service';
 import { hrService } from '../services/hr.service';
 import { authService } from '../services/auth.service';
 import { useTheme } from '../context/ThemeContext';
+import { useDashboardPermissions } from '../hooks/useDashboardPermissions';
 import type { DateRange } from '../utils/periodRange';
 import { getDefaultPeriod } from '../utils/periodRange';
 
@@ -100,6 +101,7 @@ const DashboardPage: React.FC = () => {
   const user = authService.getCurrentUser();
   const showHRDashboard = user?.role === 'admin' || user?.role === 'hr';
   const { theme } = useTheme();
+  const { isVisible } = useDashboardPermissions();
 
   const [stats, setStats] = useState({ branches: 0, departments: 0, users: 0, modules: 0 });
   const [hrData, setHRData] = useState<any>(null);
@@ -539,6 +541,7 @@ const DashboardPage: React.FC = () => {
               <>
                 {/* KPI Cards */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {isVisible('hr.kpi.total_employees') && (
                   <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(6, 182, 212, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
                     <div>
                       <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Total Employees</div>
@@ -550,7 +553,9 @@ const DashboardPage: React.FC = () => {
                       <IconUsers />
                     </div>
                   </div>
+                  )}
 
+                  {isVisible('hr.kpi.new_joiners') && (
                   <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(16, 185, 129, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
                     <div>
                       <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>New Joiners</div>
@@ -562,7 +567,9 @@ const DashboardPage: React.FC = () => {
                       <IconUserPlus />
                     </div>
                   </div>
+                  )}
 
+                  {isVisible('hr.kpi.resignations') && (
                   <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(239, 68, 68, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
                     <div>
                       <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Resignations</div>
@@ -574,7 +581,9 @@ const DashboardPage: React.FC = () => {
                       <IconUserMinus />
                     </div>
                   </div>
+                  )}
 
+                  {isVisible('hr.kpi.attrition_rate') && (
                   <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(139, 92, 246, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
                     <div>
                       <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Attrition Rate</div>
@@ -586,7 +595,9 @@ const DashboardPage: React.FC = () => {
                       <IconPercent />
                     </div>
                   </div>
+                  )}
 
+                  {isVisible('hr.kpi.avg_tenure') && (
                   <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(245, 158, 11, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
                     <div>
                       <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Avg. Tenure</div>
@@ -597,7 +608,9 @@ const DashboardPage: React.FC = () => {
                       <IconClockHistory />
                     </div>
                   </div>
+                  )}
 
+                  {isVisible('hr.kpi.pending_offboarding') && (
                   <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(244, 63, 94, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
                     <div>
                       <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Pending Offboarding</div>
@@ -608,9 +621,11 @@ const DashboardPage: React.FC = () => {
                       <IconUserMinus />
                     </div>
                   </div>
+                  )}
 
                   {hrOpsData && (
                     <>
+                      {isVisible('hr.kpi.open_positions') && (
                       <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(20, 184, 166, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
                         <div>
                           <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Open Positions</div>
@@ -621,7 +636,9 @@ const DashboardPage: React.FC = () => {
                           <IconBriefcase />
                         </div>
                       </div>
+                      )}
 
+                      {isVisible('hr.kpi.candidates_in_pipeline') && (
                       <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(6, 182, 212, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
                         <div>
                           <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Candidates in Pipeline</div>
@@ -632,7 +649,9 @@ const DashboardPage: React.FC = () => {
                           <IconUserSearch />
                         </div>
                       </div>
+                      )}
 
+                      {isVisible('hr.kpi.active_policies') && (
                       <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(132, 204, 22, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
                         <div>
                           <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Active Policies</div>
@@ -643,12 +662,13 @@ const DashboardPage: React.FC = () => {
                           <IconFileCheck />
                         </div>
                       </div>
+                      )}
                     </>
                   )}
                 </div>
 
                 {/* Recruitment pipeline */}
-                {hrOpsData?.charts?.candidatesByStage?.length > 0 && (
+                {isVisible('hr.chart.candidates_by_stage') && hrOpsData?.charts?.candidatesByStage?.length > 0 && (
                   <div className="mis-card p-6">
                     <div>
                       <h3 className="font-bold text-lg mb-1" style={{ color: 'var(--text-primary)' }}>Candidates by Stage</h3>
@@ -662,6 +682,7 @@ const DashboardPage: React.FC = () => {
 
                 {/* Growth & Distribution charts */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {isVisible('hr.chart.employee_growth') && (
                   <div className="mis-card p-6 lg:col-span-2 flex flex-col justify-between">
                     <div>
                       <h3 className="font-bold text-lg mb-1" style={{ color: 'var(--text-primary)' }}>Employee Growth</h3>
@@ -671,7 +692,9 @@ const DashboardPage: React.FC = () => {
                       <canvas ref={growthCanvasRef} />
                     </div>
                   </div>
+                  )}
 
+                  {isVisible('hr.chart.branch_distribution') && (
                   <div className="mis-card p-6 flex flex-col justify-between">
                     <div>
                       <h3 className="font-bold text-lg mb-1" style={{ color: 'var(--text-primary)' }}>Branch Distribution</h3>
@@ -681,9 +704,11 @@ const DashboardPage: React.FC = () => {
                       <canvas ref={branchCanvasRef} />
                     </div>
                   </div>
+                  )}
                 </div>
 
                 {/* Department-wise employees */}
+                {isVisible('hr.chart.department_distribution') && (
                 <div className="mis-card p-6">
                   <div>
                     <h3 className="font-bold text-lg mb-1" style={{ color: 'var(--text-primary)' }}>Department Distribution</h3>
@@ -693,9 +718,11 @@ const DashboardPage: React.FC = () => {
                     <canvas ref={deptCanvasRef} />
                   </div>
                 </div>
+                )}
 
                 {/* Resignation reasons & Role distribution */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {isVisible('hr.chart.resignation_reasons') && (
                   <div className="mis-card p-6 lg:col-span-2 flex flex-col justify-between">
                     <div>
                       <h3 className="font-bold text-lg mb-1" style={{ color: 'var(--text-primary)' }}>Resignation Reasons</h3>
@@ -705,7 +732,9 @@ const DashboardPage: React.FC = () => {
                       <canvas ref={resignReasonCanvasRef} />
                     </div>
                   </div>
+                  )}
 
+                  {isVisible('hr.chart.role_distribution') && (
                   <div className="mis-card p-6 flex flex-col justify-between">
                     <div>
                       <h3 className="font-bold text-lg mb-1" style={{ color: 'var(--text-primary)' }}>Role Distribution</h3>
@@ -715,6 +744,7 @@ const DashboardPage: React.FC = () => {
                       <canvas ref={roleCanvasRef} />
                     </div>
                   </div>
+                  )}
                 </div>
               </>
             )}
