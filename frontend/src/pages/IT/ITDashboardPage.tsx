@@ -105,11 +105,13 @@ const ITDashboardPage: React.FC = () => {
   const ageCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const categoryCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const warrantyCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const inventoryTypeCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
   // Chart Instances Refs
   const ageChartInstance = useRef<Chart | null>(null);
   const categoryChartInstance = useRef<Chart | null>(null);
   const warrantyChartInstance = useRef<Chart | null>(null);
+  const inventoryTypeChartInstance = useRef<Chart | null>(null);
 
   useEffect(() => {
     fetchBranches();
@@ -253,6 +255,37 @@ const ITDashboardPage: React.FC = () => {
               y: { grid: { color: gridColor }, ticks: { color: tickColor, stepSize: 1 } },
               x: { grid: { display: false }, ticks: { color: tickColor } }
             }
+          }
+        });
+      }
+    }
+
+    // 4. Donut Chart: Asset Inventory by Type
+    if (inventoryTypeCanvasRef.current) {
+      if (inventoryTypeChartInstance.current) inventoryTypeChartInstance.current.destroy();
+      const ctx = inventoryTypeCanvasRef.current.getContext('2d');
+      if (ctx && stats.charts.inventoryByType) {
+        inventoryTypeChartInstance.current = new Chart(ctx, {
+          type: 'doughnut',
+          data: {
+            labels: stats.charts.inventoryByTypeLabels,
+            datasets: [{
+              data: stats.charts.inventoryByType,
+              backgroundColor: ['#6366f1', '#10b981', '#3b82f6', '#a855f7', '#f59e0b', '#ec4899', '#14b8a6', '#f43f5e', '#64748b', '#ef4444'],
+              borderWidth: 0,
+              hoverOffset: 4
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                position: 'bottom',
+                labels: { color: legendColor, font: { size: 10 }, boxWidth: 10 }
+              }
+            },
+            cutout: '60%'
           }
         });
       }
@@ -451,6 +484,30 @@ const ITDashboardPage: React.FC = () => {
               </div>
               )}
 
+              {isVisible('it.kpi.total_inventory_items') && (
+              <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(99, 102, 241, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
+                <div>
+                  <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>Total Inventory Items</div>
+                  <div className="text-3xl font-bold" style={{ color: '#6366f1' }}>{stats.kpis.totalInventoryItems}</div>
+                  <div className="text-xs opacity-50 mt-1">Tracked in Asset Inventory</div>
+                  <TrendDelta current={stats.kpis.totalInventoryItems} previous={previousStats?.kpis?.totalInventoryItems} />
+                </div>
+                <div className="p-3.5 rounded-full" style={{ background: 'rgba(99, 102, 241, 0.1)', color: '#6366f1' }}><IconDevice /></div>
+              </div>
+              )}
+
+              {isVisible('it.kpi.high_criticality_inventory') && (
+              <div className="mis-card p-6 flex items-center justify-between" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(239, 68, 68, 0.1) 0%, rgba(0,0,0,0) 70%), var(--card-bg)' }}>
+                <div>
+                  <div className="text-sm font-semibold opacity-60 mb-1" style={{ color: 'var(--text-secondary)' }}>High Criticality Assets</div>
+                  <div className="text-3xl font-bold" style={{ color: '#ef4444' }}>{stats.kpis.highCriticalityInventory}</div>
+                  <div className="text-xs opacity-50 mt-1">Rated High criticality</div>
+                  <TrendDelta current={stats.kpis.highCriticalityInventory} previous={previousStats?.kpis?.highCriticalityInventory} />
+                </div>
+                <div className="p-3.5 rounded-full" style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444' }}><IconIncident /></div>
+              </div>
+              )}
+
             </section>
 
             {/* Compliance & Renewals countdown section */}
@@ -567,6 +624,18 @@ const ITDashboardPage: React.FC = () => {
                 </h3>
                 <div className="h-64 relative">
                   <canvas ref={warrantyCanvasRef}></canvas>
+                </div>
+              </div>
+              )}
+
+              {/* Donut chart: Asset Inventory by Type */}
+              {isVisible('it.chart.inventory_by_type') && (
+              <div className="mis-card p-5 lg:col-span-3">
+                <h3 className="text-sm font-bold mb-4 text-left border-b pb-2" style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
+                  🖥️ Asset Inventory by Type
+                </h3>
+                <div className="h-64 relative">
+                  <canvas ref={inventoryTypeCanvasRef}></canvas>
                 </div>
               </div>
               )}
