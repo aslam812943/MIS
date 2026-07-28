@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import DashboardLayout from '../../components/layout/DashboardLayout';
+import ViewDetailsModal from '../../components/common/ViewDetailsModal';
 import { hrService } from '../../services/hr.service';
 import { orgService } from '../../services/org.service';
 
@@ -89,6 +90,7 @@ const HRDataEntryPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
 
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [viewingRecord, setViewingRecord] = useState<any>(null);
   const [formData, setFormData] = useState<any>({});
 
   const [csvModalOpen, setCsvModalOpen] = useState(false);
@@ -512,6 +514,7 @@ const HRDataEntryPage: React.FC = () => {
                           <td key={f.name}>{renderFieldValue(row, f)}</td>
                         ))}
                         <td className="whitespace-nowrap">
+                          <button onClick={() => setViewingRecord(row)} className="text-xs font-semibold mr-3 hover:underline" style={{ color: 'var(--text-secondary)' }}>View</button>
                           <button onClick={() => handleEdit(row)} className="text-xs font-semibold mr-3 hover:underline" style={{ color: 'var(--text-accent)' }}>Edit</button>
                           <button onClick={() => handleDelete(row.id)} className="text-xs font-semibold text-red-500 hover:underline">Delete</button>
                         </td>
@@ -658,6 +661,8 @@ const HRDataEntryPage: React.FC = () => {
             </div>
           </div>
         )}
+
+        <ViewDetailsModal record={viewingRecord} onClose={() => setViewingRecord(null)} title="HR Record Details" />
       </div>
     </DashboardLayout>
   );

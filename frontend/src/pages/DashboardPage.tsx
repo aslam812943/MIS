@@ -99,7 +99,11 @@ const IconFileCheck = () => (
  */
 const DashboardPage: React.FC = () => {
   const user = authService.getCurrentUser();
-  const showHRDashboard = user?.role === 'admin' || user?.role === 'hr';
+  // Admin gets the System Overview (org-wide branch/department/user counts)
+  // as their landing dashboard — HR's employee/recruitment metrics are a
+  // separate surface owned by the 'hr' role, not something admin's main
+  // dashboard doubles up on.
+  const showHRDashboard = user?.role === 'hr';
   const { theme } = useTheme();
   const { isVisible } = useDashboardPermissions();
 
@@ -109,7 +113,9 @@ const DashboardPage: React.FC = () => {
   // Recruitment/policy aggregates — separate from hrData (which owns
   // employee-headcount KPIs), fetched from HRService.getDashboardStats.
   const [hrOpsData, setHROpsData] = useState<any>(null);
-  const [dashboardTab, setDashboardTab] = useState<'system' | 'hr'>(showHRDashboard ? 'hr' : 'system');
+  // Each role now lands on exactly one fixed view — no toggle to switch,
+  // so this is derived from role rather than being its own piece of state.
+  const dashboardTab: 'system' | 'hr' = showHRDashboard ? 'hr' : 'system';
   const [loading, setLoading] = useState(true);
   const [hrLoading, setHRLoading] = useState(false);
 
@@ -498,26 +504,6 @@ const DashboardPage: React.FC = () => {
               </p>
             </div>
             
-            {showHRDashboard && (
-              <div className="mis-tabs border-0 p-0 m-0 shrink-0 self-start md:self-center" style={{ background: 'rgba(0,0,0,0.15)', padding: '3px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
-                <button 
-                  type="button" 
-                  onClick={() => setDashboardTab('hr')}
-                  className={`mis-tab py-1.5 px-4 text-xs font-semibold rounded-[var(--radius-sm)] ${dashboardTab === 'hr' ? 'active' : ''}`}
-                  style={{ marginBottom: 0 }}
-                >
-                  HR Dashboard
-                </button>
-                <button 
-                  type="button" 
-                  onClick={() => setDashboardTab('system')}
-                  className={`mis-tab py-1.5 px-4 text-xs font-semibold rounded-[var(--radius-sm)] ${dashboardTab === 'system' ? 'active' : ''}`}
-                  style={{ marginBottom: 0 }}
-                >
-                  System Overview
-                </button>
-              </div>
-            )}
           </div>
         </header>
 

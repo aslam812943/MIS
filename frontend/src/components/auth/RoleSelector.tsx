@@ -57,6 +57,12 @@ const ROLE_OPTIONS: RoleOption[] = [
     description: 'Standard data entry and daily tasks',
     icon: '👤',
   },
+  {
+    role: UserRole.HR,
+    label: 'HR',
+    description: 'Workforce data entry and recruitment',
+    icon: '🧑‍💼',
+  },
 ];
 
 interface RoleSelectorProps {
@@ -67,16 +73,16 @@ interface RoleSelectorProps {
 const RoleSelector: React.FC<RoleSelectorProps> = ({ selectedRole, onSelect }) => {
   return (
     <div className="w-full mis-animate-in">
-      <div className="text-center mb-6 sm:mb-8">
-        <h2 className="text-xl sm:text-2xl font-bold mb-1.5" style={{ color: 'var(--text-primary)' }}>
+      <div className="text-center mb-2 sm:mb-4">
+        <h2 className="text-lg sm:text-2xl font-bold mb-1" style={{ color: 'var(--text-primary)' }}>
           Select Your Role
         </h2>
-        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+        <p className="text-xs sm:text-sm" style={{ color: 'var(--text-secondary)' }}>
           Choose your access level to continue to the portal
         </p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2 sm:gap-3">
         {ROLE_OPTIONS.map((option) => (
           <button
             key={option.role}
