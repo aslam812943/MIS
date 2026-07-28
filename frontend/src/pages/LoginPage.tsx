@@ -29,7 +29,7 @@ const LoginPage: React.FC = () => {
       >
         {theme === 'dark' ? '☀ Light mode' : '☾ Dark mode'}
       </button>
-      <div className="w-full max-w-6xl z-10 flex flex-col items-center gap-8 sm:gap-12 mis-animate-in px-0 sm:px-2">
+      <div className="w-full max-w-6xl h-full z-10 flex flex-col items-center justify-start gap-2 sm:gap-3 mis-animate-in px-0 sm:px-2 overflow-hidden">
         <div className="mis-login-brand">
           <h1>
             <span style={{ color: 'var(--text-primary)' }}>MIS</span>{' '}
@@ -41,11 +41,11 @@ const LoginPage: React.FC = () => {
         </div>
 
         <div className="mis-login-grid w-full">
-          <div className="flex-1 w-full min-w-0">
+          <div className="flex-1 w-full min-w-0 self-start">
             <RoleSelector selectedRole={selectedRole} onSelect={setSelectedRole} />
           </div>
 
-          <div className="w-full max-w-md flex flex-col items-center shrink-0 mx-auto lg:mx-0">
+          <div className="w-full max-w-md flex flex-col items-center shrink-0 mx-auto lg:mx-0 self-start lg:self-center">
             {showForgotPassword ? (
               <ForgotPasswordForm
                 selectedRole={selectedRole}
@@ -60,7 +60,7 @@ const LoginPage: React.FC = () => {
           </div>
         </div>
 
-        <footer className="text-center text-sm relative z-10" style={{ color: 'var(--text-muted)' }}>
+        <footer className="text-center text-xs relative z-10 shrink-0" style={{ color: 'var(--text-muted)' }}>
           &copy; {new Date().getFullYear()} Management Information System. All rights reserved.
         </footer>
       </div>

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import DashboardLayout from '../../components/layout/DashboardLayout';
+import ViewDetailsModal from '../../components/common/ViewDetailsModal';
 import { dpService } from '../../services/dp.service';
 import { orgService } from '../../services/org.service';
 import { authService } from '../../services/auth.service';
@@ -240,6 +241,7 @@ const DPDataEntryPage: React.FC = () => {
   const [clientSearchText, setClientSearchText] = useState('');
   const [clientDropdownOpen, setClientDropdownOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [viewingRecord, setViewingRecord] = useState<any>(null);
   const [formData, setFormData] = useState<any>({});
 
   // CSV Import state
@@ -1106,6 +1108,13 @@ const DPDataEntryPage: React.FC = () => {
                         <td className="text-right">
                           <div className="flex justify-end gap-1.5">
                             <button
+                              onClick={() => setViewingRecord(row)}
+                              className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-white transition-colors"
+                              title="View Full Details"
+                            >
+                              👁️
+                            </button>
+                            <button
                               onClick={() => handleEdit(row)}
                               className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-white transition-colors"
                               title="Edit Row"
@@ -1216,6 +1225,7 @@ const DPDataEntryPage: React.FC = () => {
           </div>
         )}
 
+        <ViewDetailsModal record={viewingRecord} onClose={() => setViewingRecord(null)} title="DP Record Details" />
       </div>
     </DashboardLayout>
   );

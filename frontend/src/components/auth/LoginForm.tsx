@@ -29,7 +29,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ selectedRole, onForgotPassword })
       [UserRole.HOD]: 'hod@gmail.com',
       [UserRole.REGIONAL_MANAGER]: 'regional@mis.com',
       [UserRole.EMPLOYEE]: 'employee@gmail.com',
-      [UserRole.HR]: 'hr@mis.com',
+      [UserRole.HR]: 'hr@gmail.com',
     };
     setEmail(roleEmails[selectedRole] || 'user@mis.com');
   }, [selectedRole]);
@@ -55,18 +55,18 @@ const LoginForm: React.FC<LoginFormProps> = ({ selectedRole, onForgotPassword })
   };
 
   return (
-    <div className="glass rounded-[var(--radius-2xl)] p-6 sm:p-8 w-full shadow-2xl mis-animate-in">
-      <div className="text-center mb-7">
-        <div className="inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-4 mis-badge mis-badge-info">
+    <div className="glass rounded-[var(--radius-2xl)] p-4 sm:p-6 w-full shadow-2xl mis-animate-in">
+      <div className="text-center mb-3 sm:mb-4">
+        <div className="inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-2 mis-badge mis-badge-info">
           {getRoleLabel()} Portal
         </div>
-        <h2 className="text-xl font-bold mb-1.5" style={{ color: 'var(--text-primary)' }}>Sign In</h2>
-        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+        <h2 className="text-lg sm:text-xl font-bold mb-1" style={{ color: 'var(--text-primary)' }}>Sign In</h2>
+        <p className="text-xs sm:text-sm" style={{ color: 'var(--text-secondary)' }}>
           Enter your credentials to access your dashboard
         </p>
       </div>
 
-      <form onSubmit={handleLoginSubmission} className="space-y-5">
+      <form onSubmit={handleLoginSubmission} className="space-y-3 sm:space-y-4">
         <div className="mis-field">
           <label htmlFor="email" className="mis-label" style={{ textTransform: 'none', letterSpacing: 'normal', fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
             Email Address
@@ -137,7 +137,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ selectedRole, onForgotPassword })
         <button
           type="submit"
           disabled={loading}
-          className="mis-btn mis-btn-primary w-full justify-center py-3"
+          className="mis-btn mis-btn-primary w-full justify-center py-2.5"
         >
           {loading ? (
             <span className="mis-spinner" style={{ width: '1.25rem', height: '1.25rem', borderWidth: '2px' }} />

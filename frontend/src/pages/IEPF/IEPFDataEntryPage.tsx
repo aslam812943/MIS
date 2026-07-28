@@ -5,6 +5,7 @@ import DashboardLayout from '../../components/layout/DashboardLayout';
 import { iepfService } from '../../services/iepf.service';
 import { orgService } from '../../services/org.service';
 import ConfirmModal from '../../components/common/ConfirmModal';
+import ViewDetailsModal from '../../components/common/ViewDetailsModal';
 import { INITIAL_CONFIRM_STATE, type ConfirmDialogState } from '../../types/confirm.types';
 
 // Plain-English explanation shown next to the claim form, written for
@@ -63,6 +64,7 @@ const IEPFDataEntryPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [viewingRecord, setViewingRecord] = useState<any>(null);
 
   // KYC verified investor lookup
   const [investors, setInvestors] = useState<VerifiedInvestor[]>([]);
@@ -910,6 +912,13 @@ const IEPFDataEntryPage: React.FC = () => {
                             <div className="flex gap-2 justify-end">
                               <button
                                 type="button"
+                                onClick={() => setViewingRecord(claim)}
+                                className="mis-btn mis-btn-ghost mis-btn-sm"
+                              >
+                                View
+                              </button>
+                              <button
+                                type="button"
                                 onClick={() => handleEdit(claim)}
                                 className="mis-btn mis-btn-ghost mis-btn-sm"
                               >
@@ -948,6 +957,8 @@ const IEPFDataEntryPage: React.FC = () => {
         onConfirm={confirmModal.onConfirm}
         onCancel={() => setConfirmModal(INITIAL_CONFIRM_STATE)}
       />
+
+      <ViewDetailsModal record={viewingRecord} onClose={() => setViewingRecord(null)} title="IEPF Claim Details" />
     </DashboardLayout>
   );
 };

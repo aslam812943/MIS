@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import DashboardLayout from '../../components/layout/DashboardLayout';
+import ViewDetailsModal from '../../components/common/ViewDetailsModal';
 import { kycService } from '../../services/kyc.service';
 import { orgService } from '../../services/org.service';
 import { authService } from '../../services/auth.service';
@@ -433,6 +434,7 @@ const KYCDataEntryPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [viewingRecord, setViewingRecord] = useState<any>(null);
 
   // Client Selection / Linking UX
   const [onboardedClients, setOnboardedClients] = useState<any[]>([]);
@@ -1998,6 +2000,7 @@ const KYCDataEntryPage: React.FC = () => {
             <td className="whitespace-nowrap text-xs font-semibold">{record.verified_by || '-'}</td>
             <td className="whitespace-nowrap text-xs font-semibold">{branchName}</td>
             <td>
+              <button onClick={() => setViewingRecord(record)} className="hover:underline text-xs font-bold mr-2" style={{ color: 'var(--text-secondary)' }}>View</button>
               <button onClick={() => handleEdit(record)} className="hover:underline text-xs font-bold mr-2" style={{ color: 'var(--accent)' }}>Edit</button>
               <button onClick={() => handleDelete(record.id)} className="hover:underline text-xs font-bold text-red-400 hover:text-red-300">Delete</button>
             </td>
@@ -2016,6 +2019,7 @@ const KYCDataEntryPage: React.FC = () => {
             <td className="whitespace-nowrap text-xs">{getStatusPill(record.status)}</td>
             <td className="whitespace-nowrap text-xs font-semibold">{branchName}</td>
             <td>
+              <button onClick={() => setViewingRecord(record)} className="hover:underline text-xs font-bold mr-2" style={{ color: 'var(--text-secondary)' }}>View</button>
               <button onClick={() => handleEdit(record)} className="hover:underline text-xs font-bold mr-2" style={{ color: 'var(--accent)' }}>Edit</button>
               <button onClick={() => handleDelete(record.id)} className="hover:underline text-xs font-bold text-red-400 hover:text-red-300">Delete</button>
             </td>
@@ -2033,6 +2037,7 @@ const KYCDataEntryPage: React.FC = () => {
             <td className="whitespace-nowrap text-xs">{record.rejection_reason || '-'}</td>
             <td className="whitespace-nowrap text-xs font-semibold">{branchName}</td>
             <td>
+              <button onClick={() => setViewingRecord(record)} className="hover:underline text-xs font-bold mr-2" style={{ color: 'var(--text-secondary)' }}>View</button>
               <button onClick={() => handleEdit(record)} className="hover:underline text-xs font-bold mr-2" style={{ color: 'var(--accent)' }}>Edit</button>
               <button onClick={() => handleDelete(record.id)} className="hover:underline text-xs font-bold text-red-400 hover:text-red-300">Delete</button>
             </td>
@@ -2050,6 +2055,7 @@ const KYCDataEntryPage: React.FC = () => {
             <td className="whitespace-nowrap text-xs">{getStatusPill(record.status)}</td>
             <td className="whitespace-nowrap text-xs font-semibold">{branchName}</td>
             <td>
+              <button onClick={() => setViewingRecord(record)} className="hover:underline text-xs font-bold mr-2" style={{ color: 'var(--text-secondary)' }}>View</button>
               <button onClick={() => handleEdit(record)} className="hover:underline text-xs font-bold mr-2" style={{ color: 'var(--accent)' }}>Edit</button>
               <button onClick={() => handleDelete(record.id)} className="hover:underline text-xs font-bold text-red-400 hover:text-red-300">Delete</button>
             </td>
@@ -2075,6 +2081,7 @@ const KYCDataEntryPage: React.FC = () => {
             <td className="whitespace-nowrap text-xs">{getStatusPill(record.status)}</td>
             <td className="whitespace-nowrap text-xs font-semibold">{branchName}</td>
             <td>
+              <button onClick={() => setViewingRecord(record)} className="hover:underline text-xs font-bold mr-2" style={{ color: 'var(--text-secondary)' }}>View</button>
               <button onClick={() => handleEdit(record)} className="hover:underline text-xs font-bold mr-2" style={{ color: 'var(--accent)' }}>Edit</button>
               <button onClick={() => handleDelete(record.id)} className="hover:underline text-xs font-bold text-red-400 hover:text-red-300">Delete</button>
             </td>
@@ -2091,6 +2098,7 @@ const KYCDataEntryPage: React.FC = () => {
             <td className="whitespace-nowrap text-xs">{getStatusPill(record.status)}</td>
             <td className="whitespace-nowrap text-xs font-semibold">{branchName}</td>
             <td>
+              <button onClick={() => setViewingRecord(record)} className="hover:underline text-xs font-bold mr-2" style={{ color: 'var(--text-secondary)' }}>View</button>
               <button onClick={() => handleEdit(record)} className="hover:underline text-xs font-bold mr-2" style={{ color: 'var(--accent)' }}>Edit</button>
               <button onClick={() => handleDelete(record.id)} className="hover:underline text-xs font-bold text-red-400 hover:text-red-300">Delete</button>
             </td>
@@ -2107,6 +2115,7 @@ const KYCDataEntryPage: React.FC = () => {
             <td className="whitespace-nowrap text-xs">{record.remarks || '-'}</td>
             <td className="whitespace-nowrap text-xs font-semibold">{branchName}</td>
             <td>
+              <button onClick={() => setViewingRecord(record)} className="hover:underline text-xs font-bold mr-2" style={{ color: 'var(--text-secondary)' }}>View</button>
               <button onClick={() => handleEdit(record)} className="hover:underline text-xs font-bold mr-2" style={{ color: 'var(--accent)' }}>Edit</button>
               <button onClick={() => handleDelete(record.id)} className="hover:underline text-xs font-bold text-red-400 hover:text-red-300">Delete</button>
             </td>
@@ -2138,6 +2147,7 @@ const KYCDataEntryPage: React.FC = () => {
             <td className="whitespace-nowrap text-xs">{getStatusPill(record.status)}</td>
             <td className="whitespace-nowrap text-xs font-semibold">{branchName}</td>
             <td>
+              <button onClick={() => setViewingRecord(record)} className="hover:underline text-xs font-bold mr-2" style={{ color: 'var(--text-secondary)' }}>View</button>
               <button onClick={() => handleEdit(record)} className="hover:underline text-xs font-bold mr-2" style={{ color: 'var(--accent)' }}>Edit</button>
               <button onClick={() => handleDelete(record.id)} className="hover:underline text-xs font-bold text-red-400 hover:text-red-300">Delete</button>
             </td>
@@ -2157,6 +2167,7 @@ const KYCDataEntryPage: React.FC = () => {
             <td className="whitespace-nowrap text-xs">{getStatusPill(record.status)}</td>
             <td className="whitespace-nowrap text-xs font-semibold">{branchName}</td>
             <td>
+              <button onClick={() => setViewingRecord(record)} className="hover:underline text-xs font-bold mr-2" style={{ color: 'var(--text-secondary)' }}>View</button>
               <button onClick={() => handleEdit(record)} className="hover:underline text-xs font-bold mr-2" style={{ color: 'var(--accent)' }}>Edit</button>
               <button onClick={() => handleDelete(record.id)} className="hover:underline text-xs font-bold text-red-400 hover:text-red-300">Delete</button>
             </td>
@@ -2176,6 +2187,7 @@ const KYCDataEntryPage: React.FC = () => {
             <td className="whitespace-nowrap text-xs">{getStatusPill(record.status)}</td>
             <td className="whitespace-nowrap text-xs font-semibold">{branchName}</td>
             <td>
+              <button onClick={() => setViewingRecord(record)} className="hover:underline text-xs font-bold mr-2" style={{ color: 'var(--text-secondary)' }}>View</button>
               <button onClick={() => handleEdit(record)} className="hover:underline text-xs font-bold mr-2" style={{ color: 'var(--accent)' }}>Edit</button>
               <button onClick={() => handleDelete(record.id)} className="hover:underline text-xs font-bold text-red-400 hover:text-red-300">Delete</button>
             </td>
@@ -2192,6 +2204,7 @@ const KYCDataEntryPage: React.FC = () => {
             <td className="whitespace-nowrap text-xs">{getStatusPill(record.status)}</td>
             <td className="whitespace-nowrap text-xs font-semibold">{branchName}</td>
             <td>
+              <button onClick={() => setViewingRecord(record)} className="hover:underline text-xs font-bold mr-2" style={{ color: 'var(--text-secondary)' }}>View</button>
               <button onClick={() => handleEdit(record)} className="hover:underline text-xs font-bold mr-2" style={{ color: 'var(--accent)' }}>Edit</button>
               <button onClick={() => handleDelete(record.id)} className="hover:underline text-xs font-bold text-red-400 hover:text-red-300">Delete</button>
             </td>
@@ -2748,6 +2761,8 @@ const KYCDataEntryPage: React.FC = () => {
             </div>
           </div>
         )}
+
+        <ViewDetailsModal record={viewingRecord} onClose={() => setViewingRecord(null)} title="KYC Record Details" />
       </div>
     </DashboardLayout>
   );

@@ -1,14 +1,13 @@
 import React, { useState } from 'react';
-import type { Branch, Department, Module, User } from '../../services/org.service';
+import type { Branch, Department, User } from '../../services/org.service';
 
 interface Props {
   users: User[];
   branches: Branch[];
   departments: Department[];
-  modules: Module[];
   loading: boolean;
   onEditUser: (user: User) => void;
-  onDeleteUser: (user: User) => void;
+  onDeleteUser?: (user: User) => void;
   onToggleBlock: (user: User) => void;
   onMarkResigned?: (user: User) => void;
 }
@@ -21,7 +20,7 @@ const roleBadgeClass = (role: string) => {
   return 'mis-badge mis-badge-info';
 };
 
-const UserTable: React.FC<Props> = ({ users, branches, departments, modules, loading, onEditUser, onDeleteUser, onToggleBlock, onMarkResigned }) => {
+const UserTable: React.FC<Props> = ({ users, branches, departments, loading, onEditUser, onDeleteUser, onToggleBlock, onMarkResigned }) => {
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
 
   const toggleExpand = (id: string) => {
@@ -31,7 +30,6 @@ const UserTable: React.FC<Props> = ({ users, branches, departments, modules, loa
   const renderDetailsRow = (user: User) => {
     const userBranch = branches.find(b => b.id === user.branch_id);
     const userDept = departments.find(d => d.id === user.department_id);
-    const userModules = modules.filter(m => user.allowed_modules?.includes(m.id));
     return (
       <tr key={`${user.id}-details`} className="bg-black/20">
         <td colSpan={3} className="px-4 sm:px-6 py-5">
@@ -62,20 +60,7 @@ const UserTable: React.FC<Props> = ({ users, branches, departments, modules, loa
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-            <div className="mis-card p-4 md:col-span-2">
-              <span className="mis-label">Module Access</span>
-              {userModules.length > 0 ? (
-                <ul className="mt-2 flex flex-wrap gap-1.5 list-none p-0 m-0">
-                  {userModules.map(m => (
-                    <li key={m.id} className="mis-badge mis-badge-info">{m.name}</li>
-                  ))}
-                </ul>
-              ) : (
-                <span className="italic text-sm mt-1 block" style={{ color: 'var(--text-muted)' }}>No modules assigned</span>
-              )}
-            </div>
-
+          <div className="grid grid-cols-1 gap-4 text-sm">
             <div className="mis-card p-4 flex flex-col justify-between">
               <div>
                 <span className="mis-label">Status Details</span>
@@ -178,15 +163,17 @@ const UserTable: React.FC<Props> = ({ users, branches, departments, modules, loa
                     >
                       {u.status === 'blocked' ? '🔓' : '🚫'}
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => onDeleteUser(u)}
-                      className="mis-icon-btn danger"
-                      title="Delete User"
-                      disabled={loading}
-                    >
-                      🗑️
-                    </button>
+                    {onDeleteUser && (
+                      <button
+                        type="button"
+                        onClick={() => onDeleteUser(u)}
+                        className="mis-icon-btn danger"
+                        title="Delete User"
+                        disabled={loading}
+                      >
+                        🗑️
+                      </button>
+                    )}
                     <span
                       className="mis-icon-btn ml-1"
                       style={{ transform: expandedUserId === u.id ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}

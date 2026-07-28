@@ -259,8 +259,9 @@ const Sidebar: React.FC = () => {
           />
         )}
 
-        {/* IEPF Department Navigation */}
-        {(isIEPFUser || isAdmin) && (
+        {/* IEPF Department Navigation — data entry stays with IEPF staff only;
+            admin keeps the oversight dashboard below, not the entry form. */}
+        {isIEPFUser && (
           <>
             <span className="mis-sidebar-section-label">IEPF Department</span>
             <NavItem
@@ -274,7 +275,7 @@ const Sidebar: React.FC = () => {
 
         {showIEPFDashboard && (
           <>
-            {(!isIEPFUser && !isAdmin) && <span className="mis-sidebar-section-label">IEPF Department</span>}
+            {!isIEPFUser && <span className="mis-sidebar-section-label">IEPF Department</span>}
             <NavItem
               to={ROUTES.IEPF_DASHBOARD}
               icon={<IconIEPFDashboard />}
@@ -284,8 +285,10 @@ const Sidebar: React.FC = () => {
           </>
         )}
 
-        {/* Settlements Department Navigation */}
-        {(user?.department_name?.toUpperCase() === 'SETTLEMENTS' || isAdmin) && (
+        {/* Settlements Department Navigation — data entry stays with
+            Settlements staff only; admin keeps the oversight dashboard below,
+            not the entry form. */}
+        {user?.department_name?.toUpperCase() === 'SETTLEMENTS' && (
           <>
             <span className="mis-sidebar-section-label">Settlements Department</span>
             <NavItem
@@ -299,7 +302,7 @@ const Sidebar: React.FC = () => {
 
         {(isAdmin || ['ceo', 'managing_director', 'director', 'executive'].includes(user?.role || '') || (user?.department_name?.toUpperCase() === 'SETTLEMENTS' && (isHOD || isEmployee))) && (
           <>
-            {(user?.department_name?.toUpperCase() !== 'SETTLEMENTS' && !isAdmin) && <span className="mis-sidebar-section-label">Settlements Department</span>}
+            {user?.department_name?.toUpperCase() !== 'SETTLEMENTS' && <span className="mis-sidebar-section-label">Settlements Department</span>}
             <NavItem
               to={ROUTES.SETTLEMENTS_DASHBOARD}
               icon={<IconIEPFDashboard />}
@@ -309,8 +312,9 @@ const Sidebar: React.FC = () => {
           </>
         )}
 
-        {/* KYC Department Navigation */}
-        {(isKYCUser || isAdmin) && (
+        {/* KYC Department Navigation — data entry stays with KYC staff only;
+            admin keeps the oversight dashboard below, not the entry form. */}
+        {isKYCUser && (
           <>
             <span className="mis-sidebar-section-label">KYC Department</span>
             <NavItem
@@ -324,7 +328,7 @@ const Sidebar: React.FC = () => {
 
         {showKYCDashboard && (
           <>
-            {(!isKYCUser && !isAdmin) && <span className="mis-sidebar-section-label">KYC Department</span>}
+            {!isKYCUser && <span className="mis-sidebar-section-label">KYC Department</span>}
             <NavItem
               to={ROUTES.KYC_DASHBOARD}
               icon={<IconIEPFDashboard />}
@@ -334,8 +338,9 @@ const Sidebar: React.FC = () => {
           </>
         )}
 
-        {/* DP Department Navigation */}
-        {(isDPUser || isAdmin) && (
+        {/* DP Department Navigation — data entry stays with DP staff only;
+            admin keeps the oversight dashboard below, not the entry form. */}
+        {isDPUser && (
           <>
             <span className="mis-sidebar-section-label">DP Department</span>
             <NavItem
@@ -349,7 +354,7 @@ const Sidebar: React.FC = () => {
 
         {showDPDashboard && (
           <>
-            {(!isDPUser && !isAdmin) && <span className="mis-sidebar-section-label">DP Department</span>}
+            {!isDPUser && <span className="mis-sidebar-section-label">DP Department</span>}
             <NavItem
               to={ROUTES.DP_DASHBOARD}
               icon={<IconIEPFDashboard />}
@@ -359,8 +364,9 @@ const Sidebar: React.FC = () => {
           </>
         )}
 
-        {/* IT Department Navigation */}
-        {(isITUser || isAdmin) && (
+        {/* IT Department Navigation — data entry stays with IT staff only;
+            admin keeps the oversight dashboard below, not the entry form. */}
+        {isITUser && (
           <>
             <span className="mis-sidebar-section-label">IT Department</span>
             <NavItem
@@ -376,7 +382,7 @@ const Sidebar: React.FC = () => {
 
         {showITDashboard && (
           <>
-            {(!isITUser && !isAdmin) && <span className="mis-sidebar-section-label">IT Department</span>}
+            {!isITUser && <span className="mis-sidebar-section-label">IT Department</span>}
             <NavItem
               to={ROUTES.IT_DASHBOARD}
               icon={<IconIEPFDashboard />}
@@ -386,8 +392,10 @@ const Sidebar: React.FC = () => {
           </>
         )}
 
-        {/* Finance Department Navigation */}
-        {(isFinanceUser || isAdmin) && (
+        {/* Finance Department Navigation — data entry stays with Finance
+            staff only; admin keeps the oversight dashboard below, not the
+            entry form. */}
+        {isFinanceUser && (
           <>
             <span className="mis-sidebar-section-label">Finance Department</span>
             <NavItem
@@ -401,7 +409,7 @@ const Sidebar: React.FC = () => {
 
         {showFinanceDashboard && (
           <>
-            {(!isFinanceUser && !isAdmin) && <span className="mis-sidebar-section-label">Finance Department</span>}
+            {!isFinanceUser && <span className="mis-sidebar-section-label">Finance Department</span>}
             <NavItem
               to={ROUTES.FINANCE_DASHBOARD}
               icon={<IconIEPFDashboard />}
@@ -423,7 +431,7 @@ const Sidebar: React.FC = () => {
                 onClick={closeOnMobile}
               />
             )}
-            {showHRDashboard && (
+            {isHR && (
               <NavItem
                 to={ROUTES.HR_DATA_ENTRY}
                 icon={<IconIEPFEntry />}
@@ -431,11 +439,11 @@ const Sidebar: React.FC = () => {
                 onClick={closeOnMobile}
               />
             )}
-            {showHRDashboard && (
+            {isHR && (
               <NavItem
-                to={ROUTES.DASHBOARD}
-                icon={<IconIEPFDashboard />}
-                label="HR Dashboard"
+                to={ROUTES.HR_USER_MANAGEMENT}
+                icon={<IconUser />}
+                label="Create User"
                 onClick={closeOnMobile}
               />
             )}

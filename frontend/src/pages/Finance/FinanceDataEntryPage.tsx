@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import DashboardLayout from '../../components/layout/DashboardLayout';
+import ViewDetailsModal from '../../components/common/ViewDetailsModal';
 import { financeService } from '../../services/finance.service';
 import { orgService } from '../../services/org.service';
 import { authService } from '../../services/auth.service';
@@ -152,6 +153,7 @@ const FinanceDataEntryPage: React.FC = () => {
 
   // Form State
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [viewingRecord, setViewingRecord] = useState<any>(null);
   const [formData, setFormData] = useState<any>({});
 
   // CSV Import state
@@ -804,6 +806,12 @@ const FinanceDataEntryPage: React.FC = () => {
                         <td>{new Date(row.created_at).toLocaleDateString()}</td>
                         <td className="text-right space-x-2">
                           <button
+                            className="text-slate-400 hover:text-slate-200 font-medium text-xs"
+                            onClick={() => setViewingRecord(row)}
+                          >
+                            View
+                          </button>
+                          <button
                             className="text-indigo-400 hover:text-indigo-300 font-medium text-xs"
                             onClick={() => handleEdit(row)}
                           >
@@ -1088,6 +1096,8 @@ const FinanceDataEntryPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      <ViewDetailsModal record={viewingRecord} onClose={() => setViewingRecord(null)} title="Finance Record Details" />
     </DashboardLayout>
   );
 };

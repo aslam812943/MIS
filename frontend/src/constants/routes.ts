@@ -24,6 +24,7 @@ export const ROUTES = {
   FINANCE_DASHBOARD: '/finance-dashboard',
   COMPARISON: '/comparison/:dept',
   HR_DATA_ENTRY: '/hr-entry',
+  HR_USER_MANAGEMENT: '/hr-users',
   ROOT: '/',
 } as const;
 

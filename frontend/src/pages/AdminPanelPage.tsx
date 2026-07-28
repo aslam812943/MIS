@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import axios from 'axios';
 import { orgService } from '../services/org.service';
-import type { Branch, Department, Module, User } from '../services/org.service';
+import type { Branch, Department, User } from '../services/org.service';
 import { INITIAL_CONFIRM_STATE, type ConfirmDialogState } from '../types/confirm.types';
 import DashboardLayout from '../components/layout/DashboardLayout';
 import UserTable from '../components/admin/UserTable';
@@ -32,7 +32,6 @@ const AdminPanelPage: React.FC = () => {
   const [listTab, setListTab] = useState<'users' | 'branches' | 'departments' | 'modules'>('users');
   const [branches, setBranches] = useState<Branch[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
-  const [modules, setModules] = useState<Module[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [newBranchName, setNewBranchName] = useState('');
   const [newDeptName, setNewDeptName] = useState('');
@@ -81,15 +80,13 @@ const AdminPanelPage: React.FC = () => {
 
   const fetchData = async () => {
     try {
-      const [bData, dData, mData, uData] = await Promise.all([
+      const [bData, dData, uData] = await Promise.all([
         orgService.getBranches(),
         orgService.getDepartments(),
-        orgService.getModules(),
         orgService.getUsers()
       ]);
       setBranches(bData);
       setDepartments(dData);
-      setModules(mData);
       setUsers(uData);
     } catch (error: unknown) {
       let message = 'Failed to load data.';
@@ -649,7 +646,7 @@ const AdminPanelPage: React.FC = () => {
                       </div>
                     </div>
                     <UserTable 
-                      users={filteredUsers} branches={branches} departments={departments} modules={modules} 
+                      users={filteredUsers} branches={branches} departments={departments}
                       loading={loading}
                       onEditUser={(u) => {
                         setUserData({
