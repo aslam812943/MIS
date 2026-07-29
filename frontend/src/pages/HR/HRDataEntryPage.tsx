@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import ViewDetailsModal from '../../components/common/ViewDetailsModal';
+import CsvImportGuide from '../../components/common/CsvImportGuide';
+import { validateCsvHeaders, containsSampleSentinel, type CsvHeaderValidation } from '../../utils/csvBulkImportHelpers';
 import { hrService } from '../../services/hr.service';
 import { orgService } from '../../services/org.service';
 
@@ -97,6 +99,8 @@ const HRDataEntryPage: React.FC = () => {
   const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
   const [csvRows, setCsvRows] = useState<any[]>([]);
   const [csvMappings, setCsvMappings] = useState<{ [key: string]: string }>({});
+  const [csvValidation, setCsvValidation] = useState<CsvHeaderValidation | null>(null);
+  const [csvHasSample, setCsvHasSample] = useState(false);
   const [csvImportErrors, setCsvImportErrors] = useState<{ row: number; error: string }[]>([]);
   const [csvImporting, setCsvImporting] = useState(false);
 
@@ -374,6 +378,20 @@ const HRDataEntryPage: React.FC = () => {
         headers.forEach((h, index) => { rowObj[h] = values[index] || ''; });
         return rowObj;
       });
+
+      // Reject the whole file if the header row doesn't exactly match the
+      // required columns, or if it's the untouched example template.
+      const validation = validateCsvHeaders(headers, getFormFields().map((f: any) => ({ key: f.name, label: f.label })));
+      const hasSample = containsSampleSentinel(parsedRows.map(r => Object.values(r)));
+      setCsvValidation(validation.valid ? null : validation);
+      setCsvHasSample(hasSample);
+
+      if (!validation.valid || hasSample) {
+        setCsvRows([]);
+        setCsvMappings({});
+        return;
+      }
+
       setCsvRows(parsedRows);
 
       const initialMap: any = {};
@@ -388,6 +406,10 @@ const HRDataEntryPage: React.FC = () => {
 
   const handleImportCsv = async () => {
     if (csvRows.length === 0) return;
+    if (csvValidation || csvHasSample) {
+      toast.error(csvHasSample ? "Can't import — this is the example file." : 'Fix the CSV column errors before importing.');
+      return;
+    }
     const dateFieldNames = new Set(getFormFields().filter(f => f.type === 'date').map(f => f.name));
 
     const mappedRecords = csvRows.map(row => {
@@ -452,7 +474,7 @@ const HRDataEntryPage: React.FC = () => {
 
           <div className="flex items-center gap-2.5">
             <button
-              onClick={() => { setCsvModalOpen(true); setCsvHeaders([]); setCsvRows([]); setCsvImportErrors([]); }}
+              onClick={() => { setCsvModalOpen(true); setCsvHeaders([]); setCsvRows([]); setCsvImportErrors([]); setCsvValidation(null); setCsvHasSample(false); }}
               className="px-3.5 py-1.5 border rounded-lg text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center gap-1.5 h-[34px]"
               style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}
             >
@@ -604,11 +626,21 @@ const HRDataEntryPage: React.FC = () => {
               <h3 className="text-lg font-bold mb-4" style={{ color: 'var(--text-primary)' }}>Bulk Import CSV Records</h3>
 
               <div className="mb-4">
+                <CsvImportGuide
+                  fields={getFormFields().map((f: any) => ({ key: f.name, label: f.label }))}
+                  templateFilename={`hr-${sheetTab}-template.csv`}
+                  missing={csvValidation?.missing}
+                  extra={csvValidation?.extra}
+                  sampleFileDetected={csvHasSample}
+                />
+              </div>
+
+              <div className="mb-4">
                 <label className="text-xs font-semibold block mb-2" style={{ color: 'var(--text-secondary)' }}>Select CSV File</label>
                 <input type="file" accept=".csv" onChange={handleCsvFileUpload} className="text-xs" />
               </div>
 
-              {csvHeaders.length > 0 && (
+              {csvHeaders.length > 0 && !csvValidation && !csvHasSample && (
                 <div className="mb-4">
                   <h4 className="text-sm font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>Map CSV Columns to Database Fields</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[250px] overflow-y-auto p-2 border rounded" style={{ borderColor: 'var(--border)' }}>
@@ -652,7 +684,7 @@ const HRDataEntryPage: React.FC = () => {
                 </button>
                 <button
                   className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold rounded-lg transition-all disabled:opacity-50"
-                  disabled={csvRows.length === 0 || csvImporting}
+                  disabled={csvRows.length === 0 || csvImporting || !!csvValidation || csvHasSample}
                   onClick={handleImportCsv}
                 >
                   {csvImporting ? 'Importing...' : `Execute Import (${csvRows.length} Rows)`}

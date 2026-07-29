@@ -6,7 +6,22 @@ import { iepfService } from '../../services/iepf.service';
 import { orgService } from '../../services/org.service';
 import ConfirmModal from '../../components/common/ConfirmModal';
 import ViewDetailsModal from '../../components/common/ViewDetailsModal';
+import CsvImportGuide from '../../components/common/CsvImportGuide';
+import { validateCsvHeaders, containsSampleSentinel, type CsvHeaderValidation } from '../../utils/csvBulkImportHelpers';
 import { INITIAL_CONFIRM_STATE, type ConfirmDialogState } from '../../types/confirm.types';
+
+// Columns a bulk-import CSV must contain — mirrors createClaim's accepted
+// fields (investor_name/pan_number/claim_date are required server-side;
+// the rest are optional but still validated the same way a manual entry is).
+const IEPF_BULK_FIELDS = [
+  { key: 'investor_name', label: 'Investor Name' },
+  { key: 'pan_number', label: 'PAN Number' },
+  { key: 'claim_type', label: 'Claim Type (Dividend/Shares/Both)' },
+  { key: 'claim_date', label: 'Claim Date (YYYY-MM-DD)' },
+  { key: 'amount', label: 'Amount' },
+  { key: 'num_shares', label: 'Number of Shares' },
+  { key: 'client_id', label: 'Client ID (optional)' },
+];
 
 // Plain-English explanation shown next to the claim form, written for
 // operations staff (not developers) — why this page exists and what each
@@ -65,6 +80,14 @@ const IEPFDataEntryPage: React.FC = () => {
   const [fetching, setFetching] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [viewingRecord, setViewingRecord] = useState<any>(null);
+
+  // Bulk CSV import
+  const [csvModalOpen, setCsvModalOpen] = useState(false);
+  const [csvRows, setCsvRows] = useState<Record<string, string>[]>([]);
+  const [csvValidation, setCsvValidation] = useState<CsvHeaderValidation | null>(null);
+  const [csvHasSample, setCsvHasSample] = useState(false);
+  const [csvImporting, setCsvImporting] = useState(false);
+  const [csvImportErrors, setCsvImportErrors] = useState<{ row: number; error: string }[]>([]);
 
   // KYC verified investor lookup
   const [investors, setInvestors] = useState<VerifiedInvestor[]>([]);
@@ -348,6 +371,94 @@ const IEPFDataEntryPage: React.FC = () => {
     setActiveTab('list');
   };
 
+  const openCsvModal = () => {
+    setCsvRows([]);
+    setCsvValidation(null);
+    setCsvHasSample(false);
+    setCsvImportErrors([]);
+    setCsvModalOpen(true);
+  };
+
+  const handleCsvFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setCsvImportErrors([]);
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      if (!text) return;
+
+      const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+      if (lines.length === 0) {
+        toast.error('The CSV file contains no records.');
+        return;
+      }
+
+      const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+      const parsedRows = lines.slice(1).map(line => {
+        const values = line.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+        const rowObj: Record<string, string> = {};
+        headers.forEach((h, index) => { rowObj[h] = values[index] || ''; });
+        return rowObj;
+      });
+
+      // Reject the whole file if the header row doesn't exactly match the
+      // required columns, or if it's the untouched example template.
+      const validation = validateCsvHeaders(headers, IEPF_BULK_FIELDS);
+      const hasSample = containsSampleSentinel(parsedRows.map(r => Object.values(r)));
+      setCsvValidation(validation.valid ? null : validation);
+      setCsvHasSample(hasSample);
+      setCsvRows(validation.valid && !hasSample ? parsedRows : []);
+    };
+    reader.readAsText(file);
+  };
+
+  const handleCsvImportSubmit = async () => {
+    if (csvRows.length === 0) {
+      toast.error('Select a valid CSV file first.');
+      return;
+    }
+    if (csvValidation || csvHasSample) {
+      toast.error(csvHasSample ? "Can't import — this is the example file." : 'Fix the CSV column errors before importing.');
+      return;
+    }
+
+    setCsvImporting(true);
+    try {
+      const records = csvRows.map(row => ({
+        investor_name: row.investor_name,
+        pan_number: row.pan_number,
+        claim_type: row.claim_type || 'Dividend',
+        claim_date: row.claim_date,
+        amount: Number(row.amount) || 0,
+        num_shares: Number(row.num_shares) || 0,
+        client_id: row.client_id || undefined,
+      }));
+
+      const result = await iepfService.bulkImportClaims(records);
+      const insertedCount = result.inserted?.length ?? 0;
+      const failedRows: { row: number; error: string }[] = result.failed ?? [];
+      setCsvImportErrors(failedRows);
+
+      if (failedRows.length === 0) {
+        toast.success(`Successfully imported ${insertedCount} claim${insertedCount === 1 ? '' : 's'}.`);
+        setCsvModalOpen(false);
+      } else if (insertedCount > 0) {
+        toast.error(`Imported ${insertedCount} claim${insertedCount === 1 ? '' : 's'}, ${failedRows.length} row${failedRows.length === 1 ? '' : 's'} failed — see details below.`);
+      } else {
+        toast.error('No rows could be imported — see details below.');
+      }
+
+      if (insertedCount > 0) fetchClaims();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Bulk import failed.');
+    } finally {
+      setCsvImporting(false);
+    }
+  };
+
   // Plain-English "why are we collecting this" panel shown beside the claim form.
   const renderHelpPanel = () => (
     <div
@@ -406,7 +517,16 @@ const IEPFDataEntryPage: React.FC = () => {
             </p>
           </div>
           
-          <div className="mis-tabs">
+          <div className="flex items-center gap-2.5">
+            <button
+              type="button"
+              onClick={openCsvModal}
+              className="px-3.5 py-1.5 border rounded-lg text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center gap-1.5 h-[34px]"
+              style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}
+            >
+              📤 Bulk Import CSV
+            </button>
+            <div className="mis-tabs">
             <button
               type="button"
               onClick={() => {
@@ -441,6 +561,7 @@ const IEPFDataEntryPage: React.FC = () => {
             >
               Search & View database
             </button>
+            </div>
           </div>
         </header>
 
@@ -959,6 +1080,104 @@ const IEPFDataEntryPage: React.FC = () => {
       />
 
       <ViewDetailsModal record={viewingRecord} onClose={() => setViewingRecord(null)} title="IEPF Claim Details" />
+
+      {/* Bulk Import CSV Modal */}
+      {csvModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-2xl p-6 rounded-xl border max-h-[85vh] overflow-y-auto" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+            <div className="flex justify-between items-start mb-4">
+              <h3 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>📤 Bulk Import Claims</h3>
+              <button type="button" className="mis-icon-btn" onClick={() => setCsvModalOpen(false)} aria-label="Close">✕</button>
+            </div>
+
+            <div className="space-y-4">
+              <CsvImportGuide
+                fields={IEPF_BULK_FIELDS}
+                templateFilename="iepf-claims-template.csv"
+                missing={csvValidation?.missing}
+                extra={csvValidation?.extra}
+                sampleFileDetected={csvHasSample}
+              />
+
+              <div>
+                <label className="text-xs font-bold uppercase tracking-wider block mb-2" style={{ color: 'var(--text-primary)' }}>
+                  Select CSV File
+                </label>
+                <input
+                  type="file"
+                  accept=".csv"
+                  onChange={handleCsvFileChange}
+                  className="block w-full text-xs file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-teal-600 file:text-white hover:file:bg-teal-700 cursor-pointer"
+                  style={{ color: 'var(--text-secondary)' }}
+                />
+              </div>
+
+              {csvRows.length > 0 && !csvValidation && !csvHasSample && (
+                <div>
+                  <span className="text-[11px] font-bold uppercase" style={{ color: 'var(--accent)' }}>
+                    Preview (First 3 Rows) — {csvRows.length} record{csvRows.length === 1 ? '' : 's'} detected
+                  </span>
+                  <div className="overflow-x-auto border rounded-lg mt-1" style={{ borderColor: 'var(--border)' }}>
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="border-b" style={{ borderColor: 'var(--border)' }}>
+                          {IEPF_BULK_FIELDS.map(f => (
+                            <th key={f.key} className="p-2 font-bold whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>{f.label}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {csvRows.slice(0, 3).map((row, idx) => (
+                          <tr key={idx} className="border-b last:border-0" style={{ borderColor: 'var(--border)' }}>
+                            {IEPF_BULK_FIELDS.map(f => (
+                              <td key={f.key} className="p-2 truncate max-w-[140px]" style={{ color: 'var(--text-primary)' }}>{row[f.key] || '—'}</td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {csvImportErrors.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-semibold mb-2" style={{ color: '#ef4444' }}>
+                    {csvImportErrors.length} Row{csvImportErrors.length === 1 ? '' : 's'} Failed
+                  </h4>
+                  <div className="max-h-[160px] overflow-y-auto border rounded-lg divide-y" style={{ borderColor: 'rgba(239, 68, 68, 0.3)', background: 'rgba(239, 68, 68, 0.05)' }}>
+                    {csvImportErrors.map(fe => (
+                      <div key={fe.row} className="px-3 py-2 text-xs">
+                        <span className="font-semibold" style={{ color: '#ef4444' }}>Row {fe.row}:</span>{' '}
+                        <span style={{ color: 'var(--text-secondary)' }}>{fe.error}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6 pt-4 border-t" style={{ borderColor: 'var(--border)' }}>
+              <button
+                type="button"
+                onClick={() => setCsvModalOpen(false)}
+                className="px-4 py-2 border rounded-lg text-xs font-semibold"
+                style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleCsvImportSubmit}
+                disabled={csvRows.length === 0 || csvImporting || !!csvValidation || csvHasSample}
+                className="px-5 py-2 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white text-xs font-bold rounded-lg transition-colors"
+              >
+                {csvImporting ? 'Importing...' : `🚀 Import ${csvRows.length > 0 ? `(${csvRows.length} Rows)` : ''}`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </DashboardLayout>
   );
 };

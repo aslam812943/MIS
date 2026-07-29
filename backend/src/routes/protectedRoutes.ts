@@ -156,6 +156,7 @@ router.post('/data-entries/:id/verify', requireAuth, dataEntryController.verifyE
  */
 router.get('/iepf/claims', requireAuth, iepfController.getClaims);
 router.post('/iepf/claims', requireAuth, iepfController.createClaim);
+router.post('/iepf/claims/bulk', requireAuth, iepfController.bulkImportClaims);
 router.patch('/iepf/claims/:id', requireAuth, iepfController.updateClaim);
 router.delete('/iepf/claims/:id', requireAuth, iepfController.deleteClaim);
 router.get('/iepf/dashboard', requireAuth, iepfController.getDashboardData);
