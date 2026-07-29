@@ -206,6 +206,31 @@ export class IEPFService {
   }
 
   /**
+   * Imports multiple claims from a bulk CSV upload — reuses createClaim's
+   * validation and access rules per row, so a bulk import can't bypass any
+   * check a single manual entry would go through. One bad row fails on its
+   * own; the rest of the batch still gets inserted.
+   */
+  async bulkImportClaims(
+    records: Partial<IEPFClaim>[],
+    creatorId: string
+  ): Promise<{ inserted: IEPFClaim[]; failed: { row: number; error: string }[] }> {
+    const inserted: IEPFClaim[] = [];
+    const failed: { row: number; error: string }[] = [];
+
+    for (let i = 0; i < records.length; i++) {
+      try {
+        const claim = await this.createClaim(records[i] as Partial<IEPFClaim>, creatorId);
+        inserted.push(claim);
+      } catch (err) {
+        failed.push({ row: i + 1, error: err instanceof Error ? err.message : 'Unknown error' });
+      }
+    }
+
+    return { inserted, failed };
+  }
+
+  /**
    * Updates an existing claim with branch lock bounds, edit permissions, and lifecycle rules.
    */
   async updateClaim(id: string, claimData: Partial<IEPFClaim>, updaterId: string): Promise<IEPFClaim> {

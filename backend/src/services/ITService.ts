@@ -16,7 +16,6 @@ const SHEET_TABLE_MAPPING: { [key: string]: string } = {
   'team-duties': 'it_team_duties',
   'software': 'it_software',
   'purchase-orders': 'it_purchase_orders',
-  'asset-inventory': 'it_asset_inventory'
 };
 
 // Mirrors each table's DB CHECK constraint on `status` in database_it.sql /
@@ -44,10 +43,7 @@ const SEVERITY_OPTIONS = ['Critical', 'High', 'Medium', 'Low'];
 // Sheets that are HO-only (org-wide) by design and whose tables therefore
 // have no branch_id column at all — audits are confirmed HO-only, and the
 // IT team roster is a single org-wide list, not per-branch.
-const NO_BRANCH_SHEETS = new Set(['audit-schedule', 'team-duties', 'asset-inventory']);
-
-const ASSET_INVENTORY_TYPES = ['MONITOR', 'CPU', 'KEYBOARD', 'MOUSE', 'LAPTOP', 'PRINTER', 'NETWORK DEVICE', 'SERVER', 'UPS', 'OTHER'];
-const CIA_RATINGS = ['LOW', 'MEDIUM', 'HIGH'];
+const NO_BRANCH_SHEETS = new Set(['audit-schedule', 'team-duties']);
 
 export class ITService {
   /**
@@ -334,27 +330,6 @@ export class ITService {
       }
     }
 
-    // Asset Inventory: asset tags mirror the company's existing physical
-    // tagging scheme (e.g. "SW-HO-MR 1"), which includes spaces — a plain
-    // alphanumeric+hyphen check (like the older 'assets' sheet's asset_id)
-    // would reject every real tag, so this allows spaces too.
-    if (payload.asset_tag !== undefined && payload.asset_tag !== null && String(payload.asset_tag).trim() !== '') {
-      if (!/^[A-Z0-9 -]+$/i.test(String(payload.asset_tag).trim())) {
-        throw new Error('Asset tag may only contain letters, numbers, spaces, and hyphens.');
-      }
-    }
-    if (payload.asset_type !== undefined && payload.asset_type !== null && String(payload.asset_type).trim() !== '') {
-      if (!ASSET_INVENTORY_TYPES.includes(String(payload.asset_type).trim().toUpperCase())) {
-        throw new Error('Invalid asset type.');
-      }
-    }
-    for (const field of ['criticality', 'confidentiality', 'integrity', 'availability']) {
-      if (sheet === 'asset-inventory' && payload[field] !== undefined && payload[field] !== null && String(payload[field]).trim() !== '') {
-        if (!CIA_RATINGS.includes(String(payload[field]).trim().toUpperCase())) {
-          throw new Error(`Invalid ${field} rating — must be Low, Medium, or High.`);
-        }
-      }
-    }
   }
 
   // Sheets whose table has a UNIQUE column, so an insert/update can raise a
@@ -369,7 +344,6 @@ export class ITService {
     'tickets': 'ticket number',
     'incidents': 'incident number',
     'purchase-orders': 'PO number',
-    'asset-inventory': 'asset tag',
   };
 
   // Reference-number fields that are server-generated, never accepted from
@@ -1077,18 +1051,6 @@ export class ITService {
     const posRaisedCount = (purchaseOrders || []).length;
     const totalPoValue = (purchaseOrders || []).reduce((sum, po: any) => sum + Number(po.amount || 0), 0);
 
-    // Asset Inventory (CIA register) — HO-only, no branch filter.
-    const { data: assetInventory } = await client
-      .from('it_asset_inventory')
-      .select('asset_type, criticality');
-    const totalInventoryItemsCount = (assetInventory || []).length;
-    const highCriticalityInventoryCount = (assetInventory || []).filter(a => a.criticality === 'HIGH').length;
-    const inventoryTypeCounts: { [key: string]: number } = {};
-    (assetInventory || []).forEach(a => {
-      const type = a.asset_type || 'OTHER';
-      inventoryTypeCounts[type] = (inventoryTypeCounts[type] || 0) + 1;
-    });
-
     return {
       kpis: {
         totalUsers: usersCount || 0,
@@ -1102,8 +1064,6 @@ export class ITService {
         amcDueSoon: amcDueSoonCount,
         posRaised: posRaisedCount,
         totalPoValue: Number(totalPoValue.toFixed(2)),
-        totalInventoryItems: totalInventoryItemsCount,
-        highCriticalityInventory: highCriticalityInventoryCount
       },
       compliance: {
         auditSchedule: auditScheduleWithCountdown,
@@ -1116,8 +1076,6 @@ export class ITService {
         categoryLabels: Object.keys(categoryCounts),
         warrantyExpiries,
         warrantyLabels: monthsLabels,
-        inventoryByType: Object.values(inventoryTypeCounts),
-        inventoryByTypeLabels: Object.keys(inventoryTypeCounts)
       }
     };
   }

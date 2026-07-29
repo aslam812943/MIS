@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import ViewDetailsModal from '../../components/common/ViewDetailsModal';
+import CsvImportGuide from '../../components/common/CsvImportGuide';
+import { validateCsvHeaders, containsSampleSentinel, type CsvHeaderValidation } from '../../utils/csvBulkImportHelpers';
 import { financeService } from '../../services/finance.service';
 import { orgService } from '../../services/org.service';
 import { authService } from '../../services/auth.service';
@@ -161,6 +163,8 @@ const FinanceDataEntryPage: React.FC = () => {
   const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
   const [csvRows, setCsvRows] = useState<any[]>([]);
   const [csvMappings, setCsvMappings] = useState<{ [key: string]: string }>({});
+  const [csvValidation, setCsvValidation] = useState<CsvHeaderValidation | null>(null);
+  const [csvHasSample, setCsvHasSample] = useState(false);
 
   useEffect(() => {
     fetchBranches();
@@ -432,6 +436,20 @@ const FinanceDataEntryPage: React.FC = () => {
         });
         return rowObj;
       });
+
+      // Reject the whole file if the header row doesn't exactly match the
+      // required columns, or if it's the untouched example template.
+      const validation = validateCsvHeaders(headers, getFormFields().map(f => ({ key: f.name, label: f.label })));
+      const hasSample = containsSampleSentinel(parsedRows.map(r => Object.values(r)));
+      setCsvValidation(validation.valid ? null : validation);
+      setCsvHasSample(hasSample);
+
+      if (!validation.valid || hasSample) {
+        setCsvRows([]);
+        setCsvMappings({});
+        return;
+      }
+
       setCsvRows(parsedRows);
 
       // Guess initial mappings
@@ -447,6 +465,10 @@ const FinanceDataEntryPage: React.FC = () => {
 
   const handleImportCsv = async () => {
     if (csvRows.length === 0) return;
+    if (csvValidation || csvHasSample) {
+      toast.error(csvHasSample ? "Can't import — this is the example file." : 'Fix the CSV column errors before importing.');
+      return;
+    }
 
     const mappedRecords = csvRows.map(row => {
       const record: any = {};
@@ -653,7 +675,14 @@ const FinanceDataEntryPage: React.FC = () => {
 
           <div className="flex items-center gap-2.5">
             <button
-              onClick={() => setCsvModalOpen(true)}
+              onClick={() => {
+                setCsvHeaders([]);
+                setCsvRows([]);
+                setCsvMappings({});
+                setCsvValidation(null);
+                setCsvHasSample(false);
+                setCsvModalOpen(true);
+              }}
               className="px-3.5 py-1.5 border rounded-lg text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center gap-1.5 h-[34px]"
               style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}
             >
@@ -1008,7 +1037,15 @@ const FinanceDataEntryPage: React.FC = () => {
           <div className="w-full max-w-4xl p-6 rounded-lg bg-gray-900 border border-gray-800 shadow-2xl text-left">
             <h3 className="text-lg font-bold text-white mb-4">Bulk Import CSV Records</h3>
 
-            <div className="space-y-6">
+            <div className="space-y-6 max-h-[75vh] overflow-y-auto pr-1">
+              <CsvImportGuide
+                fields={getFormFields().map(f => ({ key: f.name, label: f.label }))}
+                templateFilename={`finance-${sheetTab}-template.csv`}
+                missing={csvValidation?.missing}
+                extra={csvValidation?.extra}
+                sampleFileDetected={csvHasSample}
+              />
+
               <div>
                 <label className="block text-sm text-gray-400 mb-2">Select CSV File</label>
                 <input
@@ -1019,7 +1056,7 @@ const FinanceDataEntryPage: React.FC = () => {
                 />
               </div>
 
-              {csvHeaders.length > 0 && (
+              {csvHeaders.length > 0 && !csvValidation && !csvHasSample && (
                 <div>
                   <h4 className="text-sm font-semibold text-gray-300 mb-3">Map CSV Columns to Database Fields</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[300px] overflow-y-auto p-2 bg-gray-950 rounded border border-gray-800">
@@ -1087,7 +1124,7 @@ const FinanceDataEntryPage: React.FC = () => {
               </button>
               <button
                 className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold rounded-lg transition-all"
-                disabled={csvRows.length === 0}
+                disabled={csvRows.length === 0 || !!csvValidation || csvHasSample}
                 onClick={handleImportCsv}
               >
                 Execute Import ({csvRows.length} Rows)

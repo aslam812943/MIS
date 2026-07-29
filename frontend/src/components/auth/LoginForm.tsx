@@ -13,25 +13,17 @@ interface LoginFormProps {
  * Handles user input, validation, and interaction with the Auth Service.
  */
 const LoginForm: React.FC<LoginFormProps> = ({ selectedRole, onForgotPassword }) => {
-  const [email, setEmail] = useState<string>('admin@gmail.com');
-  const [password, setPassword] = useState<string>('111111');
+  const [email, setEmail] = useState<string>('');
+  const [password, setPassword] = useState<string>('');
   const [error, setError] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
   const [showPassword, setShowPassword] = useState<boolean>(false);
 
+  // Clear whatever was typed when switching roles — no demo credentials
+  // prefilled, and no leftover email/password from a different role card.
   useEffect(() => {
-    const roleEmails: Record<UserRole, string> = {
-      [UserRole.ADMIN]: 'admin@gmail.com',
-      [UserRole.CEO]: 'ceo@mis.com',
-      [UserRole.MANAGING_DIRECTOR]: 'md@mis.com',
-      [UserRole.DIRECTOR]: 'director@mis.com',
-      [UserRole.EXECUTIVE]: 'executive@mis.com',
-      [UserRole.HOD]: 'hod@gmail.com',
-      [UserRole.REGIONAL_MANAGER]: 'regional@mis.com',
-      [UserRole.EMPLOYEE]: 'employee@gmail.com',
-      [UserRole.HR]: 'hr@gmail.com',
-    };
-    setEmail(roleEmails[selectedRole] || 'user@mis.com');
+    setEmail('');
+    setPassword('');
   }, [selectedRole]);
 
   const handleLoginSubmission = async (e: React.FormEvent): Promise<void> => {

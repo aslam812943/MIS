@@ -3,6 +3,8 @@ import toast from 'react-hot-toast';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import CountdownBadge from '../../components/common/CountdownBadge';
 import ViewDetailsModal from '../../components/common/ViewDetailsModal';
+import CsvImportGuide from '../../components/common/CsvImportGuide';
+import { validateCsvHeaders, containsSampleSentinel, type CsvHeaderValidation } from '../../utils/csvBulkImportHelpers';
 import { itService } from '../../services/it.service';
 import { orgService } from '../../services/org.service';
 import { authService } from '../../services/auth.service';
@@ -102,21 +104,6 @@ const SHEET_HELP: Record<string, SheetHelpConfig> = {
       { label: 'Status', note: 'Active = in use. Under Repair = temporarily out. Retired = no longer used but not disposed. Disposed = physically gone.' },
     ],
     remember: 'Purchase Date and Useful Life directly drive the automatic book value and "due for upgrade" numbers shown in the list — get them wrong and every downstream number is wrong too.',
-  },
-  'asset-inventory': {
-    why: 'A separate physical inventory register from the Assets sheet above — this tracks every individual hardware component (monitors, CPUs, keyboards, mice, etc.) by its own asset tag, along with a CIA security rating for each item. This is the register cybersecurity/VAPT audits actually ask for: not "what did we pay for it" but "what do we have, where is it, and how sensitive is it."',
-    fields: [
-      { label: 'Asset Tag', note: 'The physical tag/label on the item (e.g. "SW-HO-MR 1"). Must be unique — this is how the item is located and tracked.' },
-      { label: 'Asset Type', note: 'What kind of item this is — Monitor, CPU, Keyboard, Mouse, Laptop, Printer, Network Device, Server, UPS, or Other.' },
-      { label: 'Model', note: 'Make/model as printed on the device, if known.' },
-      { label: 'Purchase Date', note: 'When it was bought, if known — leave blank if not recorded.' },
-      { label: 'Host Name / IP Address', note: 'For networked devices only — leave blank for peripherals like a mouse or monitor.' },
-      { label: 'Supplier / Supplier Warranty', note: 'Who it was bought from, and any warranty terms noted for it.' },
-      { label: 'Purpose / Department / Location / Owner', note: 'What it\'s used for, which department/desk it sits with, its physical location, and which department owns it (usually IT).' },
-      { label: 'Criticality / Confidentiality / Integrity / Availability', note: 'The CIA+Criticality security rating (Low/Medium/High) used in cybersecurity risk assessments — how sensitive this asset is, and how much it matters if it\'s compromised, altered, or unavailable.' },
-      { label: 'Additional Information / Remarks', note: 'Anything else worth noting about this specific item.' },
-    ],
-    remember: 'Leave any field blank rather than guessing — an accurate incomplete record is far more useful for an audit than a complete but made-up one.',
   },
   'diagrams': {
     why: 'Network topology, server architecture, and data center layout diagrams are what regulators, auditors, and whoever is responding to an incident at 2am actually rely on to understand our infrastructure quickly. An outdated diagram is worse than no diagram.',
@@ -299,6 +286,8 @@ const ITDataEntryPage: React.FC = () => {
   const [csvRows, setCsvRows] = useState<any[]>([]);
   const [csvMappings, setCsvMappings] = useState<{ [key: string]: string }>({});
   const [csvImportErrors, setCsvImportErrors] = useState<{ row: number; error: string }[]>([]);
+  const [csvValidation, setCsvValidation] = useState<CsvHeaderValidation | null>(null);
+  const [csvHasSample, setCsvHasSample] = useState(false);
   const [csvImporting, setCsvImporting] = useState(false);
 
   useEffect(() => {
@@ -651,6 +640,20 @@ const ITDataEntryPage: React.FC = () => {
         });
         return rowObj;
       });
+
+      // Reject the whole file if the header row doesn't exactly match the
+      // required columns, or if it's the untouched example template.
+      const validation = validateCsvHeaders(headers, getFormFields().map(f => ({ key: f.name, label: f.label })));
+      const hasSample = containsSampleSentinel(parsedRows.map(r => Object.values(r)));
+      setCsvValidation(validation.valid ? null : validation);
+      setCsvHasSample(hasSample);
+
+      if (!validation.valid || hasSample) {
+        setCsvRows([]);
+        setCsvMappings({});
+        return;
+      }
+
       setCsvRows(parsedRows);
 
       // Guess initial mappings
@@ -666,6 +669,10 @@ const ITDataEntryPage: React.FC = () => {
 
   const handleImportCsv = async () => {
     if (csvRows.length === 0) return;
+    if (csvValidation || csvHasSample) {
+      toast.error(csvHasSample ? "Can't import — this is the example file." : 'Fix the CSV column errors before importing.');
+      return;
+    }
 
     const dateFieldNames = new Set(getFormFields().filter(f => f.type === 'date').map(f => f.name));
 
@@ -822,27 +829,6 @@ const ITDataEntryPage: React.FC = () => {
           { name: 'amc_coverage', label: 'Under vendor AMC support?', type: 'checkbox' },
           { name: 'criticality', label: 'Criticality', type: 'select', options: ['Critical', 'Non-Critical'], required: true },
           { name: 'status', label: 'Status', type: 'select', options: ['Active', 'Under Repair', 'Retired', 'Disposed'], required: true }
-        ];
-      case 'asset-inventory':
-        return [
-          { name: 'asset_tag', label: 'Asset Tag', type: 'text', required: true },
-          { name: 'asset_type', label: 'Asset Type', type: 'select', options: ['MONITOR', 'CPU', 'KEYBOARD', 'MOUSE', 'LAPTOP', 'PRINTER', 'NETWORK DEVICE', 'SERVER', 'UPS', 'OTHER'], required: true },
-          { name: 'model', label: 'Model', type: 'text' },
-          { name: 'purchase_date', label: 'Purchase Date', type: 'date' },
-          { name: 'host_name', label: 'Host Name', type: 'text' },
-          { name: 'ip_address', label: 'IP Address', type: 'text' },
-          { name: 'supplier', label: 'Supplier', type: 'text' },
-          { name: 'supplier_warranty', label: 'Supplier Warranty', type: 'text' },
-          { name: 'purpose', label: 'Purpose', type: 'text' },
-          { name: 'department', label: 'Department / Used By', type: 'text' },
-          { name: 'location', label: 'Location', type: 'text' },
-          { name: 'owner', label: 'Owner', type: 'text' },
-          { name: 'criticality', label: 'Criticality', type: 'select', options: ['LOW', 'MEDIUM', 'HIGH'] },
-          { name: 'confidentiality', label: 'Confidentiality', type: 'select', options: ['LOW', 'MEDIUM', 'HIGH'] },
-          { name: 'integrity', label: 'Integrity', type: 'select', options: ['LOW', 'MEDIUM', 'HIGH'] },
-          { name: 'availability', label: 'Availability', type: 'select', options: ['LOW', 'MEDIUM', 'HIGH'] },
-          { name: 'additional_information', label: 'Additional Information', type: 'textarea' },
-          { name: 'remarks', label: 'Remarks', type: 'textarea' },
         ];
       case 'diagrams':
         return [
@@ -1066,6 +1052,8 @@ const ITDataEntryPage: React.FC = () => {
                   setCsvHeaders([]);
                   setCsvRows([]);
                   setCsvImportErrors([]);
+                  setCsvValidation(null);
+                  setCsvHasSample(false);
                 }}
                 className="px-3.5 py-1.5 border rounded-lg text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center gap-1.5 h-[34px]"
                 style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}
@@ -1101,7 +1089,6 @@ const ITDataEntryPage: React.FC = () => {
             { id: 'vendors', label: 'Vendors' },
             { id: 'amc-contracts', label: 'AMC Contracts' },
             { id: 'assets', label: 'Assets' },
-            { id: 'asset-inventory', label: 'Asset Inventory' },
             { id: 'diagrams', label: 'Diagrams' },
             { id: 'servers', label: 'Servers & Config' },
             { id: 'cybersecurity-compliance', label: 'Compliance Control' },
@@ -1637,8 +1624,16 @@ const ITDataEntryPage: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="w-full max-w-4xl p-6 rounded-lg bg-gray-900 border border-gray-800 shadow-2xl text-left">
             <h3 className="text-lg font-bold text-white mb-4">Bulk Import CSV Records</h3>
-            
-            <div className="space-y-6">
+
+            <div className="space-y-6 max-h-[75vh] overflow-y-auto pr-1">
+              <CsvImportGuide
+                fields={getFormFields().map(f => ({ key: f.name, label: f.label }))}
+                templateFilename={`it-${sheetTab}-template.csv`}
+                missing={csvValidation?.missing}
+                extra={csvValidation?.extra}
+                sampleFileDetected={csvHasSample}
+              />
+
               <div>
                 <label className="block text-sm text-gray-400 mb-2">Select CSV File</label>
                 <input
@@ -1649,7 +1644,7 @@ const ITDataEntryPage: React.FC = () => {
                 />
               </div>
 
-              {csvHeaders.length > 0 && (
+              {csvHeaders.length > 0 && !csvValidation && !csvHasSample && (
                 <div>
                   <h4 className="text-sm font-semibold text-gray-300 mb-3">Map CSV Columns to Database Fields</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[300px] overflow-y-auto p-2 bg-gray-950 rounded border border-gray-800">
@@ -1737,7 +1732,7 @@ const ITDataEntryPage: React.FC = () => {
               </button>
               <button
                 className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold rounded-lg transition-all disabled:opacity-50"
-                disabled={csvRows.length === 0 || csvImporting}
+                disabled={csvRows.length === 0 || csvImporting || !!csvValidation || csvHasSample}
                 onClick={handleImportCsv}
               >
                 {csvImporting ? 'Importing...' : `Execute Import (${csvRows.length} Rows)`}

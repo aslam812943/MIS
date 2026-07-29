@@ -20,6 +20,14 @@ export const iepfService = {
   },
 
   /**
+   * Bulk imports claims from a mapped CSV upload.
+   */
+  bulkImportClaims: async (records: any[]) => {
+    const response = await api.post('/admin/iepf/claims/bulk', { records });
+    return response.data;
+  },
+
+  /**
    * Updates an existing claim.
    */
   updateClaim: async (id: string, claimData: any) => {

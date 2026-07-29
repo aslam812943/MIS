@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import ViewDetailsModal from '../../components/common/ViewDetailsModal';
+import CsvImportGuide from '../../components/common/CsvImportGuide';
+import { validateCsvHeaders, containsSampleSentinel, type CsvHeaderValidation } from '../../utils/csvBulkImportHelpers';
 import { dpService } from '../../services/dp.service';
 import { orgService } from '../../services/org.service';
 import { authService } from '../../services/auth.service';
@@ -249,6 +251,8 @@ const DPDataEntryPage: React.FC = () => {
   const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
   const [csvRows, setCsvRows] = useState<any[]>([]);
   const [csvMappings, setCsvMappings] = useState<{ [key: string]: string }>({});
+  const [csvValidation, setCsvValidation] = useState<CsvHeaderValidation | null>(null);
+  const [csvHasSample, setCsvHasSample] = useState(false);
 
   useEffect(() => {
     fetchBranches();
@@ -512,6 +516,20 @@ const DPDataEntryPage: React.FC = () => {
         return columns.map(col => col.replace(/^"|"$/g, '').trim());
       });
 
+      // Reject the whole file if the header row doesn't exactly match the
+      // required columns, or if it's the untouched example template —
+      // neither case should ever reach the preview/import step.
+      const validation = validateCsvHeaders(headers, getFormFields());
+      const hasSample = containsSampleSentinel(rowsData);
+      setCsvValidation(validation.valid ? null : validation);
+      setCsvHasSample(hasSample);
+
+      if (!validation.valid || hasSample) {
+        setCsvRows([]);
+        setCsvMappings({});
+        return;
+      }
+
       setCsvRows(rowsData);
 
       // Auto match mappings
@@ -529,6 +547,10 @@ const DPDataEntryPage: React.FC = () => {
   const handleCsvImportSubmit = async () => {
     if (csvRows.length === 0) {
       toast.error('No rows to import.');
+      return;
+    }
+    if (csvValidation || csvHasSample) {
+      toast.error(csvHasSample ? "Can't import — this is the example file." : 'Fix the CSV column errors before importing.');
       return;
     }
 
@@ -782,7 +804,14 @@ const DPDataEntryPage: React.FC = () => {
           
           <div className="flex items-center gap-2.5">
             <button
-              onClick={() => setCsvModalOpen(true)}
+              onClick={() => {
+                setCsvHeaders([]);
+                setCsvRows([]);
+                setCsvMappings({});
+                setCsvValidation(null);
+                setCsvHasSample(false);
+                setCsvModalOpen(true);
+              }}
               className="px-3.5 py-1.5 border rounded-lg text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center gap-1.5 h-[34px]"
               style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}
             >
@@ -1147,7 +1176,15 @@ const DPDataEntryPage: React.FC = () => {
                 📤 Bulk CSV Data Import
               </h3>
               
-              <div className="space-y-4">
+              <div className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
+                <CsvImportGuide
+                  fields={getFormFields()}
+                  templateFilename={`dp-${sheetTab}-template.csv`}
+                  missing={csvValidation?.missing}
+                  extra={csvValidation?.extra}
+                  sampleFileDetected={csvHasSample}
+                />
+
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
                     Select CSV File
@@ -1160,7 +1197,7 @@ const DPDataEntryPage: React.FC = () => {
                   />
                 </div>
 
-                {csvHeaders.length > 0 && (
+                {csvHeaders.length > 0 && !csvValidation && !csvHasSample && (
                   <div>
                     <h4 className="text-xs font-bold text-slate-400 mb-2">Align Database Fields to CSV Headers</h4>
                     <div className="max-h-56 overflow-y-auto border border-slate-800 rounded-lg p-3 bg-slate-950/50 space-y-3">
@@ -1215,7 +1252,7 @@ const DPDataEntryPage: React.FC = () => {
                 </button>
                 <button
                   onClick={handleCsvImportSubmit}
-                  disabled={csvRows.length === 0}
+                  disabled={csvRows.length === 0 || !!csvValidation || csvHasSample}
                   className="px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-bold transition-all disabled:opacity-50"
                 >
                   🚀 Upload Records

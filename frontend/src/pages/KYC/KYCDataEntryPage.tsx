@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import ViewDetailsModal from '../../components/common/ViewDetailsModal';
+import CsvImportGuide from '../../components/common/CsvImportGuide';
+import { containsSampleSentinel } from '../../utils/csvBulkImportHelpers';
 import { kycService } from '../../services/kyc.service';
 import { orgService } from '../../services/org.service';
 import { authService } from '../../services/auth.service';
@@ -689,10 +691,19 @@ const KYCDataEntryPage: React.FC = () => {
   };
 
   const handleBulkImportSubmit = async () => {
+    if (csvRows.length === 0) {
+      toast.error('Select a CSV file first.');
+      return;
+    }
     const fields = SHEET_FIELDS[sheetTab];
     const missing = fields.filter(f => f.required && !csvMapping[f.key]);
     if (missing.length > 0) {
       toast.error(`Please map all required fields: ${missing.map(f => f.label).join(', ')}`);
+      return;
+    }
+
+    if (containsSampleSentinel(csvRows)) {
+      toast.error("Can't import — this is the example file. Replace the sample row with your real data before uploading.");
       return;
     }
 
@@ -2281,24 +2292,16 @@ const KYCDataEntryPage: React.FC = () => {
             <div className="flex gap-2">
               <button
                 onClick={() => {
-                  const input = document.getElementById('bulk-csv-input') as HTMLInputElement;
-                  if (input) {
-                    input.value = '';
-                    input.click();
-                  }
+                  setCsvHeaders([]);
+                  setCsvRows([]);
+                  setCsvMapping({});
+                  setShowMappingModal(true);
                 }}
                 className="px-3 py-1.5 border rounded-lg text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center gap-1"
                 style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}
               >
                 📤 Bulk Import CSV
               </button>
-              <input
-                id="bulk-csv-input"
-                type="file"
-                accept=".csv"
-                onChange={handleCsvFileChange}
-                className="hidden"
-              />
               <button
                 onClick={() => setActiveTab('register')}
                 className="mis-btn mis-btn-primary text-xs flex items-center gap-1 py-1.5"
@@ -2626,7 +2629,9 @@ const KYCDataEntryPage: React.FC = () => {
                     📤 Map CSV Headers & Bulk Import
                   </h3>
                   <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
-                    Pair your uploaded CSV columns to our database field definitions. {csvRows.length} records detected.
+                    {csvHeaders.length > 0
+                      ? `Pair your uploaded CSV columns to our database field definitions. ${csvRows.length} records detected.`
+                      : 'Review the required columns below, then select your CSV file to continue.'}
                   </p>
                 </div>
                 <button 
@@ -2639,9 +2644,28 @@ const KYCDataEntryPage: React.FC = () => {
 
               {/* Modal Content */}
               <div className="p-6 overflow-y-auto space-y-6 flex-1">
-                
+
+                <CsvImportGuide
+                  fields={SHEET_FIELDS[sheetTab].map((f) => ({ key: f.key, label: f.label }))}
+                  templateFilename={`kyc-${sheetTab}-template.csv`}
+                  sampleFileDetected={containsSampleSentinel(csvRows)}
+                />
+
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-wider block mb-2" style={{ color: 'var(--text-primary)' }}>
+                    Select CSV File
+                  </label>
+                  <input
+                    type="file"
+                    accept=".csv"
+                    onChange={handleCsvFileChange}
+                    className="block w-full text-xs file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-teal-600 file:text-white hover:file:bg-teal-700 cursor-pointer"
+                    style={{ color: 'var(--text-secondary)' }}
+                  />
+                </div>
+
                 {/* Default Branch Selection for Multi-Branch Users */}
-                {hasMultiBranchAccess && (
+                {csvHeaders.length > 0 && hasMultiBranchAccess && (
                   <div className="p-4 border rounded-xl" style={{ background: 'var(--panel-inset-soft)', borderColor: 'var(--border)' }}>
                     <label className="text-xs font-bold block mb-1.5" style={{ color: 'var(--text-primary)' }}>
                       Select Default Branch Office for Imported Records <span className="text-rose-500">*</span>
@@ -2664,6 +2688,8 @@ const KYCDataEntryPage: React.FC = () => {
                 )}
 
                 {/* Mapping Form Grid */}
+                {csvHeaders.length > 0 && (
+                <>
                 <div>
                   <h4 className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--text-primary)' }}>
                     Column Mapping
@@ -2736,6 +2762,8 @@ const KYCDataEntryPage: React.FC = () => {
                     </table>
                   </div>
                 </div>
+                </>
+                )}
 
               </div>
 
@@ -2752,7 +2780,7 @@ const KYCDataEntryPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleBulkImportSubmit}
-                  disabled={importing}
+                  disabled={importing || csvRows.length === 0 || containsSampleSentinel(csvRows)}
                   className="px-5 py-2 bg-teal-600 hover:bg-teal-700 disabled:bg-teal-400 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5"
                 >
                   {importing ? 'Importing...' : '🚀 Start Import'}

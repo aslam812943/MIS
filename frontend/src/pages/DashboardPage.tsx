@@ -1,6 +1,8 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { Navigate } from 'react-router-dom';
 import { Chart, registerables } from 'chart.js';
 import DashboardLayout from '../components/layout/DashboardLayout';
+import { ROUTES } from '../constants/routes';
 import PeriodFilter from '../components/common/PeriodFilter';
 import TrendDelta from '../components/common/TrendDelta';
 import { orgService } from '../services/org.service';
@@ -12,6 +14,20 @@ import type { DateRange } from '../utils/periodRange';
 import { getDefaultPeriod } from '../utils/periodRange';
 
 Chart.register(...registerables);
+
+// Employees land on their department's actual workspace instead of this
+// System/HR overview page, which has nothing meaningful for their role (no
+// org-wide stats, no HR access) — mirrors Sidebar.tsx's per-department entry
+// links. Departments without a dedicated entry page fall back to the
+// generic modules-based Data Entry page.
+const EMPLOYEE_DEPT_ENTRY_ROUTE: Record<string, string> = {
+  IEPF: ROUTES.IEPF_DATA_ENTRY,
+  SETTLEMENTS: ROUTES.SETTLEMENTS_DATA_ENTRY,
+  KYC: ROUTES.KYC_DATA_ENTRY,
+  DP: ROUTES.DP_DATA_ENTRY,
+  IT: ROUTES.IT_DATA_ENTRY,
+  FINANCE: ROUTES.FINANCE_DATA_ENTRY,
+};
 
 const IconEdit = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -489,6 +505,12 @@ const DashboardPage: React.FC = () => {
       if (candidateStageChartInstance.current) candidateStageChartInstance.current.destroy();
     };
   }, [hrData, hrOpsData, dashboardTab, theme]);
+
+  if (user?.role === 'employee') {
+    const dept = user.department_name?.toUpperCase();
+    const target = (dept && EMPLOYEE_DEPT_ENTRY_ROUTE[dept]) || ROUTES.DATA_ENTRY;
+    return <Navigate to={target} replace />;
+  }
 
   return (
     <DashboardLayout>

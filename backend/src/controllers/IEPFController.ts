@@ -88,6 +88,28 @@ export class IEPFController {
   };
 
   /**
+   * Bulk import claims from a mapped CSV upload.
+   */
+  bulkImportClaims = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const creatorId = (req as any).user.id;
+      const records = req.body.records;
+
+      if (!Array.isArray(records) || records.length === 0) {
+        res.status(HttpStatus.BAD_REQUEST).json({ message: 'No records provided.' });
+        return;
+      }
+
+      const result = await this.iepfService.bulkImportClaims(records, creatorId);
+      result.inserted.forEach((claim) => logAudit(req, 'INSERT', 'iepf_claims', claim.id, null, claim));
+
+      res.status(HttpStatus.OK).json(result);
+    } catch (error) {
+      this.respondError(res, error, 'Failed to bulk import claims.');
+    }
+  };
+
+  /**
    * Update an existing claim.
    */
   updateClaim = async (req: Request, res: Response): Promise<void> => {
