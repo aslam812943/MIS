@@ -117,7 +117,7 @@ const PeriodFilter: React.FC<PeriodFilterProps> = ({ onChange, initialMonth }) =
 
       {/* Resolved range is always spelled out — quarters/years are financial
           year (Apr-Mar), which isn't obvious from the controls alone. */}
-      <span className="text-[10px] font-semibold whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>
+      <span className="text-[10px] font-semibold" style={{ color: 'var(--text-secondary)' }}>
         {resolved.current.label} · {formatDisplayDate(resolved.current.start)} – {formatDisplayDate(resolved.current.end)}
       </span>
     </div>

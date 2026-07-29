@@ -108,6 +108,12 @@ body {
   min-height: 100dvh;
   background: var(--bg-base);
   color: var(--text-primary);
+  /* Safety net: on narrow screens, a handful of fixed-width/nowrap
+     controls (filter bars, tab pills, date ranges) can be a few px wider
+     than the viewport. Clipping the overflow here keeps the page from
+     becoming horizontally scrollable and stranding content off-screen —
+     far less disruptive than a sideways-scrolling phone layout. */
+  overflow-x: hidden;
 }
 
 #root { width: 100%; min-height: 100dvh; }
@@ -621,12 +627,14 @@ body {
 /* ─── Tabs ───────────────────────────────────── */
 .mis-tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 2px;
   padding: 4px;
   background: var(--bg-card-2);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   width: fit-content;
+  max-width: 100%;
 }
 
 .mis-tab {
