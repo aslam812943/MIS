@@ -29,7 +29,7 @@ const LoginPage: React.FC = () => {
       >
         {theme === 'dark' ? '☀ Light mode' : '☾ Dark mode'}
       </button>
-      <div className="w-full max-w-6xl h-full z-10 flex flex-col items-center justify-start gap-2 sm:gap-3 mis-animate-in px-0 sm:px-2 overflow-hidden">
+      <div className="w-full max-w-6xl z-10 flex flex-col items-center justify-start gap-2 sm:gap-3 mis-animate-in px-0 sm:px-2">
         <div className="mis-login-brand">
           <h1>
             <span style={{ color: 'var(--text-primary)' }}>MIS</span>{' '}
