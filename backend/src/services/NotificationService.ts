@@ -108,6 +108,29 @@ export class NotificationService {
     if (error) throw new Error(error.message);
   }
 
+  /**
+   * Instant, event-driven notification for a single task action (assigned,
+   * reassigned, status changed, remarked on) — separate from the batch
+   * due/overdue scan below. dedupe_key is timestamped per call since these
+   * are one-off events, not a recurring scan result that needs deduping
+   * across repeated runs.
+   */
+  async createTaskEventNotification(userId: string, title: string, message: string, taskId: string): Promise<void> {
+    const dedupeKey = `task:${taskId}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
+    const { error } = await this.client().from('notifications').insert({
+      user_id: userId,
+      department: 'Tasks',
+      type: 'task_update',
+      title,
+      message,
+      link: '/tasks',
+      source_table: 'tasks',
+      source_id: taskId,
+      dedupe_key: dedupeKey,
+    });
+    if (error) throw new Error(error.message);
+  }
+
   // ── Recipient resolution ────────────────────────────────────
 
   // Department name -> id, resolved lazily and cached for the lifetime of
@@ -382,6 +405,54 @@ export class NotificationService {
     return results.flat();
   }
 
+  /**
+   * Due-date scan for the Tasks module — separate from scanAll() above
+   * because its recipient is always the task's own assignee, not "the HOD
+   * of a department" (resolveRecipients doesn't apply here).
+   */
+  private async scanTaskDueItems(): Promise<{ recipient: Recipient; row: any }[]> {
+    const { data, error } = await this.client()
+      .from('tasks')
+      .select('id, title, due_date, status, assigned_to, assignee:profiles!tasks_assigned_to_fkey(email, full_name)')
+      .not('assigned_to', 'is', null)
+      .not('due_date', 'is', null)
+      .in('status', ['Not Started', 'In Progress', 'Blocked']);
+    if (error || !data) return [];
+
+    const leadDays = 3;
+    const today = new Date();
+    const results: { recipient: Recipient; row: any }[] = [];
+
+    for (const task of data as any[]) {
+      if (!task.assignee?.email) continue;
+      const dueDate = new Date(task.due_date);
+      const alertFrom = new Date(dueDate.getTime() - leadDays * MS_PER_DAY);
+      if (today < alertFrom) continue;
+
+      const isOverdue = today > dueDate;
+      const daysDiff = Math.max(1, Math.round(Math.abs(dueDate.getTime() - today.getTime()) / MS_PER_DAY));
+      const dueDateFmt = dueDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+
+      results.push({
+        recipient: { id: task.assigned_to, email: task.assignee.email, full_name: task.assignee.full_name },
+        row: {
+          user_id: task.assigned_to,
+          department: 'Tasks',
+          type: isOverdue ? 'overdue' : 'due_soon',
+          title: `Task "${task.title}" ${isOverdue ? 'is overdue' : 'is due soon'}`,
+          message: isOverdue
+            ? `"${task.title}" was due on ${dueDateFmt} — ${daysDiff} day${daysDiff === 1 ? '' : 's'} overdue.`
+            : `"${task.title}" is due on ${dueDateFmt} — ${daysDiff} day${daysDiff === 1 ? '' : 's'} remaining.`,
+          link: '/tasks',
+          source_table: 'tasks',
+          source_id: task.id,
+          dedupe_key: `tasks:${task.id}:${isOverdue ? 'overdue' : 'due_soon'}`,
+        },
+      });
+    }
+    return results;
+  }
+
   // ── Main entry point ─────────────────────────────────────────
 
   /**
@@ -393,6 +464,7 @@ export class NotificationService {
   async runDueItemCheck(): Promise<{ itemsFound: number; notificationsCreated: number; usersEmailed: number }> {
     const client = this.client();
     const items = await this.scanAll();
+    const taskItems = await this.scanTaskDueItems();
 
     const rows: any[] = [];
     // recipientId -> { email, name, items[] }, built alongside `rows` so we
@@ -421,8 +493,14 @@ export class NotificationService {
       }
     }
 
+    for (const t of taskItems) {
+      recipientMeta.set(t.recipient.id, t.recipient);
+      rows.push(t.row);
+      rowRecipients.push(t.recipient.id);
+    }
+
     if (rows.length === 0) {
-      return { itemsFound: items.length, notificationsCreated: 0, usersEmailed: 0 };
+      return { itemsFound: items.length + taskItems.length, notificationsCreated: 0, usersEmailed: 0 };
     }
 
     const { data: inserted, error } = await client
@@ -455,6 +533,6 @@ export class NotificationService {
       }
     }
 
-    return { itemsFound: items.length, notificationsCreated: newRows.length, usersEmailed };
+    return { itemsFound: items.length + taskItems.length, notificationsCreated: newRows.length, usersEmailed };
   }
 }

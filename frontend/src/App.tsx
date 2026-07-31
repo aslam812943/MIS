@@ -21,6 +21,7 @@ import FinanceDashboardPage from './pages/Finance/FinanceDashboardPage';
 import ComparisonPage from './pages/Comparison/ComparisonPage';
 import HRDataEntryPage from './pages/HR/HRDataEntryPage';
 import HRUserManagementPage from './pages/HR/HRUserManagementPage';
+import TaskManagementPage from './pages/Tasks/TaskManagementPage';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 
 import { ROUTES } from './constants/routes';
@@ -223,6 +224,15 @@ function App() {
           element={
             <ProtectedRoute>
               <HRUserManagementPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path={ROUTES.TASKS}
+          element={
+            <ProtectedRoute>
+              <TaskManagementPage />
             </ProtectedRoute>
           }
         />
