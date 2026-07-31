@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom';
 import { ROUTES } from '../../constants/routes';
 import { authService } from '../../services/auth.service';
 import { notificationService } from '../../services/notification.service';
+import { taskService } from '../../services/task.service';
 import { useLayout } from './LayoutContext';
 import { useTheme } from '../../context/ThemeContext';
 
@@ -96,6 +97,15 @@ const IconBell = () => (
   </svg>
 );
 
+const IconTask = () => (
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="5" width="18" height="16" rx="2"/>
+    <path d="M3 10h18"/>
+    <path d="M8 3v4M16 3v4"/>
+    <path d="M8 15l2 2 4-4"/>
+  </svg>
+);
+
 /* ── Nav Item ─────────────────────────────────────────────── */
 interface NavItemProps {
   to: string;
@@ -154,6 +164,23 @@ const Sidebar: React.FC = () => {
     };
     fetchUnread();
     const interval = setInterval(fetchUnread, 60000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, []);
+
+  const [openTaskCount, setOpenTaskCount] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    const fetchOpenTasks = () => {
+      taskService.getTasks('mine')
+        .then((tasks) => {
+          if (cancelled) return;
+          const open = tasks.filter((t) => !['Completed', 'Cancelled'].includes(t.status)).length;
+          setOpenTaskCount(open);
+        })
+        .catch(() => { /* silent — badge just stays at last known value */ });
+    };
+    fetchOpenTasks();
+    const interval = setInterval(fetchOpenTasks, 60000);
     return () => { cancelled = true; clearInterval(interval); };
   }, []);
 
@@ -238,6 +265,14 @@ const Sidebar: React.FC = () => {
           icon={<IconBell />}
           label="Notifications"
           badge={unreadCount > 0 ? String(unreadCount) : undefined}
+          onClick={closeOnMobile}
+        />
+
+        <NavItem
+          to={ROUTES.TASKS}
+          icon={<IconTask />}
+          label="Tasks"
+          badge={openTaskCount > 0 ? String(openTaskCount) : undefined}
           onClick={closeOnMobile}
         />
 

@@ -36,6 +36,8 @@ import { NotificationService } from '../services/NotificationService.js';
 import { NotificationController } from '../controllers/NotificationController.js';
 import { DashboardPermissionService } from '../services/DashboardPermissionService.js';
 import { DashboardPermissionController } from '../controllers/DashboardPermissionController.js';
+import { TaskService } from '../services/TaskService.js';
+import { TaskController } from '../controllers/TaskController.js';
 import multer from 'multer';
 
 const router = Router();
@@ -84,6 +86,9 @@ const notificationController = new NotificationController(notificationService);
 
 const dashboardPermissionService = new DashboardPermissionService();
 const dashboardPermissionController = new DashboardPermissionController(dashboardPermissionService);
+
+const taskService = new TaskService(notificationService);
+const taskController = new TaskController(taskService);
 
 /**
 
@@ -293,6 +298,22 @@ router.delete('/finance/:sheet/:id', requireAuth, financeController.deleteEntry)
  * Audit Log endpoints
  */
 router.get('/audit-logs', requireAuth, requireAdmin, auditController.getAuditLogs);
+
+/**
+ * Task Management endpoints — cross-department, available to every
+ * authenticated role (not gated by requireAdmin/requireAdminOrHR), since
+ * any user can create and be assigned a task. Per-task authorization
+ * (assignee/creator/admin/manager-in-scope) is enforced inside TaskService.
+ * The static 'assignable-users' path is registered before '/tasks/:id' so
+ * Express doesn't mistake it for an :id param.
+ */
+router.get('/tasks/assignable-users', requireAuth, taskController.getAssignableUsers);
+router.get('/tasks', requireAuth, taskController.getTasks);
+router.post('/tasks', requireAuth, taskController.createTask);
+router.get('/tasks/:id', requireAuth, taskController.getTaskDetail);
+router.patch('/tasks/:id', requireAuth, taskController.updateTask);
+router.delete('/tasks/:id', requireAuth, taskController.deleteTask);
+router.post('/tasks/:id/remarks', requireAuth, taskController.addRemark);
 
 /**
  * Notification endpoints

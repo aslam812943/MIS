@@ -25,6 +25,7 @@ export const ROUTES = {
   COMPARISON: '/comparison/:dept',
   HR_DATA_ENTRY: '/hr-entry',
   HR_USER_MANAGEMENT: '/hr-users',
+  TASKS: '/tasks',
   ROOT: '/',
 } as const;
 
