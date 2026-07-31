@@ -302,14 +302,24 @@ const TaskManagementPage: React.FC = () => {
 
         <div className="mis-card overflow-hidden">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 border-b" style={{ borderColor: 'var(--border)' }}>
-            <div className="mis-tabs overflow-x-auto max-w-full">
+            {/* .mis-tabs has flex-wrap:wrap for other pages' sake, but a
+                *wrapping* flex container's natural (fit-content) width is
+                defined by spec as just its widest single child — not the
+                sum of all children — regardless of how much space is
+                actually free. That collapsed this to one tab per line with
+                a large empty gap before the filter. Forcing nowrap here
+                sidesteps that: with only 3 short labels, it fits on one
+                line on any real device without needing to scroll. */}
+            <div className="mis-tabs" style={{ flexWrap: 'nowrap' }}>
               <button type="button" className={`mis-tab ${tab === 'mine' ? 'active' : ''}`} onClick={() => setTab('mine')}>My Tasks</button>
               <button type="button" className={`mis-tab ${tab === 'assigned_by_me' ? 'active' : ''}`} onClick={() => setTab('assigned_by_me')}>Assigned by Me</button>
               {showTeamTab && (
                 <button type="button" className={`mis-tab ${tab === 'team' ? 'active' : ''}`} onClick={() => setTab('team')}>Team</button>
               )}
             </div>
-            <select className="mis-select text-xs w-full sm:w-auto" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+            {/* Full width + stacked below the tabs on mobile; compact and
+                right-aligned next to the tabs from sm upward. */}
+            <select className="mis-select text-xs w-full sm:w-40 shrink-0" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
               <option value="">All Statuses</option>
               {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>

@@ -591,7 +591,6 @@ body {
 }
 
 .mis-select {
-  width: 100%;
   background: #FFFFFF;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -650,6 +649,8 @@ body {
   color: var(--text-secondary);
   cursor: pointer;
   transition: all var(--transition);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .mis-tab:hover:not(.active) {
   color: var(--text-primary);
