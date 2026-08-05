@@ -243,11 +243,11 @@ const FinanceDashboardPage: React.FC = () => {
 
         {/* Header Section */}
         <header
-          className="flex flex-col lg:flex-row justify-between lg:items-center gap-6 p-6 border rounded-xl shadow-xs text-left"
+          className="flex flex-col lg:flex-row justify-between lg:items-center gap-4 p-4 border rounded-xl shadow-xs text-left"
           style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
         >
           <div className="text-center lg:text-left w-full lg:w-auto">
-            <h1 className="text-2.5xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
+            <h1 className="text-xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
               📊 Finance Performance & Compliance Analytics
             </h1>
             <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
@@ -272,14 +272,14 @@ const FinanceDashboardPage: React.FC = () => {
             <button
               onClick={() => fetchDashboardStats(false)}
               disabled={refreshing}
-              className="px-3 py-1.5 border rounded-lg text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+              className="px-3 py-1 border rounded-lg text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
               style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}
             >
               {refreshing ? 'Refreshing...' : '🔄 Sync Data'}
             </button>
             <Link
               to="/comparison/finance"
-              className="px-3 py-1.5 border rounded-lg text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+              className="px-3 py-1 border rounded-lg text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
               style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}
             >
               🔀 Compare Periods

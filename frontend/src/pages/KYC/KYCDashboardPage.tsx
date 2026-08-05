@@ -280,9 +280,9 @@ const KYCDashboardPage: React.FC = () => {
       <div className="mis-page mis-animate-in max-w-7xl mx-auto space-y-8">
         
         {/* Header */}
-        <header className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 p-6 border rounded-xl shadow-xs" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+        <header className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 p-4 border rounded-xl shadow-xs" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
           <div className="text-center sm:text-left w-full sm:w-auto">
-            <h1 className="text-2xl font-bold tracking-tight flex items-center justify-center sm:justify-start gap-2" style={{ color: 'var(--text-primary)' }}>
+            <h1 className="text-xl font-bold tracking-tight flex items-center justify-center sm:justify-start gap-2" style={{ color: 'var(--text-primary)' }}>
               📊 KYC Department Analytics
             </h1>
             <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>

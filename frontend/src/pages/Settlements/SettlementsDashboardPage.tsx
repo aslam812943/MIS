@@ -295,11 +295,11 @@ const SettlementsDashboardPage: React.FC = () => {
 
         {/* ── Page Header ───────────────────────────────────── */}
         <header 
-          className="flex flex-col lg:flex-row justify-between lg:items-center gap-6 p-6 border rounded-xl shadow-xs text-left" 
+          className="flex flex-col lg:flex-row justify-between lg:items-center gap-4 p-4 border rounded-xl shadow-xs text-left" 
           style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
         >
           <div className="text-center lg:text-left w-full lg:w-auto">
-            <h1 className="text-2.5xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
+            <h1 className="text-xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
               📊 Clearing & Settlements Analytics
             </h1>
             <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
@@ -326,14 +326,14 @@ const SettlementsDashboardPage: React.FC = () => {
               type="button"
               onClick={() => fetchDashboardData(false)}
               disabled={refreshing}
-              className="px-3.5 py-1.5 border rounded-lg text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center justify-center gap-1 h-[34px]"
+              className="px-3 py-1 border rounded-lg text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center justify-center gap-1 h-[30px]"
               style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)', minWidth: '135px' }}
             >
               {refreshing ? 'Refreshing...' : '🔄 Refresh Metrics'}
             </button>
             <Link
               to="/comparison/settlements"
-              className="px-3.5 py-1.5 border rounded-lg text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center justify-center gap-1 h-[34px]"
+              className="px-3 py-1 border rounded-lg text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center justify-center gap-1 h-[30px]"
               style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}
             >
               🔀 Compare Periods

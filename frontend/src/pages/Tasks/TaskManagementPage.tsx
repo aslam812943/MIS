@@ -44,6 +44,12 @@ const isOverdue = (task: Task) =>
 const formatDate = (iso: string | null) =>
   iso ? new Date(iso).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 
+// Activity entries need time-of-day too — several can land on the same
+// date (e.g. created + first status change), and formatDate alone made
+// them indistinguishable.
+const formatDateTime = (iso: string) =>
+  new Date(iso).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
 const errMsg = (error: unknown, fallback: string) => {
   if (axios.isAxiosError(error) && error.response?.data?.message) return error.response.data.message;
   if (error instanceof Error) return error.message;
@@ -581,21 +587,47 @@ const TaskManagementPage: React.FC = () => {
 
                       <div>
                         <span className="mis-label">Activity & Remarks</span>
-                        <div className="mt-2 space-y-2 max-h-56 overflow-y-auto border rounded-lg p-3" style={{ borderColor: 'var(--border)', background: 'var(--panel-inset-soft)' }}>
+                        <div className="mt-2 max-h-64 overflow-y-auto border rounded-lg p-3" style={{ borderColor: 'var(--border)', background: 'var(--panel-inset-soft)' }}>
                           {detail.remarks.length === 0 ? (
-                            <p className="text-xs italic" style={{ color: 'var(--text-muted)' }}>No activity yet.</p>
+                            <p className="text-xs italic m-0" style={{ color: 'var(--text-muted)' }}>No activity yet.</p>
                           ) : (
-                            detail.remarks.map((r) => (
-                              <div key={r.id} className="text-xs">
-                                {r.is_system ? (
-                                  <span className="italic" style={{ color: 'var(--text-muted)' }}>{r.remark_text} — {formatDate(r.created_at)}</span>
-                                ) : (
-                                  <div>
-                                    <span className="font-bold" style={{ color: 'var(--text-primary)' }}>{r.author_name}</span>{' '}
-                                    <span style={{ color: 'var(--text-muted)' }}>· {formatDate(r.created_at)}</span>
-                                    <p className="m-0 mt-0.5" style={{ color: 'var(--text-secondary)' }}>{r.remark_text}</p>
-                                  </div>
-                                )}
+                            detail.remarks.map((r, idx) => (
+                              <div key={r.id} className="flex gap-2.5">
+                                {/* Timeline rail: a small dot for system events, an
+                                    initial-avatar for a person's own remark, and a
+                                    connecting line down to the next entry. */}
+                                <div className="flex flex-col items-center shrink-0">
+                                  {r.is_system ? (
+                                    <div className="rounded-full shrink-0 mt-1.5" style={{ width: 8, height: 8, background: 'var(--text-muted)' }} />
+                                  ) : (
+                                    <div
+                                      className="rounded-full shrink-0 flex items-center justify-center font-bold"
+                                      style={{ width: 22, height: 22, background: 'var(--accent)', color: '#fff', fontSize: '10px' }}
+                                    >
+                                      {(r.author_name || '?').charAt(0).toUpperCase()}
+                                    </div>
+                                  )}
+                                  {idx < detail.remarks.length - 1 && (
+                                    <div className="flex-1" style={{ width: 1, minHeight: 14, background: 'var(--border)' }} />
+                                  )}
+                                </div>
+
+                                <div className="flex-1 min-w-0 pb-3">
+                                  {r.is_system ? (
+                                    <div className="text-xs italic pt-0.5" style={{ color: 'var(--text-muted)' }}>
+                                      {r.remark_text}
+                                      <div className="text-[10px] not-italic mt-0.5 opacity-70">{formatDateTime(r.created_at)}</div>
+                                    </div>
+                                  ) : (
+                                    <div className="rounded-lg p-2.5" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+                                      <div className="flex items-center justify-between gap-2 mb-1">
+                                        <span className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>{r.author_name}</span>
+                                        <span className="text-[10px] shrink-0" style={{ color: 'var(--text-muted)' }}>{formatDateTime(r.created_at)}</span>
+                                      </div>
+                                      <p className="m-0 text-xs whitespace-pre-wrap" style={{ color: 'var(--text-secondary)' }}>{r.remark_text}</p>
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                             ))
                           )}

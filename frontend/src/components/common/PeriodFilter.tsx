@@ -67,6 +67,7 @@ const PeriodFilter: React.FC<PeriodFilterProps> = ({ onChange, initialMonth }) =
           value={month}
           onChange={e => setMonth(e.target.value)}
           className="mis-input py-1 px-2 text-xs"
+          style={{ width: '150px' }}
         />
       )}
 
