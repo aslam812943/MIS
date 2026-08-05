@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, Link } from 'react-router-dom';
 import { Chart, registerables } from 'chart.js';
 import DashboardLayout from '../components/layout/DashboardLayout';
 import { ROUTES } from '../constants/routes';
@@ -27,7 +27,19 @@ const EMPLOYEE_DEPT_ENTRY_ROUTE: Record<string, string> = {
   DP: ROUTES.DP_DATA_ENTRY,
   IT: ROUTES.IT_DATA_ENTRY,
   FINANCE: ROUTES.FINANCE_DATA_ENTRY,
+  SALES: ROUTES.SALES_DATA_ENTRY,
 };
+
+// Same bar-chart glyph Sidebar.tsx uses for every "X Dashboard" link —
+// reused here so the quick-launch tiles below read as the same icon
+// language as the sidebar, not a new one-off set.
+const IconDashboardTile = () => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="18" y1="20" x2="18" y2="10" />
+    <line x1="12" y1="20" x2="12" y2="4" />
+    <line x1="6" y1="20" x2="6" y2="14" />
+  </svg>
+);
 
 const IconEdit = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -512,6 +524,28 @@ const DashboardPage: React.FC = () => {
     return <Navigate to={target} replace />;
   }
 
+  // Quick-launch tiles for every non-admin/non-hr role (CEO, MD, Director,
+  // Executive, HOD, Regional Manager) — this System/HR-tab area otherwise
+  // renders nothing for them. Visibility mirrors Sidebar.tsx's showXDashboard
+  // checks exactly, so a role only ever sees a tile it could also reach from
+  // the sidebar.
+  const role = user?.role || '';
+  const isLeadership = ['ceo', 'managing_director', 'director', 'executive'].includes(role);
+  const isHOD = role === 'hod';
+  const isRegionalManager = role === 'regional_manager';
+  const deptUpper = user?.department_name?.toUpperCase();
+  const inDept = (name: string) => (isHOD || isRegionalManager) && deptUpper === name;
+
+  const quickLaunchTiles = [
+    { label: 'IEPF Dashboard', to: ROUTES.IEPF_DASHBOARD, show: isLeadership || inDept('IEPF') },
+    { label: 'Settlements Dashboard', to: ROUTES.SETTLEMENTS_DASHBOARD, show: isLeadership || inDept('SETTLEMENTS') },
+    { label: 'KYC Dashboard', to: ROUTES.KYC_DASHBOARD, show: isLeadership || inDept('KYC') },
+    { label: 'DP Dashboard', to: ROUTES.DP_DASHBOARD, show: isLeadership || inDept('DP') },
+    { label: 'IT Dashboard', to: ROUTES.IT_DASHBOARD, show: isLeadership || inDept('IT') },
+    { label: 'Finance Dashboard', to: ROUTES.FINANCE_DASHBOARD, show: isLeadership || inDept('FINANCE') },
+    { label: 'Sales Dashboard', to: ROUTES.SALES_DASHBOARD, show: isLeadership || inDept('SALES') },
+  ].filter((t) => t.show);
+
   return (
     <DashboardLayout>
       <div className="mis-page mis-animate-in max-w-7xl">
@@ -805,7 +839,34 @@ const DashboardPage: React.FC = () => {
               </div>
             </div>
           </div>
-        ) : null}
+        ) : (
+          /* ── Quick Launch (CEO/MD/Director/Executive/HOD/Regional
+             Manager) — this role has no org-wide stats page of its own, so
+             the landing view is a fast way into whichever department
+             dashboard(s) it can already reach from the sidebar. ────── */
+          <div className="mis-card p-6 sm:p-8">
+            <h2 className="mis-section-title">Quick Launch</h2>
+            <p className="mis-section-desc">Jump straight into a department dashboard.</p>
+
+            {quickLaunchTiles.length === 0 ? (
+              <p className="mis-empty">No dashboards assigned yet — check the sidebar for what's available to you.</p>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {quickLaunchTiles.map((tile) => (
+                  <Link
+                    key={tile.to}
+                    to={tile.to}
+                    className="mis-btn mis-btn-ghost mis-action-row justify-start"
+                    style={{ textDecoration: 'none' }}
+                  >
+                    <span className="mis-action-icon"><IconDashboardTile /></span>
+                    <span>{tile.label}</span>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </DashboardLayout>
   );

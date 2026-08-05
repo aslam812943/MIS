@@ -90,6 +90,16 @@ export const DASHBOARD_WIDGETS: Record<string, DashboardWidget[]> = {
     { key: 'iepf.chart.monthly_claims_trend', label: 'Monthly Claims Trend', type: 'chart' },
     { key: 'iepf.chart.pending_reason_analysis', label: 'Pending Reason Analysis', type: 'chart' },
   ],
+  Sales: [
+    { key: 'sales.kpi.total_sales_value', label: 'Total Sales Value', type: 'kpi' },
+    { key: 'sales.kpi.total_sales_count', label: 'Total Sales', type: 'kpi' },
+    { key: 'sales.kpi.avg_sale_value', label: 'Avg. Sale Value', type: 'kpi' },
+    { key: 'sales.kpi.pending_count', label: 'Pending Sales', type: 'kpi' },
+    { key: 'sales.kpi.cancelled_count', label: 'Cancelled Sales', type: 'kpi' },
+    { key: 'sales.chart.product_breakdown', label: 'Product-wise Sales', type: 'chart' },
+    { key: 'sales.chart.monthly_trend', label: 'Monthly Sales Trend', type: 'chart' },
+    { key: 'sales.chart.branch_distribution', label: 'Branch Distribution', type: 'chart' },
+  ],
   HR: [
     { key: 'hr.kpi.total_employees', label: 'Total Employees', type: 'kpi' },
     { key: 'hr.kpi.new_joiners', label: 'New Joiners', type: 'kpi' },

@@ -211,15 +211,18 @@ const Sidebar: React.FC = () => {
   const isFinanceUser = user?.department_name?.toUpperCase() === 'FINANCE';
   const showFinanceDashboard = isAdmin || ['ceo', 'managing_director', 'director', 'executive'].includes(user?.role || '') || (isFinanceUser && (isHOD || isEmployee));
 
+  const isSalesUser = user?.department_name?.toUpperCase() === 'SALES';
+  const showSalesDashboard = isAdmin || ['ceo', 'managing_director', 'director', 'executive'].includes(user?.role || '') || (isSalesUser && (isHOD || isEmployee));
+
   const isSettlementsUser = user?.department_name?.toUpperCase() === 'SETTLEMENTS';
 
   // Employees/HODs in one of the departments with a dedicated data-entry
-  // page (IEPF/Settlements/KYC/DP/IT/Finance) already have their real entry
-  // sheet in that department's nav section — the generic modules-based
+  // page (IEPF/Settlements/KYC/DP/IT/Finance/Sales) already have their real
+  // entry sheet in that department's nav section — the generic modules-based
   // Data Entry page has nothing assigned for them and just shows an empty
   // "No modules assigned" state. Only show it as a fallback for employees
   // in departments without a dedicated page.
-  const hasDedicatedDeptEntry = isIEPFUser || isSettlementsUser || isKYCUser || isDPUser || isITUser || isFinanceUser;
+  const hasDedicatedDeptEntry = isIEPFUser || isSettlementsUser || isKYCUser || isDPUser || isITUser || isFinanceUser || isSalesUser;
 
   const closeOnMobile = () => setSidebarOpen(false);
 
@@ -449,6 +452,33 @@ const Sidebar: React.FC = () => {
               to={ROUTES.FINANCE_DASHBOARD}
               icon={<IconIEPFDashboard />}
               label="Finance Dashboard"
+              onClick={closeOnMobile}
+            />
+          </>
+        )}
+
+        {/* Sales Department Navigation — data entry stays with Sales staff
+            only; admin keeps the oversight dashboard below, not the entry
+            form. */}
+        {isSalesUser && (
+          <>
+            <span className="mis-sidebar-section-label">Sales Department</span>
+            <NavItem
+              to={ROUTES.SALES_DATA_ENTRY}
+              icon={<IconIEPFEntry />}
+              label="Sales Entry"
+              onClick={closeOnMobile}
+            />
+          </>
+        )}
+
+        {showSalesDashboard && (
+          <>
+            {!isSalesUser && <span className="mis-sidebar-section-label">Sales Department</span>}
+            <NavItem
+              to={ROUTES.SALES_DASHBOARD}
+              icon={<IconIEPFDashboard />}
+              label="Sales Dashboard"
               onClick={closeOnMobile}
             />
           </>

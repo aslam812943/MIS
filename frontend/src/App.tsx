@@ -8,6 +8,8 @@ import DataEntryPage from './pages/DataEntry/DataEntryPage';
 import VerifyEntriesPage from './pages/DataEntry/VerifyEntriesPage';
 import IEPFDataEntryPage from './pages/IEPF/IEPFDataEntryPage';
 import IEPFDashboardPage from './pages/IEPF/IEPFDashboardPage';
+import SalesDataEntryPage from './pages/Sales/SalesDataEntryPage';
+import SalesDashboardPage from './pages/Sales/SalesDashboardPage';
 import SettlementsDataEntryPage from './pages/Settlements/SettlementsDataEntryPage';
 import SettlementsDashboardPage from './pages/Settlements/SettlementsDashboardPage';
 import KYCDataEntryPage from './pages/KYC/KYCDataEntryPage';
@@ -102,13 +104,31 @@ function App() {
           } 
         />
 
-        <Route 
-          path={ROUTES.IEPF_DASHBOARD} 
+        <Route
+          path={ROUTES.IEPF_DASHBOARD}
           element={
             <ProtectedRoute>
               <IEPFDashboardPage />
             </ProtectedRoute>
-          } 
+          }
+        />
+
+        <Route
+          path={ROUTES.SALES_DATA_ENTRY}
+          element={
+            <ProtectedRoute>
+              <SalesDataEntryPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path={ROUTES.SALES_DASHBOARD}
+          element={
+            <ProtectedRoute>
+              <SalesDashboardPage />
+            </ProtectedRoute>
+          }
         />
 
         <Route 

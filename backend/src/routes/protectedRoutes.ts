@@ -20,6 +20,8 @@ import { DataEntryController } from '../controllers/DataEntryController.js';
 import { AuditController } from '../controllers/AuditController.js';
 import { IEPFService } from '../services/IEPFService.js';
 import { IEPFController } from '../controllers/IEPFController.js';
+import { SalesService } from '../services/SalesService.js';
+import { SalesController } from '../controllers/SalesController.js';
 import { SettlementService } from '../services/SettlementService.js';
 import { SettlementController } from '../controllers/SettlementController.js';
 import { KYCService } from '../services/KYCService.js';
@@ -63,6 +65,8 @@ const auditController = new AuditController();
 
 const iepfService = new IEPFService();
 const iepfController = new IEPFController(iepfService);
+const salesService = new SalesService();
+const salesController = new SalesController(salesService);
 
 const settlementService = new SettlementService();
 const settlementController = new SettlementController(settlementService);
@@ -167,6 +171,15 @@ router.delete('/iepf/claims/:id', requireAuth, iepfController.deleteClaim);
 router.get('/iepf/dashboard', requireAuth, iepfController.getDashboardData);
 router.get('/iepf/staff', requireAuth, iepfController.getIEPFStaff);
 router.get('/iepf/investors', requireAuth, iepfController.getVerifiedInvestors);
+
+/**
+ * Sales Department endpoints
+ */
+router.get('/sales', requireAuth, salesController.getSales);
+router.post('/sales', requireAuth, salesController.createSale);
+router.patch('/sales/:id', requireAuth, salesController.updateSale);
+router.delete('/sales/:id', requireAuth, salesController.deleteSale);
+router.get('/sales/dashboard', requireAuth, salesController.getDashboardData);
 
 /**
  * Settlements Department endpoints
