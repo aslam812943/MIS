@@ -6,6 +6,7 @@ import { loginRateLimiter, apiRateLimiter } from './middlewares/rateLimiter.js';
 import dotenv from 'dotenv';
 import authRoutes from './routes/authRoutes.js';
 import protectedRoutes from './routes/protectedRoutes.js';
+import externalRoutes from './routes/externalRoutes.js';
 
 dotenv.config();
 
@@ -24,6 +25,7 @@ app.use(express.urlencoded({ extended: true }));
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', protectedRoutes);
+app.use('/api/external', externalRoutes);
 
 // Health Check
 app.get('/health', (req: Request, res: Response) => {
