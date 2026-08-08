@@ -22,34 +22,10 @@ const ROLE_OPTIONS: RoleOption[] = [
     icon: '👔',
   },
   {
-    role: UserRole.MANAGING_DIRECTOR,
-    label: 'Managing Director',
-    description: 'Operational management and decision making',
-    icon: '💼',
-  },
-  {
-    role: UserRole.DIRECTOR,
-    label: 'Director',
-    description: 'Departmental oversight and planning',
-    icon: '📊',
-  },
-  {
-    role: UserRole.REGIONAL_MANAGER,
-    label: 'Regional Manager',
-    description: 'Regional branch coordination',
-    icon: '🌐',
-  },
-  {
     role: UserRole.HOD,
     label: 'HOD',
     description: 'Head of Department management',
     icon: '🏫',
-  },
-  {
-    role: UserRole.EXECUTIVE,
-    label: 'Executive',
-    description: 'Core operations and data analysis',
-    icon: '⚡',
   },
   {
     role: UserRole.EMPLOYEE,

@@ -223,6 +223,45 @@ export class TaskService {
     }));
   }
 
+  // ── External creation (Telegram/WhatsApp via n8n) ───────────────────────
+  /**
+   * Resolves a messaging-platform identity (e.g. a Telegram chat_id) to the
+   * real MIS user it's registered to. Throws — rather than falling back to
+   * some default "system" user — if the sender isn't in the allow-list, so
+   * an unregistered chat can never create a task under someone else's name.
+   */
+  async resolveSenderProfileId(
+    channel: string,
+    externalId: string
+  ): Promise<{ profileId: string; name: string; email: string; role: string }> {
+    const { data, error } = await this.client()
+      .from('external_task_senders')
+      .select('profile_id, profiles(full_name, email, role)')
+      .eq('channel', channel)
+      .eq('external_id', externalId)
+      .maybeSingle();
+
+    if (error) throw new Error(`Failed to verify sender: ${error.message}`);
+    if (!data) {
+      throw new Error(
+        `Unrecognized sender (channel="${channel}", external_id="${externalId}"). Ask an admin to register this chat_id before it can create tasks.`
+      );
+    }
+
+    const profile = (data as any).profiles;
+    return {
+      profileId: data.profile_id,
+      name: profile?.full_name || profile?.email || 'Unknown sender',
+      email: profile?.email,
+      role: profile?.role,
+    };
+  }
+
+  /** Public wrapper — lets ExternalTaskController record where a task came from, using the same system-remark mechanism status changes already use. */
+  async addSourceRemark(taskId: string, text: string): Promise<void> {
+    await this.addSystemRemark(taskId, text);
+  }
+
   // ── Create ───────────────────────────────────────────────────────────
   async createTask(input: {
     title?: string;

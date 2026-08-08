@@ -41,7 +41,7 @@ const LoginPage: React.FC = () => {
         </div>
 
         <div className="mis-login-grid w-full">
-          <div className="flex-1 w-full min-w-0 self-start">
+          <div className="flex-1 w-full min-w-0 self-start lg:self-center">
             <RoleSelector selectedRole={selectedRole} onSelect={setSelectedRole} />
           </div>
 
