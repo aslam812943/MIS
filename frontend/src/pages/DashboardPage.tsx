@@ -518,6 +518,13 @@ const DashboardPage: React.FC = () => {
     };
   }, [hrData, hrOpsData, dashboardTab, theme]);
 
+  const isCreatorDept = user?.department_name?.toUpperCase() === 'CONTENT CREATION';
+  const isCreator = user?.role === 'content_creator' || (isCreatorDept && (user?.role === 'hod' || user?.role === 'employee'));
+
+  if (isCreator || user?.role === 'social_media_manager') {
+    return <Navigate to={ROUTES.CREATOR_DASHBOARD} replace />;
+  }
+
   if (user?.role === 'employee') {
     const dept = user.department_name?.toUpperCase();
     const target = (dept && EMPLOYEE_DEPT_ENTRY_ROUTE[dept]) || ROUTES.DATA_ENTRY;

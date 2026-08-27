@@ -7,6 +7,7 @@ import dotenv from 'dotenv';
 import authRoutes from './routes/authRoutes.js';
 import protectedRoutes from './routes/protectedRoutes.js';
 import externalRoutes from './routes/externalRoutes.js';
+import socialMediaRoutes from './routes/socialMediaRoutes.js';
 
 dotenv.config();
 
@@ -26,6 +27,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', protectedRoutes);
 app.use('/api/external', externalRoutes);
+app.use('/api/social-media', socialMediaRoutes);
 
 // Health Check
 app.get('/health', (req: Request, res: Response) => {

@@ -39,6 +39,18 @@ const ROLE_OPTIONS: RoleOption[] = [
     description: 'Workforce data entry and recruitment',
     icon: '🧑‍💼',
   },
+  {
+    role: UserRole.CONTENT_CREATOR,
+    label: 'Content Creator',
+    description: 'Create, edit, schedule reels and assets',
+    icon: '📸',
+  },
+  {
+    role: UserRole.SOCIAL_MEDIA_MANAGER,
+    label: 'Social Media Manager',
+    description: 'Manage, schedule and approve campaigns',
+    icon: '📊',
+  },
 ];
 
 interface RoleSelectorProps {

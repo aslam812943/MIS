@@ -188,6 +188,9 @@ const Sidebar: React.FC = () => {
   const isHOD = user?.role === 'hod';
   const isEmployee = user?.role === 'employee';
   const isHR = user?.role === 'hr';
+  const isCreatorDept = user?.department_name?.toUpperCase() === 'CONTENT CREATION';
+  const isCreator = user?.role === 'content_creator' || (isCreatorDept && (isHOD || isEmployee));
+  const isSMM = user?.role === 'social_media_manager';
   // Matches DashboardPage.tsx's showHRDashboard check — same roles that see
   // the HR tab on the landing page get a direct link to it here.
   const showHRDashboard = isAdmin || isHR;
@@ -253,6 +256,61 @@ const Sidebar: React.FC = () => {
       {/* Navigation */}
       <nav className="mis-sidebar-nav" ref={navRef} onScroll={handleNavScroll}>
         <span className="mis-sidebar-section-label">Main</span>
+
+        
+        {isSMM && (
+          <>
+            <span className="mis-sidebar-section-label">Social Media Management</span>
+            <NavItem
+              to={ROUTES.SMM_DASHBOARD}
+              icon={<IconDashboard />}
+              label="Analytics Dashboard"
+              onClick={closeOnMobile}
+            />
+            <NavItem
+              to={ROUTES.SMM_APPROVALS}
+              icon={<IconVerify />}
+              label="Approvals Queue"
+              onClick={closeOnMobile}
+            />
+            <NavItem
+              to={ROUTES.SMM_CAMPAIGNS}
+              icon={<IconIEPFDashboard />}
+              label="Campaigns & Briefs"
+              onClick={closeOnMobile}
+            />
+          </>
+        )}
+
+        {(isCreator || isSMM) && (
+          <>
+            <span className="mis-sidebar-section-label">Content Creation</span>
+            <NavItem
+              to={ROUTES.CREATOR_DASHBOARD}
+              icon={<IconDashboard />}
+              label="Creator Dashboard"
+              onClick={closeOnMobile}
+            />
+            <NavItem
+              to={ROUTES.CREATOR_PLANNER}
+              icon={<IconDataEntry />}
+              label="Content Planner"
+              onClick={closeOnMobile}
+            />
+            <NavItem
+              to={ROUTES.CREATOR_CALENDAR}
+              icon={<IconTask />}
+              label="Schedule Calendar"
+              onClick={closeOnMobile}
+            />
+            <NavItem
+              to={ROUTES.CREATOR_ASSETS}
+              icon={<IconIEPFEntry />}
+              label="Asset Library"
+              onClick={closeOnMobile}
+            />
+          </>
+        )}
 
         {!isEmployee && (
           <NavItem

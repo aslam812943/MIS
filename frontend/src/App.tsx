@@ -24,6 +24,13 @@ import ComparisonPage from './pages/Comparison/ComparisonPage';
 import HRDataEntryPage from './pages/HR/HRDataEntryPage';
 import HRUserManagementPage from './pages/HR/HRUserManagementPage';
 import TaskManagementPage from './pages/Tasks/TaskManagementPage';
+import CreatorDashboard from './pages/ContentCreator/CreatorDashboard';
+import Planner from './pages/ContentCreator/Planner';
+import Calendar from './pages/ContentCreator/Calendar';
+import AssetLibrary from './pages/ContentCreator/AssetLibrary';
+import SMMDashboard from './pages/SocialMediaManager/SMMDashboard';
+import ApprovalsQueue from './pages/SocialMediaManager/ApprovalsQueue';
+import CampaignsManager from './pages/SocialMediaManager/CampaignsManager';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 
 import { ROUTES } from './constants/routes';
@@ -39,6 +46,64 @@ function App() {
       <Routes>
         {/* Authentication Routes */}
         <Route path={ROUTES.LOGIN} element={<LoginPage />} />
+        
+        <Route 
+          path={ROUTES.SMM_DASHBOARD} 
+          element={
+            <ProtectedRoute>
+              <SMMDashboard />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path={ROUTES.SMM_APPROVALS} 
+          element={
+            <ProtectedRoute>
+              <ApprovalsQueue />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path={ROUTES.SMM_CAMPAIGNS} 
+          element={
+            <ProtectedRoute>
+              <CampaignsManager />
+            </ProtectedRoute>
+          } 
+        />
+        
+        <Route 
+          path={ROUTES.CREATOR_DASHBOARD} 
+          element={
+            <ProtectedRoute>
+              <CreatorDashboard />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path={ROUTES.CREATOR_PLANNER} 
+          element={
+            <ProtectedRoute>
+              <Planner />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path={ROUTES.CREATOR_CALENDAR} 
+          element={
+            <ProtectedRoute>
+              <Calendar />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path={ROUTES.CREATOR_ASSETS} 
+          element={
+            <ProtectedRoute>
+              <AssetLibrary />
+            </ProtectedRoute>
+          } 
+        />
         
         {/* Protected Admin Routes */}
         <Route 

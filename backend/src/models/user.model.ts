@@ -8,6 +8,8 @@ export enum UserRole {
   REGIONAL_MANAGER = 'regional_manager',
   EMPLOYEE = 'employee',
   HR = 'hr',
+  CONTENT_CREATOR = 'content_creator',
+  SOCIAL_MEDIA_MANAGER = 'social_media_manager',
 }
 
 export interface User {

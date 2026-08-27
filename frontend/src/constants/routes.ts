@@ -28,6 +28,13 @@ export const ROUTES = {
   SALES_DATA_ENTRY: '/sales-entry',
   SALES_DASHBOARD: '/sales-dashboard',
   TASKS: '/tasks',
+  CREATOR_DASHBOARD: '/creator/dashboard',
+  CREATOR_PLANNER: '/creator/planner',
+  CREATOR_CALENDAR: '/creator/calendar',
+  CREATOR_ASSETS: '/creator/assets',
+  SMM_DASHBOARD: '/smm/dashboard',
+  SMM_APPROVALS: '/smm/approvals',
+  SMM_CAMPAIGNS: '/smm/campaigns',
   ROOT: '/',
 } as const;
 
