@@ -390,7 +390,7 @@ const ITDataEntryPage: React.FC = () => {
   const validateForm = (): boolean => {
     // 1. Required Fields Check
     for (const f of getFormFields()) {
-      if (f.required) {
+      if (f.required && !f.readOnly) {
         const val = formData[f.name];
         if (
           val === undefined ||
@@ -643,7 +643,7 @@ const ITDataEntryPage: React.FC = () => {
 
       // Reject the whole file if the header row doesn't exactly match the
       // required columns, or if it's the untouched example template.
-      const validation = validateCsvHeaders(headers, getFormFields().map(f => ({ key: f.name, label: f.label })));
+      const validation = validateCsvHeaders(headers, getFormFields().filter(f => !f.readOnly).map(f => ({ key: f.name, label: f.label })));
       const hasSample = containsSampleSentinel(parsedRows.map(r => Object.values(r)));
       setCsvValidation(validation.valid ? null : validation);
       setCsvHasSample(hasSample);
@@ -658,7 +658,7 @@ const ITDataEntryPage: React.FC = () => {
 
       // Guess initial mappings
       const initialMap: any = {};
-      getFormFields().forEach(field => {
+      getFormFields().filter(f => !f.readOnly).forEach(field => {
         const matched = headers.find(h => h.toLowerCase() === field.name.toLowerCase() || h.toLowerCase() === field.name.replace(/_/g, '').toLowerCase());
         if (matched) initialMap[field.name] = matched;
       });
@@ -851,7 +851,7 @@ const ITDataEntryPage: React.FC = () => {
         ];
       case 'tickets':
         return [
-          { name: 'ticket_number', label: 'Ticket Reference Number', type: 'text', required: true, readOnly: true },
+          { name: 'ticket_number', label: 'Ticket Reference Number', type: 'text', readOnly: true },
           { name: 'requester_name', label: 'Requester (User/Branch)', type: 'text', required: true },
           { name: 'issue_description', label: 'Issue Description', type: 'textarea', required: true },
           { name: 'assigned_to', label: 'Assigned Executive', type: 'text' },
@@ -863,7 +863,7 @@ const ITDataEntryPage: React.FC = () => {
         ];
       case 'incidents':
         return [
-          { name: 'incident_number', label: 'Incident Code', type: 'text', required: true, readOnly: true },
+          { name: 'incident_number', label: 'Incident Code', type: 'text', readOnly: true },
           { name: 'incident_name', label: 'Incident Title', type: 'text', required: true },
           { name: 'description', label: 'Event Description', type: 'textarea', required: true },
           { name: 'severity', label: 'Severity Rating', type: 'select', options: ['Critical', 'High', 'Medium', 'Low'], required: true },
@@ -962,7 +962,7 @@ const ITDataEntryPage: React.FC = () => {
         ];
       case 'purchase-orders':
         return [
-          { name: 'po_number', label: 'PO Number', type: 'text', required: true, readOnly: true },
+          { name: 'po_number', label: 'PO Number', type: 'text', readOnly: true },
           {
             name: 'vendor_id',
             label: 'Vendor',
@@ -1627,7 +1627,7 @@ const ITDataEntryPage: React.FC = () => {
 
             <div className="space-y-6 max-h-[75vh] overflow-y-auto pr-1">
               <CsvImportGuide
-                fields={getFormFields().map(f => ({ key: f.name, label: f.label }))}
+                fields={getFormFields().filter(f => !f.readOnly).map(f => ({ key: f.name, label: f.label }))}
                 templateFilename={`it-${sheetTab}-template.csv`}
                 missing={csvValidation?.missing}
                 extra={csvValidation?.extra}
