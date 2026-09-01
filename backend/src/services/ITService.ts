@@ -283,8 +283,9 @@ export class ITService {
     // POC phone: 10-digit Indian mobile number, matching the same format
     // used for staff phone numbers elsewhere in the app.
     if (payload.poc_phone !== undefined && payload.poc_phone !== null && String(payload.poc_phone).trim() !== '') {
-      if (!/^\d{10}$/.test(String(payload.poc_phone).trim())) {
-        throw new Error('POC phone must be exactly 10 digits.');
+      const trimmed = String(payload.poc_phone).trim().toUpperCase();
+      if (trimmed !== 'NIL' && trimmed !== 'N/A' && trimmed !== 'NA' && !/^\d{10}$/.test(trimmed)) {
+        throw new Error('POC phone must be exactly 10 digits or NIL.');
       }
     }
 
@@ -533,7 +534,11 @@ export class ITService {
     let query = client.from(table).select(selectString);
 
     if (targetBranchId && !NO_BRANCH_SHEETS.has(sheet)) {
-      query = query.eq('branch_id', targetBranchId);
+      if (sheet === 'vendors') {
+        query = query.or(`branch_id.eq.${targetBranchId},branch_id.is.null`);
+      } else {
+        query = query.eq('branch_id', targetBranchId);
+      }
     }
     if (startDate) {
       query = query.gte('created_at', startDate);
@@ -634,6 +639,12 @@ export class ITService {
     delete (payload as any).id;
     delete (payload as any).created_at;
     delete (payload as any).updated_at;
+    delete (payload as any).asset_type_select;
+    delete (payload as any).asset_type_is_other;
+    delete (payload as any).custom_asset_type;
+    delete (payload as any).asset_type_select;
+    delete (payload as any).asset_type_is_other;
+    delete (payload as any).custom_asset_type;
 
     if (sheet === 'audit-schedule') this.computeNextAuditDueDate(payload);
 
@@ -979,12 +990,15 @@ export class ITService {
       'Server': 0,
       'Printer': 0,
       'Network Device': 0,
-      'Software License': 0
+      'Software License': 0,
+      'Other': 0
     };
     (assets || []).forEach(asset => {
       const type = asset.asset_type;
       if (type && type in categoryCounts) {
         categoryCounts[type] = (categoryCounts[type] || 0) + 1;
+      } else if (type) {
+        categoryCounts['Other'] = (categoryCounts['Other'] || 0) + 1;
       }
     });
 

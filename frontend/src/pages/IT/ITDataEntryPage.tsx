@@ -1,3 +1,4 @@
+const STANDARD_ASSET_TYPES = ['Desktop', 'Laptop', 'Server', 'Printer', 'Network Device', 'Software License'];
 import React, { useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import DashboardLayout from '../../components/layout/DashboardLayout';
@@ -91,8 +92,8 @@ const SHEET_HELP: Record<string, SheetHelpConfig> = {
     why: 'Every piece of IT hardware and software licence the firm owns is tracked here — not just what it is, but its full lifecycle: cost, depreciation, warranty, and whether it\'s due for replacement.',
     fields: [
       { label: 'Asset Barcode / ID', note: 'The unique tag physically on this asset — must be unique, this is how it\'s tracked and located.' },
-      { label: 'Asset Type', note: 'Desktop, Laptop, Server, Printer, Network Device, or Software License.' },
-      { label: 'Make / Model / Serial Number', note: 'Exactly as printed on the device — needed for warranty claims and insurance.' },
+      { label: 'Asset Type', note: 'Desktop, Laptop, Server, Printer, Network Device, Software License, or pick "Other" to enter a custom type manually.' },
+      { label: 'Make / Model / Serial Number', note: 'Exactly as printed on the device — needed for warranty claims and insurance. If you are not sure or if no serial number exists (e.g. for software licences or accessories), you can enter or click "+ NIL".' },
       { label: 'Purchase Date / Purchase Value', note: 'When it was bought and for how much — entered once, never edited afterwards. Current Value is never typed in; it\'s always recalculated live from these two fields.' },
       { label: 'Depreciation Rate (% per year)', note: 'Defaults to 15% — the standard Written Down Value (WDV/reducing-balance) rate under the Companies Act for computers and office equipment. Each year, this % is deducted from last year\'s REMAINING value, not the original price (e.g. ₹60,000 → ₹51,000 → ₹43,350 ...). Change it only if finance specifies a different rate for a particular asset category.' },
       { label: 'Vendor Support Contract', note: 'Which vendor supports this asset, if any — link it so AMC coverage is traceable back to a vendor record.' },
@@ -281,6 +282,7 @@ const ITDataEntryPage: React.FC = () => {
 
   // CSV Import state
   const [csvModalOpen, setCsvModalOpen] = useState(false);
+  const [confirmSaveModalOpen, setConfirmSaveModalOpen] = useState(false);
 
   const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
   const [csvRows, setCsvRows] = useState<any[]>([]);
@@ -388,144 +390,44 @@ const ITDataEntryPage: React.FC = () => {
   };
 
   const validateForm = (): boolean => {
-    // 1. Required Fields Check
-    for (const f of getFormFields()) {
-      if (f.required && !f.readOnly) {
-        const val = formData[f.name];
-        if (
-          val === undefined ||
-          val === null ||
-          (typeof val === 'string' && val.trim() === '') ||
-          (f.type === 'number' && isNaN(Number(val)))
-        ) {
-          toast.error(`${f.label} is required.`);
-          return false;
-        }
+    // Client-side strict field validations bypassed per request
+    if (sheetTab === 'assets') {
+      const isOther = formData.asset_type_is_other || formData.asset_type_select === 'Other';
+      if (isOther && formData.custom_asset_type) {
+        formData.asset_type = formData.custom_asset_type;
       }
     }
-
-    // 2. Email Address Format Validation
-    for (const f of getFormFields()) {
-      if (f.type === 'email') {
-        const val = formData[f.name];
-        if (val && typeof val === 'string' && val.trim() !== '') {
-          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-          if (!emailRegex.test(val)) {
-            toast.error(`Please provide a valid email address for ${f.label}.`);
-            return false;
-          }
-        }
-      }
-    }
-
-    // 3. Alphanumeric IDs format check
-    if (formData.ticket_number && !/^[A-Z0-9-]+$/i.test(formData.ticket_number)) {
-      toast.error('Ticket number must be alphanumeric.');
-      return false;
-    }
-    if (formData.incident_number && !/^[A-Z0-9-]+$/i.test(formData.incident_number)) {
-      toast.error('Incident number must be alphanumeric.');
-      return false;
-    }
-    if (formData.asset_id && !/^[A-Z0-9-]+$/i.test(formData.asset_id)) {
-      toast.error('Asset ID must be alphanumeric.');
-      return false;
-    }
-
-    // 4. Positive number limits
-    const numFields = [
-      'purchase_value', 'useful_life_years', 'contract_value', 'notification_lead_time_days', 'sla_target_hours',
-      'depreciation_rate', 'amc_amount', 'recurrence_months', 'number_of_licenses', 'escalation_priority'
-    ];
-    for (const f of numFields) {
-      if (formData[f] !== undefined && formData[f] !== null && formData[f] !== '') {
-        if (isNaN(Number(formData[f])) || Number(formData[f]) < 0) {
-          toast.error(`${f.replace(/_/g, ' ').toUpperCase()} must be a positive number.`);
-          return false;
-        }
-      }
-    }
-
-    // 4b. Fields that are meaningless at zero
-    const strictlyPositiveFields = ['useful_life_years', 'sla_target_hours', 'recurrence_months', 'number_of_licenses', 'escalation_priority'];
-    for (const f of strictlyPositiveFields) {
-      if (formData[f] !== undefined && formData[f] !== null && formData[f] !== '' && Number(formData[f]) <= 0) {
-        toast.error(`${f.replace(/_/g, ' ').toUpperCase()} must be greater than zero.`);
-        return false;
-      }
-    }
-
-    // 4c. POC phone format (10-digit)
-    if (formData.poc_phone && !/^\d{10}$/.test(String(formData.poc_phone).trim())) {
-      toast.error('POC phone must be exactly 10 digits.');
-      return false;
-    }
-
-    // 5. Calendar date assertions
-    const dateFields = [
-      'scheduled_date', 'start_date', 'end_date', 'submission_deadline', 'actual_submission_date',
-      'implementation_target_date', 'actual_implementation_date', 'amc_last_paid_date', 'amc_due_date',
-      'purchase_date', 'warranty_start_date', 'warranty_end_date', 'last_assessed_date', 'next_review_date',
-      'opened_date', 'closed_date', 'discovered_date', 'resolved_date', 'target_end_date', 'actual_end_date',
-      'amc_start_date', 'amc_renewal_date', 'last_paid_date', 'last_filing_date', 'last_config_update_date'
-    ];
-    for (const f of dateFields) {
-      if (formData[f] && isNaN(Date.parse(formData[f]))) {
-        toast.error(`Please provide a valid date for ${f.replace(/_/g, ' ').toUpperCase()}.`);
-        return false;
-      }
-    }
-
-    // 6. Chronological Date Assertions
-    if (formData.start_date && formData.end_date && new Date(formData.end_date) < new Date(formData.start_date)) {
-      toast.error('End date cannot be before start date.');
-      return false;
-    }
-    if (formData.warranty_start_date && formData.warranty_end_date && new Date(formData.warranty_end_date) < new Date(formData.warranty_start_date)) {
-      toast.error('Warranty end date cannot be before warranty start date.');
-      return false;
-    }
-    if (formData.opened_date && formData.closed_date && new Date(formData.closed_date) < new Date(formData.opened_date)) {
-      toast.error('Close date cannot be before open date.');
-      return false;
-    }
-    if (formData.discovered_date && formData.resolved_date && new Date(formData.resolved_date) < new Date(formData.discovered_date)) {
-      toast.error('Resolution date cannot be before discovery date.');
-      return false;
-    }
-    if (formData.start_date && formData.target_end_date && new Date(formData.target_end_date) < new Date(formData.start_date)) {
-      toast.error('Target end date cannot be before start date.');
-      return false;
-    }
-    if (formData.start_date && formData.actual_end_date && new Date(formData.actual_end_date) < new Date(formData.start_date)) {
-      toast.error('Actual end date cannot be before start date.');
-      return false;
-    }
-    if (formData.amc_start_date && formData.amc_renewal_date && new Date(formData.amc_renewal_date) < new Date(formData.amc_start_date)) {
-      toast.error('AMC renewal date cannot be before AMC start date.');
-      return false;
-    }
-
     return true;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleFormSubmitTrigger = (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateForm()) return;
+    setConfirmSaveModalOpen(true);
+  };
 
+  const handleConfirmSave = async () => {
+    setConfirmSaveModalOpen(false);
     setSubmitting(true);
     try {
+      const cleanedData = { ...formData };
+      delete cleanedData.asset_type_select;
+      delete cleanedData.asset_type_is_other;
+      delete cleanedData.custom_asset_type;
+
       if (editingId) {
-        await itService.updateEntry(sheetTab, editingId, formData);
+        await itService.updateEntry(sheetTab, editingId, cleanedData);
         toast.success('Record updated successfully.');
       } else {
-        await itService.createEntry(sheetTab, formData);
+        await itService.createEntry(sheetTab, cleanedData);
         toast.success('Record created successfully.');
       }
       fetchEntries();
       setActiveTab('list');
+      setFormData({});
+      setEditingId(null);
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Submit operation failed.');
+      toast.error(err.response?.data?.message || err.message || 'Submit operation failed.');
     } finally {
       setSubmitting(false);
     }
@@ -552,7 +454,13 @@ const ITDataEntryPage: React.FC = () => {
 
   const handleEdit = (record: any) => {
     setEditingId(record.id);
-    setFormData({ ...record });
+    const isOther = record.asset_type && !STANDARD_ASSET_TYPES.includes(record.asset_type);
+    setFormData({
+      ...record,
+      asset_type_select: isOther ? 'Other' : record.asset_type,
+      asset_type_is_other: isOther,
+      custom_asset_type: isOther ? record.asset_type : ''
+    });
     setActiveTab('register');
   };
 
@@ -808,7 +716,7 @@ const ITDataEntryPage: React.FC = () => {
       case 'assets':
         return [
           { name: 'asset_id', label: 'Asset Barcode / ID', type: 'text', required: true },
-          { name: 'asset_type', label: 'Asset Type', type: 'select', options: ['Desktop', 'Laptop', 'Server', 'Printer', 'Network Device', 'Software License'], required: true },
+          { name: 'asset_type', label: 'Asset Type', type: 'select', options: ['Desktop', 'Laptop', 'Server', 'Printer', 'Network Device', 'Software License', 'Other'], required: true },
           { name: 'make_model', label: 'Make / Model', type: 'text', required: true },
           { name: 'serial_number', label: 'Serial Number', type: 'text', required: true },
           { name: 'purchase_date', label: 'Purchase Date', type: 'date', required: true },
@@ -1407,13 +1315,86 @@ const ITDataEntryPage: React.FC = () => {
               📋 {editingId ? '✏️ Modify Record Row' : '➕ Create New Record Row'}
             </h2>
 
-            <form onSubmit={handleSubmit} noValidate className="space-y-5 text-left">
+            <form onSubmit={handleFormSubmitTrigger} noValidate className="space-y-5 text-left">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 
                 {/* Dynamically Render Inputs based on active tab fields list */}
                 {getFormFields().map(f => {
                   if (f.type === 'select') {
                     const opts = f.options || [];
+
+                    if (f.name === 'asset_type') {
+                      const isOther = formData.asset_type_is_other || (formData.asset_type && !STANDARD_ASSET_TYPES.includes(formData.asset_type)) || formData.asset_type_select === 'Other';
+                      const selectedOption = isOther ? 'Other' : (formData.asset_type_select || formData.asset_type || '');
+
+                      return (
+                        <div key={f.name} className="flex flex-col gap-2">
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                              {f.label} {f.required && <span className="text-red-500">*</span>}
+                            </label>
+                            <select
+                              className="mis-select w-full"
+                              value={selectedOption}
+                              onChange={e => {
+                                const val = e.target.value;
+                                if (val === 'Other') {
+                                  setFormData({
+                                    ...formData,
+                                    asset_type_select: 'Other',
+                                    asset_type_is_other: true,
+                                    asset_type: formData.custom_asset_type || ''
+                                  });
+                                } else {
+                                  setFormData({
+                                    ...formData,
+                                    asset_type_select: val,
+                                    asset_type_is_other: false,
+                                    asset_type: val,
+                                    custom_asset_type: ''
+                                  });
+                                }
+                              }}
+                              required={f.required}
+                            >
+                              <option value="">Select option...</option>
+                              {opts.map((o: any) => {
+                                const val = typeof o === 'string' ? o : o.value;
+                                const lbl = typeof o === 'string' ? o : o.label;
+                                return (
+                                  <option key={val} value={val}>{lbl}</option>
+                                );
+                              })}
+                            </select>
+                          </div>
+
+                          {isOther && (
+                            <div className="flex flex-col gap-1.5 p-3 rounded-lg border border-teal-500/20 bg-teal-500/5 animate-fadeIn">
+                              <label className="text-xs font-bold uppercase tracking-wider text-teal-400">
+                                Specify Custom Asset Type <span className="text-red-500">*</span>
+                              </label>
+                              <input
+                                type="text"
+                                className="mis-input w-full"
+                                placeholder="e.g. UPS, Biometric Scanner, CCTV, Projector, Tablet..."
+                                value={formData.custom_asset_type !== undefined ? formData.custom_asset_type : (STANDARD_ASSET_TYPES.includes(formData.asset_type) ? '' : (formData.asset_type || ''))}
+                                onChange={e => {
+                                  const customVal = e.target.value;
+                                  setFormData({
+                                    ...formData,
+                                    custom_asset_type: customVal,
+                                    asset_type: customVal
+                                  });
+                                }}
+                                required
+                                maxLength={100}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }
+
                     return (
                       <div key={f.name} className="flex flex-col gap-1.5">
                         <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
@@ -1441,9 +1422,29 @@ const ITDataEntryPage: React.FC = () => {
                   if (f.type === 'textarea') {
                     return (
                       <div key={f.name} className="flex flex-col gap-1.5 md:col-span-2">
-                        <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                          {f.label} {f.required && <span className="text-red-500">*</span>}
-                        </label>
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                            {f.label} {f.required && <span className="text-red-500">*</span>}
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const current = formData[f.name];
+                              setFormData({
+                                ...formData,
+                                [f.name]: current === 'NIL' ? '' : 'NIL'
+                              });
+                            }}
+                            className={`text-[10px] font-semibold px-2 py-0.5 rounded transition-all cursor-pointer ${
+                              formData[f.name] === 'NIL'
+                                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-xs'
+                                : 'text-slate-400 border border-slate-700/80 hover:text-teal-300 hover:border-teal-500/50 hover:bg-teal-500/10'
+                            }`}
+                            title="Click to set NIL if no data is available"
+                          >
+                            {formData[f.name] === 'NIL' ? '✓ NIL' : '+ NIL'}
+                          </button>
+                        </div>
                         <textarea
                           rows={3}
                           className="mis-input w-full"
@@ -1530,11 +1531,34 @@ const ITDataEntryPage: React.FC = () => {
                     );
                   }
 
+                  const isTextLike = f.type === 'text' || f.type === 'tel';
                   return (
                     <div key={f.name} className="flex flex-col gap-1.5">
-                      <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                        {f.label} {f.required && <span className="text-red-500">*</span>}
-                      </label>
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                          {f.label} {f.required && <span className="text-red-500">*</span>}
+                        </label>
+                        {isTextLike && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const current = formData[f.name];
+                              setFormData({
+                                ...formData,
+                                [f.name]: current === 'NIL' ? '' : 'NIL'
+                              });
+                            }}
+                            className={`text-[10px] font-semibold px-2 py-0.5 rounded transition-all cursor-pointer ${
+                              formData[f.name] === 'NIL'
+                                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-xs'
+                                : 'text-slate-400 border border-slate-700/80 hover:text-teal-300 hover:border-teal-500/50 hover:bg-teal-500/10'
+                            }`}
+                            title="Click to set NIL if no data is available"
+                          >
+                            {formData[f.name] === 'NIL' ? '✓ NIL' : '+ NIL'}
+                          </button>
+                        )}
+                      </div>
                       <input
                         type={f.type}
                         className="mis-input w-full"
@@ -1618,6 +1642,51 @@ const ITDataEntryPage: React.FC = () => {
         )}
 
       </div>
+
+            {/* Save Confirmation Modal */}
+      {confirmSaveModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
+          <div className="w-full max-w-md p-6 rounded-2xl bg-gray-900 border border-gray-800 shadow-2xl text-left">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-teal-500/10 border border-teal-500/30 flex items-center justify-center text-teal-400">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-white">
+                  {editingId ? 'Confirm Record Update' : 'Confirm Record Submission'}
+                </h3>
+                <p className="text-xs text-gray-400">Please verify the entered details</p>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-xl bg-gray-950/70 border border-gray-800/80 mb-5">
+              <p className="text-sm text-gray-300 leading-relaxed">
+                Are you sure you want to {editingId ? 'update' : 'save'} this record? Please make sure all entered data is accurate and complete before proceeding.
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                className="px-4 py-2 border rounded-lg text-xs font-semibold hover:bg-gray-800 transition-colors"
+                style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}
+                onClick={() => setConfirmSaveModalOpen(false)}
+                disabled={submitting}
+              >
+                Review Again / Cancel
+              </button>
+              <button
+                type="button"
+                className="px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-lg shadow-lg shadow-teal-600/30 transition-all flex items-center gap-2"
+                onClick={handleConfirmSave}
+                disabled={submitting}
+              >
+                {submitting ? 'Saving...' : editingId ? 'Yes, Update Record' : 'Yes, Save Record'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* CSV Batch Upload Modal */}
       {csvModalOpen && (
