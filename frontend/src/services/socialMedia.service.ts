@@ -1,9 +1,18 @@
-﻿import api from './api';
+import api from './api';
+
+export interface CreatorProfile {
+  id: string;
+  full_name: string;
+  email: string;
+  avatar_url?: string;
+  role: string;
+}
 
 export interface SocialMediaPost {
   id: string;
   creator_id: string;
   creator_name?: string;
+  creator_email?: string;
   title: string;
   caption?: string;
   platform: 'Instagram' | 'YouTube' | 'TikTok' | 'Facebook' | 'LinkedIn' | 'X';
@@ -38,8 +47,15 @@ export interface SocialMediaAnalyticsRecord {
 }
 
 export const socialMediaService = {
-  async getPosts(): Promise<SocialMediaPost[]> {
-    const response = await api.get<SocialMediaPost[]>('/social-media/posts');
+  async getPosts(creatorId?: string): Promise<SocialMediaPost[]> {
+    const response = await api.get<SocialMediaPost[]>('/social-media/posts', {
+      params: creatorId && creatorId !== 'all' ? { creator_id: creatorId } : undefined
+    });
+    return response.data;
+  },
+
+  async getCreators(): Promise<CreatorProfile[]> {
+    const response = await api.get<CreatorProfile[]>('/social-media/creators');
     return response.data;
   },
 
@@ -62,9 +78,13 @@ export const socialMediaService = {
     await api.delete(`/social-media/posts/${id}`);
   },
 
-  async getScheduledPosts(start: string, end: string): Promise<SocialMediaPost[]> {
+  async getScheduledPosts(start: string, end: string, creatorId?: string): Promise<SocialMediaPost[]> {
     const response = await api.get<SocialMediaPost[]>('/social-media/posts/scheduled', {
-      params: { start, end }
+      params: {
+        start,
+        end,
+        ...(creatorId && creatorId !== 'all' ? { creator_id: creatorId } : {})
+      }
     });
     return response.data;
   },

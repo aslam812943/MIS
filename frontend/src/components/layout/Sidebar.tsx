@@ -225,7 +225,7 @@ const Sidebar: React.FC = () => {
   // Data Entry page has nothing assigned for them and just shows an empty
   // "No modules assigned" state. Only show it as a fallback for employees
   // in departments without a dedicated page.
-  const hasDedicatedDeptEntry = isIEPFUser || isSettlementsUser || isKYCUser || isDPUser || isITUser || isFinanceUser || isSalesUser;
+  const hasDedicatedDeptEntry = isIEPFUser || isSettlementsUser || isKYCUser || isDPUser || isITUser || isFinanceUser || isSalesUser || isCreatorDept || isCreator;
 
   const closeOnMobile = () => setSidebarOpen(false);
 

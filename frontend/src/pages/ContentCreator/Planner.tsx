@@ -1,31 +1,44 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
-import { socialMediaService, type SocialMediaPost } from '../../services/socialMedia.service';
+import { socialMediaService, type SocialMediaPost, type CreatorProfile } from '../../services/socialMedia.service';
+import { authService } from '../../services/auth.service';
 import toast from 'react-hot-toast';
 
 const COLUMNS: Array<{ key: SocialMediaPost['status']; label: string; icon: string }> = [
-  { key: 'Idea', label: 'Ideas / Concepts', icon: '💡' },
-  { key: 'Scripting', label: 'Script Writing', icon: '✍️' },
-  { key: 'Filming', label: 'Production / Filming', icon: '🎥' },
-  { key: 'Editing', label: 'Editing & Review', icon: '✂️' },
-  { key: 'Scheduled', label: 'Scheduled Posts', icon: '📅' },
-  { key: 'Published', label: 'Published Content', icon: '🚀' }
+  { key: 'Idea', label: 'Ideas / Concepts', icon: '??' },
+  { key: 'Scripting', label: 'Script Writing', icon: '??' },
+  { key: 'Filming', label: 'Production / Filming', icon: '??' },
+  { key: 'Editing', label: 'Editing & Review', icon: '??' },
+  { key: 'Scheduled', label: 'Scheduled Posts', icon: '??' },
+  { key: 'Published', label: 'Published Content', icon: '??' }
 ];
 
 const PLATFORMS = ['Instagram', 'YouTube', 'TikTok', 'Facebook', 'LinkedIn', 'X'] as const;
 const CONTENT_TYPES = ['Reel', 'Short', 'Post', 'Story', 'Video'] as const;
 
 const Planner: React.FC = () => {
+  const user = authService.getCurrentUser();
+  const isLeadershipOrHOD = ['admin', 'ceo', 'managing_director', 'director', 'executive', 'social_media_manager', 'hod', 'regional_manager'].includes(user?.role || '');
+
   const [posts, setPosts] = useState<SocialMediaPost[]>([]);
+  const [creators, setCreators] = useState<CreatorProfile[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [editingPost, setEditingPost] = useState<Partial<SocialMediaPost> | null>(null);
   const [showModal, setShowModal] = useState<boolean>(false);
   const [filterPlatform, setFilterPlatform] = useState<string>('all');
+  const [filterCreator, setFilterCreator] = useState<string>('all');
 
-  const fetchPosts = async () => {
+  const fetchPosts = async (creatorId: string = filterCreator) => {
     try {
-      const data = await socialMediaService.getPosts();
-      setPosts(data);
+      setLoading(true);
+      const [postsData, creatorsData] = await Promise.all([
+        socialMediaService.getPosts(creatorId),
+        isLeadershipOrHOD ? socialMediaService.getCreators().catch(() => []) : Promise.resolve([])
+      ]);
+      setPosts(postsData);
+      if (isLeadershipOrHOD && creatorsData.length > 0) {
+        setCreators(creatorsData);
+      }
     } catch (err) {
       console.error(err);
       toast.error('Failed to fetch content pipeline.');
@@ -35,8 +48,8 @@ const Planner: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchPosts();
-  }, []);
+    fetchPosts(filterCreator);
+  }, [filterCreator]);
 
   const handleOpenCreateModal = (status: SocialMediaPost['status'] = 'Idea') => {
     setEditingPost({
@@ -46,7 +59,8 @@ const Planner: React.FC = () => {
       content_type: 'Reel',
       status: status,
       script: '',
-      scheduled_at: ''
+      scheduled_at: '',
+      creator_id: isLeadershipOrHOD && filterCreator !== 'all' ? filterCreator : user?.id
     });
     setShowModal(true);
   };
@@ -78,7 +92,7 @@ const Planner: React.FC = () => {
       }
       setShowModal(false);
       setEditingPost(null);
-      fetchPosts();
+      fetchPosts(filterCreator);
     } catch (err) {
       console.error(err);
       toast.error('Failed to save content card.');
@@ -92,7 +106,7 @@ const Planner: React.FC = () => {
       toast.success('Content item deleted.');
       setShowModal(false);
       setEditingPost(null);
-      fetchPosts();
+      fetchPosts(filterCreator);
     } catch (err) {
       console.error(err);
       toast.error('Failed to delete content.');
@@ -103,7 +117,7 @@ const Planner: React.FC = () => {
     try {
       await socialMediaService.updatePost(post.id, { status: nextStatus });
       toast.success(`Moved to ${nextStatus}`);
-      fetchPosts();
+      fetchPosts(filterCreator);
     } catch (err) {
       console.error(err);
       toast.error('Failed to change status.');
@@ -112,13 +126,13 @@ const Planner: React.FC = () => {
 
   const getPlatformIcon = (platform: string) => {
     switch (platform) {
-      case 'Instagram': return '📸';
-      case 'YouTube': return '🎥';
-      case 'TikTok': return '🎵';
-      case 'Facebook': return '📘';
-      case 'LinkedIn': return '💼';
-      case 'X': return '🐦';
-      default: return '🔗';
+      case 'Instagram': return '??';
+      case 'YouTube': return '??';
+      case 'TikTok': return '??';
+      case 'Facebook': return '??';
+      case 'LinkedIn': return '??';
+      case 'X': return '??';
+      default: return '??';
     }
   };
 
@@ -134,7 +148,10 @@ const Planner: React.FC = () => {
     }
   };
 
-  const filteredPosts = posts.filter(p => filterPlatform === 'all' || p.platform === filterPlatform);
+  const filteredPosts = posts.filter(p => {
+    const matchPlatform = filterPlatform === 'all' || p.platform === filterPlatform;
+    return matchPlatform;
+  });
 
   return (
     <DashboardLayout>
@@ -142,14 +159,39 @@ const Planner: React.FC = () => {
         {/* Top Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold" style={{ color: 'var(--text-primary)' }}>
-              Content <span className="mis-page-title-accent">Planner</span>
-            </h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl sm:text-3xl font-extrabold" style={{ color: 'var(--text-primary)' }}>
+                Content <span className="mis-page-title-accent">Planner</span>
+              </h1>
+              {isLeadershipOrHOD && (
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                  {user?.role === 'hod' ? 'HOD Board' : 'Team Board'}
+                </span>
+              )}
+            </div>
             <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
               Manage your production pipeline and move draft items through scripts and editing.
             </p>
           </div>
+
           <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+            {/* Creator filter for HOD */}
+            {isLeadershipOrHOD && (
+              <select
+                value={filterCreator}
+                onChange={(e) => setFilterCreator(e.target.value)}
+                className="mis-input py-2 px-3 text-sm rounded-lg font-medium"
+                style={{ width: 'auto' }}
+              >
+                <option value="all">All Creators</option>
+                {creators.map(c => (
+                  <option key={c.id} value={c.id}>
+                    {c.full_name}
+                  </option>
+                ))}
+              </select>
+            )}
+
             {/* Platform filter */}
             <select
               value={filterPlatform}
@@ -162,6 +204,7 @@ const Planner: React.FC = () => {
                 <option key={p} value={p}>{p}</option>
               ))}
             </select>
+
             <button
               onClick={() => handleOpenCreateModal('Idea')}
               className="mis-btn mis-btn-primary py-2 px-4 text-sm font-semibold rounded-lg shadow-md"
@@ -218,13 +261,27 @@ const Planner: React.FC = () => {
                               </span>
                               <span className="text-xs">{getPlatformIcon(post.platform)} {post.platform}</span>
                             </div>
+
                             <h4 className="text-sm font-bold line-clamp-2" style={{ color: 'var(--text-primary)' }}>
                               {post.title}
                             </h4>
+
                             {post.caption && (
                               <p className="text-xs line-clamp-2 mt-1" style={{ color: 'var(--text-secondary)' }}>
                                 {post.caption}
                               </p>
+                            )}
+
+                            {/* Creator Badge */}
+                            {post.creator_name && (
+                              <div className="mt-2.5 flex items-center gap-1.5">
+                                <span className="w-4 h-4 rounded-full bg-indigo-500/20 text-indigo-400 text-[9px] flex items-center justify-center font-bold">
+                                  {post.creator_name.slice(0, 1).toUpperCase()}
+                                </span>
+                                <span className="text-[11px] font-medium text-slate-400">
+                                  {post.creator_name}
+                                </span>
+                              </div>
                             )}
 
                             {/* Card Footer Actions */}
@@ -277,41 +334,61 @@ const Planner: React.FC = () => {
         {/* Modal for Creating & Editing Posts */}
         {showModal && editingPost && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
-            <div className="glass w-full max-w-lg rounded-2xl overflow-hidden border border-slate-700/50 shadow-2xl flex flex-col">
-              {/* Modal Header */}
-              <div className="p-4 border-b flex justify-between items-center" style={{ borderColor: 'var(--border-light)' }}>
-                <h3 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>
-                  {editingPost.id ? 'Edit Content Details' : 'New Content Pipeline Idea'}
+            <div className="glass w-full max-w-lg rounded-2xl overflow-hidden border border-slate-700/50 shadow-2xl flex flex-col max-h-[90vh]">
+              <div className="p-4 border-b border-slate-700/50 flex justify-between items-center bg-slate-900/40">
+                <h3 className="text-md font-bold text-white">
+                  {editingPost.id ? 'Edit Content Card' : 'Create New Content Card'}
                 </h3>
                 <button
-                  onClick={() => { setShowModal(false); setEditingPost(null); }}
-                  className="text-slate-400 hover:text-white text-lg font-bold"
+                  onClick={() => setShowModal(false)}
+                  className="text-slate-400 hover:text-white font-bold text-lg"
                 >
                   &times;
                 </button>
               </div>
 
-              {/* Modal Form */}
-              <form onSubmit={handleSavePost} className="p-5 space-y-4 overflow-y-auto max-h-[75vh]">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="mis-field col-span-2">
-                    <label className="mis-label">Content Title *</label>
-                    <input
-                      type="text"
-                      className="mis-input"
-                      value={editingPost.title || ''}
-                      onChange={e => setEditingPost({ ...editingPost, title: e.target.value })}
-                      placeholder="e.g., A Day in the Life of a Developer"
-                      required
-                    />
-                  </div>
-
-                  <div className="mis-field">
-                    <label className="mis-label">Platform</label>
+              <form onSubmit={handleSavePost} className="p-5 space-y-4 overflow-y-auto flex-1">
+                {/* Assigned Creator for HOD/Management */}
+                {isLeadershipOrHOD && creators.length > 0 && (
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1">
+                      Assigned Creator
+                    </label>
                     <select
-                      className="mis-input"
-                      value={editingPost.platform}
-                      onChange={e => setEditingPost({ ...editingPost, platform: e.target.value as any })}
+                      value={editingPost.creator_id || user?.id || ''}
+                      onChange={(e) => setEditingPost({ ...editingPost, creator_id: e.target.value })}
+                      className="mis-input w-full py-2 px-3 rounded-lg text-sm"
+                    >
+                      {creators.map(c => (
+                        <option key={c.id} value={c.id}>
+                          {c.full_name} ({c.role === 'hod' ? 'HOD' : 'Creator'})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1">
+                    Title / Hook <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editingPost.title || ''}
+                    onChange={(e) => setEditingPost({ ...editingPost, title: e.target.value })}
+                    placeholder="e.g. 5 Investment Mistakes in Your 20s"
+                    className="mis-input w-full py-2 px-3 rounded-lg text-sm"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1">Target Platform</label>
+                    <select
+                      value={editingPost.platform || 'Instagram'}
+                      onChange={(e) => setEditingPost({ ...editingPost, platform: e.target.value as any })}
+                      className="mis-input w-full py-2 px-3 rounded-lg text-sm"
                     >
                       {PLATFORMS.map(p => (
                         <option key={p} value={p}>{p}</option>
@@ -319,25 +396,27 @@ const Planner: React.FC = () => {
                     </select>
                   </div>
 
-                  <div className="mis-field">
-                    <label className="mis-label">Content Type</label>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1">Content Type</label>
                     <select
-                      className="mis-input"
-                      value={editingPost.content_type}
-                      onChange={e => setEditingPost({ ...editingPost, content_type: e.target.value as any })}
+                      value={editingPost.content_type || 'Reel'}
+                      onChange={(e) => setEditingPost({ ...editingPost, content_type: e.target.value as any })}
+                      className="mis-input w-full py-2 px-3 rounded-lg text-sm"
                     >
                       {CONTENT_TYPES.map(t => (
                         <option key={t} value={t}>{t}</option>
                       ))}
                     </select>
                   </div>
+                </div>
 
-                  <div className="mis-field">
-                    <label className="mis-label">Pipeline Status</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1">Current Pipeline Stage</label>
                     <select
-                      className="mis-input"
-                      value={editingPost.status}
-                      onChange={e => setEditingPost({ ...editingPost, status: e.target.value as any })}
+                      value={editingPost.status || 'Idea'}
+                      onChange={(e) => setEditingPost({ ...editingPost, status: e.target.value as any })}
+                      className="mis-input w-full py-2 px-3 rounded-lg text-sm"
                     >
                       {COLUMNS.map(c => (
                         <option key={c.key} value={c.key}>{c.label}</option>
@@ -345,75 +424,63 @@ const Planner: React.FC = () => {
                     </select>
                   </div>
 
-                  <div className="mis-field">
-                    <label className="mis-label">Scheduled Publish Date & Time</label>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1">Schedule Date & Time</label>
                     <input
                       type="datetime-local"
-                      className="mis-input"
                       value={editingPost.scheduled_at || ''}
-                      onChange={e => setEditingPost({ ...editingPost, scheduled_at: e.target.value })}
+                      onChange={(e) => setEditingPost({ ...editingPost, scheduled_at: e.target.value })}
+                      className="mis-input w-full py-2 px-3 rounded-lg text-sm"
                     />
                   </div>
                 </div>
 
-                <div className="mis-field">
-                  <label className="mis-label">Script & Talking Notes</label>
-                  <textarea
-                    rows={4}
-                    className="mis-input py-2 font-mono text-xs"
-                    value={editingPost.script || ''}
-                    onChange={e => setEditingPost({ ...editingPost, script: e.target.value })}
-                    placeholder="Hook: Start with a question...&#10;Body: Show step 1, 2, 3...&#10;Call to Action: Follow for more!"
-                  />
-                </div>
-
-                <div className="mis-field">
-                  <label className="mis-label">Description / Social Caption & Hashtags</label>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1">Script / Outline</label>
                   <textarea
                     rows={3}
-                    className="mis-input py-2"
+                    value={editingPost.script || ''}
+                    onChange={(e) => setEditingPost({ ...editingPost, script: e.target.value })}
+                    placeholder="Draft the video script, talking points, hook, call to action..."
+                    className="mis-input w-full py-2 px-3 rounded-lg text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1">Caption & Hashtags</label>
+                  <textarea
+                    rows={2}
                     value={editingPost.caption || ''}
-                    onChange={e => setEditingPost({ ...editingPost, caption: e.target.value })}
-                    placeholder="Write a catchy caption... #creator #devlife"
+                    onChange={(e) => setEditingPost({ ...editingPost, caption: e.target.value })}
+                    placeholder="Caption for social media publication..."
+                    className="mis-input w-full py-2 px-3 rounded-lg text-sm"
                   />
                 </div>
 
-                <div className="mis-field">
-                  <label className="mis-label">Media File URL / Asset Path</label>
-                  <input
-                    type="text"
-                    className="mis-input"
-                    value={editingPost.media_url || ''}
-                    onChange={e => setEditingPost({ ...editingPost, media_url: e.target.value })}
-                    placeholder="Paste URL or upload in the Asset Library"
-                  />
-                </div>
-
-                {/* Actions */}
-                <div className="flex justify-between items-center pt-4 border-t" style={{ borderColor: 'var(--border-light)' }}>
+                <div className="flex justify-between items-center pt-3 border-t border-slate-700/50">
                   {editingPost.id ? (
                     <button
                       type="button"
                       onClick={() => handleDeletePost(editingPost.id!)}
-                      className="px-4 py-2 text-sm font-semibold rounded-lg bg-red-600/10 text-red-500 hover:bg-red-600/20 transition"
+                      className="text-xs text-rose-400 hover:text-rose-300 font-semibold"
                     >
-                      Delete Item
+                      Delete Card
                     </button>
                   ) : <div />}
 
                   <div className="flex gap-2">
                     <button
                       type="button"
-                      onClick={() => { setShowModal(false); setEditingPost(null); }}
-                      className="px-4 py-2 text-sm font-semibold rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 transition"
+                      onClick={() => setShowModal(false)}
+                      className="mis-btn py-1.5 px-3 text-xs rounded-lg"
                     >
                       Cancel
                     </button>
                     <button
                       type="submit"
-                      className="mis-btn mis-btn-primary px-4 py-2 text-sm font-semibold rounded-lg shadow"
+                      className="mis-btn mis-btn-primary py-1.5 px-4 text-xs font-semibold rounded-lg shadow-md"
                     >
-                      {editingPost.id ? 'Save Changes' : 'Create Card'}
+                      Save Card
                     </button>
                   </div>
                 </div>

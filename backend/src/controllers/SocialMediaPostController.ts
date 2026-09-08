@@ -1,6 +1,19 @@
-﻿import type { Request, Response } from 'express';
+import type { Request, Response } from 'express';
 import { SocialMediaPostService } from '../services/SocialMediaPostService.js';
 import { HttpStatus } from '../utils/httpStatus.js';
+
+const isManagerOrAdmin = (role: string): boolean => {
+  return [
+    'admin',
+    'ceo',
+    'managing_director',
+    'director',
+    'executive',
+    'social_media_manager',
+    'hod',
+    'regional_manager'
+  ].includes(role);
+};
 
 export class SocialMediaPostController {
   constructor(private postService: SocialMediaPostService) {}
@@ -8,13 +21,29 @@ export class SocialMediaPostController {
   getAllPosts = async (req: Request, res: Response): Promise<void> => {
     try {
       const user = (req as any).user;
+      const isManager = isManagerOrAdmin(user?.role || '');
+      const creatorIdQuery = req.query.creator_id as string | undefined;
+
       let posts;
-      if (user.role === 'admin' || user.role === 'social_media_manager') {
-        posts = await this.postService.getAllPosts();
+      if (isManager) {
+        if (creatorIdQuery && creatorIdQuery !== 'all') {
+          posts = await this.postService.getPostsByCreator(creatorIdQuery);
+        } else {
+          posts = await this.postService.getAllPosts();
+        }
       } else {
         posts = await this.postService.getPostsByCreator(user.id);
       }
       res.status(HttpStatus.OK).json(posts);
+    } catch (error: any) {
+      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ message: error.message });
+    }
+  };
+
+  getCreators = async (_req: Request, res: Response): Promise<void> => {
+    try {
+      const creators = await this.postService.getCreators();
+      res.status(HttpStatus.OK).json(creators);
     } catch (error: any) {
       res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ message: error.message });
     }
@@ -29,7 +58,8 @@ export class SocialMediaPostController {
         return;
       }
       const user = (req as any).user;
-      if (user.role !== 'admin' && user.role !== 'social_media_manager' && post.creator_id !== user.id) {
+      const isManager = isManagerOrAdmin(user?.role || '');
+      if (!isManager && post.creator_id !== user.id) {
         res.status(HttpStatus.FORBIDDEN).json({ message: 'Access denied' });
         return;
       }
@@ -42,9 +72,10 @@ export class SocialMediaPostController {
   createPost = async (req: Request, res: Response): Promise<void> => {
     try {
       const user = (req as any).user;
+      const isManager = isManagerOrAdmin(user?.role || '');
       const postData = {
         ...req.body,
-        creator_id: user.id
+        creator_id: (isManager && req.body.creator_id) ? req.body.creator_id : user.id
       };
       const post = await this.postService.createPost(postData);
       res.status(HttpStatus.CREATED).json(post);
@@ -62,7 +93,8 @@ export class SocialMediaPostController {
         return;
       }
       const user = (req as any).user;
-      if (user.role !== 'admin' && user.role !== 'social_media_manager' && existing.creator_id !== user.id) {
+      const isManager = isManagerOrAdmin(user?.role || '');
+      if (!isManager && existing.creator_id !== user.id) {
         res.status(HttpStatus.FORBIDDEN).json({ message: 'Access denied' });
         return;
       }
@@ -82,7 +114,8 @@ export class SocialMediaPostController {
         return;
       }
       const user = (req as any).user;
-      if (user.role !== 'admin' && user.role !== 'social_media_manager' && existing.creator_id !== user.id) {
+      const isManager = isManagerOrAdmin(user?.role || '');
+      if (!isManager && existing.creator_id !== user.id) {
         res.status(HttpStatus.FORBIDDEN).json({ message: 'Access denied' });
         return;
       }
@@ -95,12 +128,18 @@ export class SocialMediaPostController {
 
   getScheduled = async (req: Request, res: Response): Promise<void> => {
     try {
-      const { start, end } = req.query;
+      const { start, end, creator_id } = req.query;
       if (!start || !end) {
         res.status(HttpStatus.BAD_REQUEST).json({ message: 'Start and end date range is required' });
         return;
       }
-      const posts = await this.postService.getScheduledPosts(start as string, end as string);
+      const user = (req as any).user;
+      const isManager = isManagerOrAdmin(user?.role || '');
+      const targetCreatorId = isManager
+        ? (creator_id && creator_id !== 'all' ? (creator_id as string) : undefined)
+        : user.id;
+
+      const posts = await this.postService.getScheduledPosts(start as string, end as string, targetCreatorId);
       res.status(HttpStatus.OK).json(posts);
     } catch (error: any) {
       res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ message: error.message });
