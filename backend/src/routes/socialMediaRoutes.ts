@@ -1,4 +1,4 @@
-﻿import { Router } from 'express';
+import { Router } from 'express';
 import multer from 'multer';
 import { SocialMediaPostController } from '../controllers/SocialMediaPostController.js';
 import { SocialMediaPostService } from '../services/SocialMediaPostService.js';
@@ -22,6 +22,7 @@ const analyticsController = new SocialMediaAnalyticsController(analyticsService)
 router.use(requireAuth);
 
 // Post Management
+router.get('/creators', postController.getCreators);
 router.get('/posts', postController.getAllPosts);
 router.get('/posts/scheduled', postController.getScheduled);
 router.get('/posts/:id', postController.getPostById);
