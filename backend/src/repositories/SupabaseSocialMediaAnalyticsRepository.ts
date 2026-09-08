@@ -1,10 +1,14 @@
-﻿import { supabase } from '../config/supabase.js';
+import { supabase, supabaseAdmin } from '../config/supabase.js';
 import type { SocialMediaCampaign, SocialMediaAnalyticsRecord } from '../models/socialMediaCampaign.model.js';
 import type { ISocialMediaAnalyticsRepository } from './interfaces/ISocialMediaAnalyticsRepository.js';
 
 export class SupabaseSocialMediaAnalyticsRepository implements ISocialMediaAnalyticsRepository {
+  private get client() {
+    return supabaseAdmin || supabase;
+  }
+
   async findAnalyticsInRange(start: string, end: string): Promise<SocialMediaAnalyticsRecord[]> {
-    const { data, error } = await supabase
+    const { data, error } = await this.client
       .from('social_media_analytics')
       .select('*')
       .gte('date', start)
@@ -16,7 +20,7 @@ export class SupabaseSocialMediaAnalyticsRepository implements ISocialMediaAnaly
   }
 
   async findCampaigns(): Promise<SocialMediaCampaign[]> {
-    const { data, error } = await supabase
+    const { data, error } = await this.client
       .from('social_media_campaigns')
       .select('*')
       .order('created_at', { ascending: false });
@@ -26,7 +30,7 @@ export class SupabaseSocialMediaAnalyticsRepository implements ISocialMediaAnaly
   }
 
   async createCampaign(campaign: Partial<SocialMediaCampaign>): Promise<SocialMediaCampaign> {
-    const { data, error } = await supabase
+    const { data, error } = await this.client
       .from('social_media_campaigns')
       .insert([campaign])
       .select()

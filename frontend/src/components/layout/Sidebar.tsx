@@ -128,10 +128,6 @@ const NavItem: React.FC<NavItemProps> = ({ to, icon, label, badge, onClick }) =>
   </NavLink>
 );
 
-// Every page mounts its own <DashboardLayout>, so the sidebar fully
-// remounts on each route change. Persisting the nav scroll offset here
-// (outside the component) keeps it stable across those remounts instead
-// of snapping back to the top on every navigation.
 let savedNavScrollTop = 0;
 
 /* ── Sidebar Component ────────────────────────────────────── */
@@ -160,7 +156,7 @@ const Sidebar: React.FC = () => {
     const fetchUnread = () => {
       notificationService.getUnreadCount()
         .then((count) => { if (!cancelled) setUnreadCount(count); })
-        .catch(() => { /* silent — badge just stays at last known value */ });
+        .catch(() => { /* silent */ });
     };
     fetchUnread();
     const interval = setInterval(fetchUnread, 60000);
@@ -177,60 +173,58 @@ const Sidebar: React.FC = () => {
           const open = tasks.filter((t) => !['Completed', 'Cancelled'].includes(t.status)).length;
           setOpenTaskCount(open);
         })
-        .catch(() => { /* silent — badge just stays at last known value */ });
+        .catch(() => { /* silent */ });
     };
     fetchOpenTasks();
     const interval = setInterval(fetchOpenTasks, 60000);
     return () => { cancelled = true; clearInterval(interval); };
   }, []);
 
-  const isAdmin = user?.role === 'admin';
-  const isHOD = user?.role === 'hod';
-  const isEmployee = user?.role === 'employee';
-  const isHR = user?.role === 'hr';
-  const isCreatorDept = user?.department_name?.toUpperCase() === 'CONTENT CREATION';
-  const isCreator = user?.role === 'content_creator' || (isCreatorDept && (isHOD || isEmployee));
-  const isSMM = user?.role === 'social_media_manager';
-  // Matches DashboardPage.tsx's showHRDashboard check — same roles that see
-  // the HR tab on the landing page get a direct link to it here.
-  const showHRDashboard = isAdmin || isHR;
+  const role = user?.role || '';
+  const isAdmin = role === 'admin';
+  const isLeadership = ['ceo', 'managing_director', 'director', 'executive'].includes(role);
+  const isHOD = role === 'hod';
+  const isEmployee = role === 'employee';
+  const isHR = role === 'hr';
+  const isCreatorDept = user?.department_name?.toUpperCase() === 'CONTENT CREATION' || user?.department_name?.toUpperCase() === 'CONTENT CREATOR';
+  const isCreator = role === 'content_creator' || (isCreatorDept && (isHOD || isEmployee));
+  const isSMM = role === 'social_media_manager';
+
+  // SMM & Content Creation navigation visible to staff, HOD, and executive management (CEO/Admin/MD/Director)
+  const showSMM = isSMM || isAdmin || isLeadership;
+  const showCreator = isCreator || isSMM || isAdmin || isLeadership;
+
+  // HR Dashboard and Administration visibility
+  const showHRDashboard = isAdmin || isHR || isLeadership;
   
-  // Employees now get a link to their own department's dashboard too (used
-  // to be HOD-only) — what they actually see on it is controlled per-widget
-  // by admin via Admin Panel > Dashboard Permissions, defaulting to hidden
-  // until admin opts specific widgets in (see useDashboardPermissions).
+  // Department specific visibility
   const isIEPFUser = user?.department_name?.toUpperCase() === 'IEPF';
-  const showIEPFDashboard = isAdmin || ['ceo', 'managing_director', 'director', 'executive'].includes(user?.role || '') || (isIEPFUser && (isHOD || isEmployee));
+  const showIEPFDashboard = isAdmin || isLeadership || (isIEPFUser && (isHOD || isEmployee));
 
   const isKYCUser = user?.department_name?.toUpperCase() === 'KYC';
-  const showKYCDashboard = isAdmin || ['ceo', 'managing_director', 'director', 'executive'].includes(user?.role || '') || (isKYCUser && (isHOD || isEmployee));
+  const showKYCDashboard = isAdmin || isLeadership || (isKYCUser && (isHOD || isEmployee));
 
   const isDPUser = user?.department_name?.toUpperCase() === 'DP';
-  const showDPDashboard = isAdmin || ['ceo', 'managing_director', 'director', 'executive'].includes(user?.role || '') || (isDPUser && (isHOD || isEmployee));
+  const showDPDashboard = isAdmin || isLeadership || (isDPUser && (isHOD || isEmployee));
 
   const isITUser = user?.department_name?.toUpperCase() === 'IT';
-  const showITDashboard = isAdmin || ['ceo', 'managing_director', 'director', 'executive'].includes(user?.role || '') || (isITUser && (isHOD || isEmployee));
+  const showITDashboard = isAdmin || isLeadership || (isITUser && (isHOD || isEmployee));
 
   const isFinanceUser = user?.department_name?.toUpperCase() === 'FINANCE';
-  const showFinanceDashboard = isAdmin || ['ceo', 'managing_director', 'director', 'executive'].includes(user?.role || '') || (isFinanceUser && (isHOD || isEmployee));
+  const showFinanceDashboard = isAdmin || isLeadership || (isFinanceUser && (isHOD || isEmployee));
 
   const isSalesUser = user?.department_name?.toUpperCase() === 'SALES';
-  const showSalesDashboard = isAdmin || ['ceo', 'managing_director', 'director', 'executive'].includes(user?.role || '') || (isSalesUser && (isHOD || isEmployee));
+  const showSalesDashboard = isAdmin || isLeadership || (isSalesUser && (isHOD || isEmployee));
 
   const isSettlementsUser = user?.department_name?.toUpperCase() === 'SETTLEMENTS';
+  const showSettlementsDashboard = isAdmin || isLeadership || (isSettlementsUser && (isHOD || isEmployee));
 
-  // Employees/HODs in one of the departments with a dedicated data-entry
-  // page (IEPF/Settlements/KYC/DP/IT/Finance/Sales) already have their real
-  // entry sheet in that department's nav section — the generic modules-based
-  // Data Entry page has nothing assigned for them and just shows an empty
-  // "No modules assigned" state. Only show it as a fallback for employees
-  // in departments without a dedicated page.
   const hasDedicatedDeptEntry = isIEPFUser || isSettlementsUser || isKYCUser || isDPUser || isITUser || isFinanceUser || isSalesUser || isCreatorDept || isCreator;
 
   const closeOnMobile = () => setSidebarOpen(false);
 
   const initials = user?.full_name
-    ? user.full_name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()
+    ? user.full_name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()
     : 'U';
 
   return (
@@ -257,66 +251,11 @@ const Sidebar: React.FC = () => {
       <nav className="mis-sidebar-nav" ref={navRef} onScroll={handleNavScroll}>
         <span className="mis-sidebar-section-label">Main</span>
 
-        
-        {isSMM && (
-          <>
-            <span className="mis-sidebar-section-label">Social Media Management</span>
-            <NavItem
-              to={ROUTES.SMM_DASHBOARD}
-              icon={<IconDashboard />}
-              label="Analytics Dashboard"
-              onClick={closeOnMobile}
-            />
-            <NavItem
-              to={ROUTES.SMM_APPROVALS}
-              icon={<IconVerify />}
-              label="Approvals Queue"
-              onClick={closeOnMobile}
-            />
-            <NavItem
-              to={ROUTES.SMM_CAMPAIGNS}
-              icon={<IconIEPFDashboard />}
-              label="Campaigns & Briefs"
-              onClick={closeOnMobile}
-            />
-          </>
-        )}
-
-        {(isCreator || isSMM) && (
-          <>
-            <span className="mis-sidebar-section-label">Content Creation</span>
-            <NavItem
-              to={ROUTES.CREATOR_DASHBOARD}
-              icon={<IconDashboard />}
-              label="Creator Dashboard"
-              onClick={closeOnMobile}
-            />
-            <NavItem
-              to={ROUTES.CREATOR_PLANNER}
-              icon={<IconDataEntry />}
-              label="Content Planner"
-              onClick={closeOnMobile}
-            />
-            <NavItem
-              to={ROUTES.CREATOR_CALENDAR}
-              icon={<IconTask />}
-              label="Schedule Calendar"
-              onClick={closeOnMobile}
-            />
-            <NavItem
-              to={ROUTES.CREATOR_ASSETS}
-              icon={<IconIEPFEntry />}
-              label="Asset Library"
-              onClick={closeOnMobile}
-            />
-          </>
-        )}
-
         {!isEmployee && (
           <NavItem
             to={ROUTES.DASHBOARD}
             icon={<IconDashboard />}
-            label="Dashboard"
+            label="Executive Dashboard"
             onClick={closeOnMobile}
           />
         )}
@@ -346,24 +285,70 @@ const Sidebar: React.FC = () => {
           />
         )}
 
-        {isHOD && !hasDedicatedDeptEntry && (
-          <NavItem
-            to={ROUTES.VERIFY_ENTRIES}
-            icon={<IconVerify />}
-            label="Verify Entries"
-            onClick={closeOnMobile}
-          />
+        {/* Social Media Management Navigation */}
+        {showSMM && (
+          <>
+            <span className="mis-sidebar-section-label">Social Media Management</span>
+            <NavItem
+              to={ROUTES.SMM_DASHBOARD}
+              icon={<IconDashboard />}
+              label="Analytics Dashboard"
+              onClick={closeOnMobile}
+            />
+            <NavItem
+              to={ROUTES.SMM_APPROVALS}
+              icon={<IconVerify />}
+              label="Approvals Queue"
+              onClick={closeOnMobile}
+            />
+            <NavItem
+              to={ROUTES.SMM_CAMPAIGNS}
+              icon={<IconIEPFDashboard />}
+              label="Campaigns & Briefs"
+              onClick={closeOnMobile}
+            />
+          </>
         )}
 
-        {/* IEPF Department Navigation — data entry stays with IEPF staff only;
-            admin keeps the oversight dashboard below, not the entry form. */}
+        {/* Content Creation Navigation */}
+        {showCreator && (
+          <>
+            <span className="mis-sidebar-section-label">Content Creation</span>
+            <NavItem
+              to={ROUTES.CREATOR_DASHBOARD}
+              icon={<IconDashboard />}
+              label="Creator Dashboard"
+              onClick={closeOnMobile}
+            />
+            <NavItem
+              to={ROUTES.CREATOR_PLANNER}
+              icon={<IconDataEntry />}
+              label="Content Planner"
+              onClick={closeOnMobile}
+            />
+            <NavItem
+              to={ROUTES.CREATOR_CALENDAR}
+              icon={<IconTask />}
+              label="Schedule Calendar"
+              onClick={closeOnMobile}
+            />
+            <NavItem
+              to={ROUTES.CREATOR_ASSETS}
+              icon={<IconIEPFEntry />}
+              label="Asset Library"
+              onClick={closeOnMobile}
+            />
+          </>
+        )}
+
+        {/* IEPF Department Navigation */}
         {isIEPFUser && (
           <>
             <span className="mis-sidebar-section-label">IEPF Department</span>
             <NavItem
               to={ROUTES.IEPF_DATA_ENTRY}
               icon={<IconIEPFEntry />}
-              label="IEPF Data Entry"
+              label="IEPF Entry"
               onClick={closeOnMobile}
             />
           </>
@@ -381,10 +366,8 @@ const Sidebar: React.FC = () => {
           </>
         )}
 
-        {/* Settlements Department Navigation — data entry stays with
-            Settlements staff only; admin keeps the oversight dashboard below,
-            not the entry form. */}
-        {user?.department_name?.toUpperCase() === 'SETTLEMENTS' && (
+        {/* Settlements Department Navigation */}
+        {isSettlementsUser && (
           <>
             <span className="mis-sidebar-section-label">Settlements Department</span>
             <NavItem
@@ -396,9 +379,9 @@ const Sidebar: React.FC = () => {
           </>
         )}
 
-        {(isAdmin || ['ceo', 'managing_director', 'director', 'executive'].includes(user?.role || '') || (user?.department_name?.toUpperCase() === 'SETTLEMENTS' && (isHOD || isEmployee))) && (
+        {showSettlementsDashboard && (
           <>
-            {user?.department_name?.toUpperCase() !== 'SETTLEMENTS' && <span className="mis-sidebar-section-label">Settlements Department</span>}
+            {!isSettlementsUser && <span className="mis-sidebar-section-label">Settlements Department</span>}
             <NavItem
               to={ROUTES.SETTLEMENTS_DASHBOARD}
               icon={<IconIEPFDashboard />}
@@ -408,8 +391,7 @@ const Sidebar: React.FC = () => {
           </>
         )}
 
-        {/* KYC Department Navigation — data entry stays with KYC staff only;
-            admin keeps the oversight dashboard below, not the entry form. */}
+        {/* KYC Department Navigation */}
         {isKYCUser && (
           <>
             <span className="mis-sidebar-section-label">KYC Department</span>
@@ -434,8 +416,7 @@ const Sidebar: React.FC = () => {
           </>
         )}
 
-        {/* DP Department Navigation — data entry stays with DP staff only;
-            admin keeps the oversight dashboard below, not the entry form. */}
+        {/* DP Department Navigation */}
         {isDPUser && (
           <>
             <span className="mis-sidebar-section-label">DP Department</span>
@@ -460,8 +441,7 @@ const Sidebar: React.FC = () => {
           </>
         )}
 
-        {/* IT Department Navigation — data entry stays with IT staff only;
-            admin keeps the oversight dashboard below, not the entry form. */}
+        {/* IT Department Navigation */}
         {isITUser && (
           <>
             <span className="mis-sidebar-section-label">IT Department</span>
@@ -471,8 +451,6 @@ const Sidebar: React.FC = () => {
               label="IT Entry"
               onClick={closeOnMobile}
             />
-            {/* PO Generator is now embedded inline as a tab inside IT Entry,
-                not a separate external redirect. */}
           </>
         )}
 
@@ -488,9 +466,7 @@ const Sidebar: React.FC = () => {
           </>
         )}
 
-        {/* Finance Department Navigation — data entry stays with Finance
-            staff only; admin keeps the oversight dashboard below, not the
-            entry form. */}
+        {/* Finance Department Navigation */}
         {isFinanceUser && (
           <>
             <span className="mis-sidebar-section-label">Finance Department</span>
@@ -515,9 +491,7 @@ const Sidebar: React.FC = () => {
           </>
         )}
 
-        {/* Sales Department Navigation — data entry stays with Sales staff
-            only; admin keeps the oversight dashboard below, not the entry
-            form. */}
+        {/* Sales Department Navigation */}
         {isSalesUser && (
           <>
             <span className="mis-sidebar-section-label">Sales Department</span>
@@ -542,6 +516,7 @@ const Sidebar: React.FC = () => {
           </>
         )}
 
+        {/* Administration Navigation */}
         {showHRDashboard && (
           <>
             <span className="mis-sidebar-section-label">Administration</span>
@@ -554,7 +529,7 @@ const Sidebar: React.FC = () => {
                 onClick={closeOnMobile}
               />
             )}
-            {isHR && (
+            {(isAdmin || isHR) && (
               <NavItem
                 to={ROUTES.HR_DATA_ENTRY}
                 icon={<IconIEPFEntry />}
@@ -562,11 +537,11 @@ const Sidebar: React.FC = () => {
                 onClick={closeOnMobile}
               />
             )}
-            {isHR && (
+            {(isAdmin || isHR) && (
               <NavItem
                 to={ROUTES.HR_USER_MANAGEMENT}
                 icon={<IconUser />}
-                label="Create User"
+                label="User Management"
                 onClick={closeOnMobile}
               />
             )}
