@@ -1,4 +1,3 @@
-const STANDARD_ASSET_TYPES = ['Desktop', 'Laptop', 'Server', 'Printer', 'Network Device', 'Software License'];
 import React, { useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import DashboardLayout from '../../components/layout/DashboardLayout';
@@ -9,6 +8,30 @@ import { validateCsvHeaders, containsSampleSentinel, type CsvHeaderValidation } 
 import { itService } from '../../services/it.service';
 import { orgService } from '../../services/org.service';
 import { authService } from '../../services/auth.service';
+
+const STANDARD_FIELD_OPTIONS: Record<string, Record<string, string[]>> = {
+  'audits': {
+    'audit_type': ['Internal', 'CERT-In Empanelled External', 'SEBI-Mandated Cyber Audit', 'VAPT']
+  },
+  'audit-schedule': {
+    'audit_type': ['System Audit', 'Cybersecurity Audit', 'VAPT']
+  },
+  'diagrams': {
+    'type': ['Network Topology', 'Server Architecture', 'Data Center Layout']
+  },
+  'vendors': {
+    'category': ['Hardware', 'Software', 'Network & ISP', 'Cloud', 'Security', 'AMC Service']
+  },
+  'assets': {
+    'asset_type': ['Desktop', 'Laptop', 'Server', 'Printer', 'Network Device', 'Software License']
+  },
+  'audit-findings': {
+    'domain': ['Governance', 'Infrastructure', 'Data Security', 'Network Security', 'Access Control', 'Incident Management']
+  },
+  'cybersecurity-compliance': {
+    'compliance_domain': ['Governance', 'Infrastructure', 'Data Security', 'Network Security', 'Access Control', 'Incident Management']
+  }
+};
 
 interface SheetHelpConfig {
   why: string;
@@ -389,12 +412,77 @@ const ITDataEntryPage: React.FC = () => {
     }
   };
 
+  const getDynamicFieldOptions = (sheet: string, fieldName: string): string[] => {
+    const base = STANDARD_FIELD_OPTIONS[sheet]?.[fieldName] || [];
+    const optionsSet = new Set<string>(base);
+
+    if (sheetTab === sheet && Array.isArray(entries)) {
+      entries.forEach((row: any) => {
+        const val = row?.[fieldName];
+        if (val && typeof val === 'string' && val.trim() && val !== 'Other') {
+          optionsSet.add(val.trim());
+        }
+      });
+    }
+
+    if (sheet === 'assets' && Array.isArray(assetsList)) {
+      assetsList.forEach((a: any) => {
+        const val = a?.[fieldName];
+        if (val && typeof val === 'string' && val.trim() && val !== 'Other') {
+          optionsSet.add(val.trim());
+        }
+      });
+    }
+
+    if (sheet === 'audits' && Array.isArray(auditsList)) {
+      auditsList.forEach((a: any) => {
+        const val = a?.[fieldName];
+        if (val && typeof val === 'string' && val.trim() && val !== 'Other') {
+          optionsSet.add(val.trim());
+        }
+      });
+    }
+
+    if (sheet === 'vendors' && Array.isArray(vendors)) {
+      vendors.forEach((v: any) => {
+        const val = v?.[fieldName];
+        if (val && typeof val === 'string' && val.trim() && val !== 'Other') {
+          optionsSet.add(val.trim());
+        }
+      });
+    }
+
+    if (sheet === 'diagrams' && Array.isArray(diagramsList)) {
+      diagramsList.forEach((d: any) => {
+        const val = d?.[fieldName];
+        if (val && typeof val === 'string' && val.trim() && val !== 'Other') {
+          optionsSet.add(val.trim());
+        }
+      });
+    }
+
+    return Array.from(optionsSet);
+  };
+
   const validateForm = (): boolean => {
-    // Client-side strict field validations bypassed per request
-    if (sheetTab === 'assets') {
-      const isOther = formData.asset_type_is_other || formData.asset_type_select === 'Other';
-      if (isOther && formData.custom_asset_type) {
-        formData.asset_type = formData.custom_asset_type;
+    const fields = getFormFields();
+    for (const f of fields) {
+      const isOther = formData[`${f.name}_is_other`] || formData[`${f.name}_select`] === 'Other';
+      if (isOther) {
+        const customVal = formData[`custom_${f.name}`];
+        if (f.required && (!customVal || !customVal.trim())) {
+          toast.error(`Please specify a custom ${f.label}.`);
+          return false;
+        }
+        if (customVal && customVal.trim()) {
+          formData[f.name] = customVal.trim();
+        }
+      } else if (f.required) {
+        const val = formData[f.name];
+        if (val === undefined || val === null || (typeof val === 'string' && !val.trim())) {
+          toast.error(`${f.label} is required.`);
+          return false;
+        }
       }
     }
     return true;
@@ -411,9 +499,11 @@ const ITDataEntryPage: React.FC = () => {
     setSubmitting(true);
     try {
       const cleanedData = { ...formData };
-      delete cleanedData.asset_type_select;
-      delete cleanedData.asset_type_is_other;
-      delete cleanedData.custom_asset_type;
+      Object.keys(cleanedData).forEach(k => {
+        if (k.endsWith('_select') || k.endsWith('_is_other') || k.startsWith('custom_')) {
+          delete cleanedData[k];
+        }
+      });
 
       if (editingId) {
         await itService.updateEntry(sheetTab, editingId, cleanedData);
@@ -423,6 +513,10 @@ const ITDataEntryPage: React.FC = () => {
         toast.success('Record created successfully.');
       }
       fetchEntries();
+      if (sheetTab === 'assets') fetchAssets();
+      if (sheetTab === 'audits') fetchAudits();
+      if (sheetTab === 'vendors') fetchVendors();
+      if (sheetTab === 'diagrams') fetchDiagrams();
       setActiveTab('list');
       setFormData({});
       setEditingId(null);
@@ -454,13 +548,21 @@ const ITDataEntryPage: React.FC = () => {
 
   const handleEdit = (record: any) => {
     setEditingId(record.id);
-    const isOther = record.asset_type && !STANDARD_ASSET_TYPES.includes(record.asset_type);
-    setFormData({
-      ...record,
-      asset_type_select: isOther ? 'Other' : record.asset_type,
-      asset_type_is_other: isOther,
-      custom_asset_type: isOther ? record.asset_type : ''
-    });
+    const customConfig = STANDARD_FIELD_OPTIONS[sheetTab];
+    const initialForm: any = { ...record };
+
+    if (customConfig) {
+      Object.keys(customConfig).forEach(fieldName => {
+        const dynamicOpts = getDynamicFieldOptions(sheetTab, fieldName);
+        const val = record[fieldName];
+        const isOther = val && !dynamicOpts.includes(val);
+        initialForm[`${fieldName}_select`] = isOther ? 'Other' : val;
+        initialForm[`${fieldName}_is_other`] = isOther;
+        initialForm[`custom_${fieldName}`] = isOther ? val : '';
+      });
+    }
+
+    setFormData(initialForm);
     setActiveTab('register');
   };
 
@@ -470,6 +572,10 @@ const ITDataEntryPage: React.FC = () => {
       await itService.deleteEntry(sheetTab, id);
       toast.success('Record deleted.');
       fetchEntries();
+      if (sheetTab === 'assets') fetchAssets();
+      if (sheetTab === 'audits') fetchAudits();
+      if (sheetTab === 'vendors') fetchVendors();
+      if (sheetTab === 'diagrams') fetchDiagrams();
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Delete operation failed.');
     }
@@ -614,7 +720,13 @@ const ITDataEntryPage: React.FC = () => {
         toast.error(`All ${failedRows.length} rows failed — see details below.`);
       }
 
-      if (insertedCount > 0) fetchEntries();
+      if (insertedCount > 0) {
+        fetchEntries();
+        if (sheetTab === 'assets') fetchAssets();
+        if (sheetTab === 'audits') fetchAudits();
+        if (sheetTab === 'vendors') fetchVendors();
+        if (sheetTab === 'diagrams') fetchDiagrams();
+      }
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'CSV Import failed.');
     } finally {
@@ -655,7 +767,7 @@ const ITDataEntryPage: React.FC = () => {
       case 'audits':
         return [
           { name: 'audit_name', label: 'Audit Name/Cycle', type: 'text', required: true },
-          { name: 'audit_type', label: 'Audit Type', type: 'select', options: ['Internal', 'CERT-In Empanelled External', 'SEBI-Mandated Cyber Audit', 'VAPT'], required: true },
+          { name: 'audit_type', label: 'Audit Type', type: 'select', options: [...getDynamicFieldOptions('audits', 'audit_type'), 'Other'], required: true },
           { name: 'tor_document_url', label: 'TOR Document File', type: 'file' },
           { name: 'auditor_name', label: 'Auditor Name/Firm', type: 'text', required: true },
           { name: 'scheduled_date', label: 'Scheduled Date', type: 'date', required: true },
@@ -676,7 +788,7 @@ const ITDataEntryPage: React.FC = () => {
           },
           { name: 'finding_id', label: 'Finding ID', type: 'text', required: true },
           { name: 'finding_description', label: 'Finding Description', type: 'textarea', required: true },
-          { name: 'domain', label: 'Compliance Domain', type: 'select', options: ['Governance', 'Infrastructure', 'Data Security', 'Network Security', 'Access Control', 'Incident Management'], required: true },
+          { name: 'domain', label: 'Compliance Domain', type: 'select', options: [...getDynamicFieldOptions('audit-findings', 'domain'), 'Other'], required: true },
           { name: 'severity', label: 'Severity', type: 'select', options: ['Critical', 'High', 'Medium', 'Low'], required: true },
           { name: 'recommended_action', label: 'Recommended Action', type: 'textarea', required: true },
           { name: 'responsible_person', label: 'Responsible Person', type: 'text', required: true },
@@ -688,7 +800,7 @@ const ITDataEntryPage: React.FC = () => {
       case 'vendors':
         return [
           { name: 'vendor_name', label: 'Vendor Name', type: 'text', required: true },
-          { name: 'category', label: 'Category', type: 'select', options: ['Hardware', 'Software', 'Network & ISP', 'Cloud', 'Security', 'AMC Service'], required: true },
+          { name: 'category', label: 'Category', type: 'select', options: [...getDynamicFieldOptions('vendors', 'category'), 'Other'], required: true },
           { name: 'poc_name', label: 'POC Name', type: 'text', required: true },
           { name: 'poc_email', label: 'POC Email', type: 'email', required: true },
           { name: 'poc_phone', label: 'POC Phone', type: 'tel', required: true },
@@ -716,7 +828,7 @@ const ITDataEntryPage: React.FC = () => {
       case 'assets':
         return [
           { name: 'asset_id', label: 'Asset Barcode / ID', type: 'text', required: true },
-          { name: 'asset_type', label: 'Asset Type', type: 'select', options: ['Desktop', 'Laptop', 'Server', 'Printer', 'Network Device', 'Software License', 'Other'], required: true },
+          { name: 'asset_type', label: 'Asset Type', type: 'select', options: [...getDynamicFieldOptions('assets', 'asset_type'), 'Other'], required: true },
           { name: 'make_model', label: 'Make / Model', type: 'text', required: true },
           { name: 'serial_number', label: 'Serial Number', type: 'text', required: true },
           { name: 'purchase_date', label: 'Purchase Date', type: 'date', required: true },
@@ -741,14 +853,14 @@ const ITDataEntryPage: React.FC = () => {
       case 'diagrams':
         return [
           { name: 'diagram_name', label: 'Diagram Name', type: 'text', required: true },
-          { name: 'type', label: 'Topology Type', type: 'select', options: ['Network Topology', 'Server Architecture', 'Data Center Layout'], required: true },
+          { name: 'type', label: 'Topology Type', type: 'select', options: [...getDynamicFieldOptions('diagrams', 'type'), 'Other'], required: true },
           { name: 'version', label: 'Version Number', type: 'text', required: true },
           { name: 'file_url', label: 'Upload Diagram File', type: 'file', required: true },
           { name: 'description', label: 'Revision Notes', type: 'textarea' }
         ];
       case 'cybersecurity-compliance':
         return [
-          { name: 'compliance_domain', label: 'Domain', type: 'select', options: ['Governance', 'Infrastructure', 'Data Security', 'Network Security', 'Access Control', 'Incident Management'], required: true },
+          { name: 'compliance_domain', label: 'Domain', type: 'select', options: [...getDynamicFieldOptions('cybersecurity-compliance', 'compliance_domain'), 'Other'], required: true },
           { name: 'control_item', label: 'Control Requirement Description', type: 'textarea', required: true },
           { name: 'framework_reference', label: 'CSCRF / ISO Reference Clause', type: 'text', required: true },
           { name: 'last_assessed_date', label: 'Last Assessed Date', type: 'date' },
@@ -792,7 +904,7 @@ const ITDataEntryPage: React.FC = () => {
         ];
       case 'audit-schedule':
         return [
-          { name: 'audit_type', label: 'Audit Type', type: 'select', options: ['System Audit', 'Cybersecurity Audit', 'VAPT'], required: true },
+          { name: 'audit_type', label: 'Audit Type', type: 'select', options: [...getDynamicFieldOptions('audit-schedule', 'audit_type'), 'Other'], required: true },
           { name: 'recurrence_months', label: 'Recurrence (Every X Months)', type: 'number', required: true },
           { name: 'last_filing_date', label: 'Last Filing Date', type: 'date', required: true },
           { name: 'auditor_name', label: 'Auditor / Agency Name', type: 'text', required: true },
@@ -1322,10 +1434,23 @@ const ITDataEntryPage: React.FC = () => {
                 {getFormFields().map(f => {
                   if (f.type === 'select') {
                     const opts = f.options || [];
+                    const isCustomCapable = opts.includes('Other') || Boolean(STANDARD_FIELD_OPTIONS[sheetTab] && STANDARD_FIELD_OPTIONS[sheetTab][f.name]);
 
-                    if (f.name === 'asset_type') {
-                      const isOther = formData.asset_type_is_other || (formData.asset_type && !STANDARD_ASSET_TYPES.includes(formData.asset_type)) || formData.asset_type_select === 'Other';
-                      const selectedOption = isOther ? 'Other' : (formData.asset_type_select || formData.asset_type || '');
+                    if (isCustomCapable) {
+                      const dynamicTypes = getDynamicFieldOptions(sheetTab, f.name);
+                      const isOtherSelected = formData[`${f.name}_is_other`] || formData[`${f.name}_select`] === 'Other';
+                      const currentVal = formData[f.name];
+
+                      let selectedOption = '';
+                      if (formData[`${f.name}_select`] !== undefined) {
+                        selectedOption = formData[`${f.name}_select`];
+                      } else if (isOtherSelected) {
+                        selectedOption = 'Other';
+                      } else if (currentVal) {
+                        selectedOption = dynamicTypes.includes(currentVal) ? currentVal : 'Other';
+                      }
+
+                      const showOtherInput = selectedOption === 'Other' || isOtherSelected;
 
                       return (
                         <div key={f.name} className="flex flex-col gap-2">
@@ -1341,17 +1466,17 @@ const ITDataEntryPage: React.FC = () => {
                                 if (val === 'Other') {
                                   setFormData({
                                     ...formData,
-                                    asset_type_select: 'Other',
-                                    asset_type_is_other: true,
-                                    asset_type: formData.custom_asset_type || ''
+                                    [`${f.name}_select`]: 'Other',
+                                    [`${f.name}_is_other`]: true,
+                                    [f.name]: formData[`custom_${f.name}`] || ''
                                   });
                                 } else {
                                   setFormData({
                                     ...formData,
-                                    asset_type_select: val,
-                                    asset_type_is_other: false,
-                                    asset_type: val,
-                                    custom_asset_type: ''
+                                    [`${f.name}_select`]: val,
+                                    [`${f.name}_is_other`]: false,
+                                    [f.name]: val,
+                                    [`custom_${f.name}`]: ''
                                   });
                                 }
                               }}
@@ -1368,22 +1493,22 @@ const ITDataEntryPage: React.FC = () => {
                             </select>
                           </div>
 
-                          {isOther && (
+                          {showOtherInput && (
                             <div className="flex flex-col gap-1.5 p-3 rounded-lg border border-teal-500/20 bg-teal-500/5 animate-fadeIn">
                               <label className="text-xs font-bold uppercase tracking-wider text-teal-400">
-                                Specify Custom Asset Type <span className="text-red-500">*</span>
+                                Specify Custom {f.label} <span className="text-red-500">*</span>
                               </label>
                               <input
                                 type="text"
                                 className="mis-input w-full"
-                                placeholder="e.g. UPS, Biometric Scanner, CCTV, Projector, Tablet..."
-                                value={formData.custom_asset_type !== undefined ? formData.custom_asset_type : (STANDARD_ASSET_TYPES.includes(formData.asset_type) ? '' : (formData.asset_type || ''))}
+                                placeholder={`e.g. Enter custom ${f.label.toLowerCase()}...`}
+                                value={formData[`custom_${f.name}`] !== undefined ? formData[`custom_${f.name}`] : (dynamicTypes.includes(formData[f.name]) ? '' : (formData[f.name] || ''))}
                                 onChange={e => {
                                   const customVal = e.target.value;
                                   setFormData({
                                     ...formData,
-                                    custom_asset_type: customVal,
-                                    asset_type: customVal
+                                    [`custom_${f.name}`]: customVal,
+                                    [f.name]: customVal
                                   });
                                 }}
                                 required
@@ -1668,8 +1793,7 @@ const ITDataEntryPage: React.FC = () => {
             <div className="flex justify-end gap-3">
               <button
                 type="button"
-                className="px-4 py-2 border rounded-lg text-xs font-semibold hover:bg-gray-800 transition-colors"
-                style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}
+                className="px-4 py-2 border border-gray-700 rounded-lg text-xs font-semibold text-gray-300 hover:text-white hover:bg-gray-800 hover:border-gray-600 transition-colors"
                 onClick={() => setConfirmSaveModalOpen(false)}
                 disabled={submitting}
               >
@@ -1785,10 +1909,10 @@ const ITDataEntryPage: React.FC = () => {
 
             </div>
 
-            <div className="flex justify-end space-x-3 pt-6 mt-6 border-t border-gray-850">
+            <div className="flex justify-end space-x-3 pt-6 mt-6 border-t border-gray-800">
               <button
-                className="px-4 py-2 border rounded-lg text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-                style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}
+                type="button"
+                className="px-4 py-2 border border-gray-700 rounded-lg text-xs font-semibold text-gray-300 hover:text-white hover:bg-gray-800 hover:border-gray-600 transition-colors"
                 onClick={() => {
                   setCsvModalOpen(false);
 
