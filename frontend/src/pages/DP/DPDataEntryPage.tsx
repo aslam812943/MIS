@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import ViewDetailsModal from '../../components/common/ViewDetailsModal';
+import ConfirmModal from '../../components/common/ConfirmModal';
+import { INITIAL_CONFIRM_STATE, type ConfirmDialogState } from '../../types/confirm.types';
 import CsvImportGuide from '../../components/common/CsvImportGuide';
 import { validateCsvHeaders, containsSampleSentinel, type CsvHeaderValidation } from '../../utils/csvBulkImportHelpers';
 import { dpService } from '../../services/dp.service';
@@ -244,6 +246,7 @@ const DPDataEntryPage: React.FC = () => {
   const [clientDropdownOpen, setClientDropdownOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [viewingRecord, setViewingRecord] = useState<any>(null);
+  const [confirmModal, setConfirmModal] = useState<ConfirmDialogState>(INITIAL_CONFIRM_STATE);
   const [formData, setFormData] = useState<any>({});
 
   // CSV Import state
@@ -438,16 +441,28 @@ const DPDataEntryPage: React.FC = () => {
     setActiveTab('register');
   };
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this record?')) return;
-    try {
-      await dpService.deleteEntry(sheetTab, id);
-      toast.success('Record deleted.');
-      fetchEntries();
-    } catch (err) {
-      console.error(err);
-      toast.error('Failed to delete record.');
-    }
+  const handleDelete = (id: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete DP Record',
+      message: 'Are you sure you want to delete this record? This action cannot be undone.',
+      confirmLabel: 'Delete Record',
+      cancelLabel: 'Cancel',
+      isDanger: true,
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, loading: true }));
+        try {
+          await dpService.deleteEntry(sheetTab, id);
+          toast.success('Record deleted.');
+          fetchEntries();
+          setConfirmModal(INITIAL_CONFIRM_STATE);
+        } catch (err) {
+          console.error(err);
+          toast.error('Failed to delete record.');
+          setConfirmModal(prev => ({ ...prev, loading: false }));
+        }
+      }
+    });
   };
 
   // Row Selection logic
@@ -1262,7 +1277,19 @@ const DPDataEntryPage: React.FC = () => {
           </div>
         )}
 
-        <ViewDetailsModal record={viewingRecord} onClose={() => setViewingRecord(null)} title="DP Record Details" />
+        <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        confirmLabel={confirmModal.confirmLabel}
+        cancelLabel={confirmModal.cancelLabel}
+        isDanger={confirmModal.isDanger}
+        loading={confirmModal.loading}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal(INITIAL_CONFIRM_STATE)}
+      />
+
+      <ViewDetailsModal record={viewingRecord} onClose={() => setViewingRecord(null)} title="DP Record Details" />
       </div>
     </DashboardLayout>
   );

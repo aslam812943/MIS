@@ -1,13 +1,17 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import CountdownBadge from '../../components/common/CountdownBadge';
 import ViewDetailsModal from '../../components/common/ViewDetailsModal';
+import ConfirmModal from '../../components/common/ConfirmModal';
+import { INITIAL_CONFIRM_STATE, type ConfirmDialogState } from '../../types/confirm.types';
 import CsvImportGuide from '../../components/common/CsvImportGuide';
 import { validateCsvHeaders, containsSampleSentinel, type CsvHeaderValidation } from '../../utils/csvBulkImportHelpers';
 import { itService } from '../../services/it.service';
 import { orgService } from '../../services/org.service';
 import { authService } from '../../services/auth.service';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 
 const STANDARD_FIELD_OPTIONS: Record<string, Record<string, string[]>> = {
   'audits': {
@@ -256,8 +260,1383 @@ const SHEET_HELP: Record<string, SheetHelpConfig> = {
       { label: 'PO Date', note: 'The date printed on the PO.' },
       { label: 'Status', note: 'Raised = generated and sent. Approved = vendor/internal sign-off done. Fulfilled = goods/services received. Cancelled = called off.' },
     ],
-    remember: 'Log the PO here right after generating it — this sheet is the only place PO data exists for reporting, since the generator tool itself doesn\'t store anything.',
+    remember: 'Log the PO here with its PO number immediately after generating it, so there is a permanent audit trail in MIS.',
   },
+};
+
+export interface POItem {
+  id: string;
+  description: string;
+  hsnSac: string;
+  qty: number;
+  unit: string;
+  rate: number;
+  gstRate: number;
+}
+
+function numberToWordsIndian(num: number): string {
+  if (isNaN(num) || num === 0) return 'Rupees Zero Only';
+  const a = [
+    '', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten',
+    'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'
+  ];
+  const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+  const inWords = (n: number): string => {
+    let str = '';
+    if (n > 99) {
+      str += a[Math.floor(n / 100)] + ' Hundred ';
+      n %= 100;
+    }
+    if (n > 19) {
+      str += b[Math.floor(n / 10)] + ' ' + a[n % 10] + ' ';
+    } else if (n > 0) {
+      str += a[n] + ' ';
+    }
+    return str.trim();
+  };
+
+  const whole = Math.floor(Math.abs(num));
+  const fraction = Math.round((Math.abs(num) - whole) * 100);
+
+  const crore = Math.floor(whole / 10000000);
+  const lakh = Math.floor((whole % 10000000) / 100000);
+  const thousand = Math.floor((whole % 100000) / 1000);
+  const hundred = whole % 1000;
+
+  let res = '';
+  if (crore > 0) res += inWords(crore) + ' Crore ';
+  if (lakh > 0) res += inWords(lakh) + ' Lakh ';
+  if (thousand > 0) res += inWords(thousand) + ' Thousand ';
+  if (hundred > 0) res += inWords(hundred) + ' ';
+
+  res = res.trim();
+  if (!res) res = 'Zero';
+
+  let out = 'Rupees ' + res;
+  if (fraction > 0) {
+    out += ' and ' + inWords(fraction) + ' Paise';
+  }
+  out += ' Only';
+  return out;
+}
+
+const POGeneratorComponent: React.FC<{
+  vendors?: Array<{ id: string; vendor_name: string; [key: string]: any }>;
+  onSaveToMIS?: (poRecord: {
+    po_number: string;
+    vendor_id?: string;
+    vendor_name?: string;
+    amount: number;
+    po_date: string;
+    item_description: string;
+    status: string;
+    terms?: string;
+  }) => Promise<void>;
+  onViewList?: () => void;
+}> = ({
+  vendors = [],
+  onSaveToMIS,
+  onViewList
+}) => {
+  const todayStr = new Date().toISOString().split('T')[0];
+  const [editorTab, setEditorTab] = useState<'details' | 'items' | 'terms' | 'settings'>('details');
+
+  // Metadata
+  const [poNumber, setPoNumber] = useState<string>(`SSL/IT/${new Date().getFullYear()}-${(new Date().getFullYear() + 1).toString().slice(-2)}/${Math.floor(100 + Math.random() * 900)}`);
+  const [poDate, setPoDate] = useState<string>(todayStr);
+  const [quotationRef, setQuotationRef] = useState<string>('QTN-2026-09');
+  const [quotationDate, setQuotationDate] = useState<string>(todayStr);
+  const [paymentTerms, setPaymentTerms] = useState<string>('30 Days after Delivery & Invoice');
+  const [deliveryTimeline, setDeliveryTimeline] = useState<string>('Within 7-10 Business Days');
+  const [subject, setSubject] = useState<string>('Purchase Order for IT Infrastructure Hardware & Support Services');
+
+  // Company / Buyer Info
+  const [companyName] = useState<string>('SHAREWEALTH SECURITIES LTD.');
+  const [companyAddress] = useState<string>('Sharewealth House, 4th Floor, ST Stand Road, Thrissur - 680001, Kerala');
+  const [companyGstin] = useState<string>('32AABCS8800M1ZF');
+  const [companyPan] = useState<string>('AABCS8800M');
+  const [companyCin] = useState<string>('U67120KL2005PLC018045');
+  const [companyContact] = useState<string>('Email: it@sharewealthindia.com | Phone: +91 487 242 0400');
+
+  // Vendor / Supplier Info
+  const [selectedVendorId, setSelectedVendorId] = useState<string>('');
+  const [vendorName, setVendorName] = useState<string>('Synapsewave Innovations Private Limited');
+  const [vendorAddress, setVendorAddress] = useState<string>('Door No. 12/450, Cyber Valley, InfoPark, Kochi - 682042, Kerala');
+  const [vendorGstin, setVendorGstin] = useState<string>('32AAAAA0000A1Z5');
+  const [vendorState, setVendorState] = useState<string>('Kerala (32)');
+  const [vendorContact, setVendorContact] = useState<string>('contact@synapsewave.in | +91 98470 12345');
+
+  // Consignee / Delivery (Ship To) Info
+  const [shipToName, setShipToName] = useState<string>('Sharewealth Securities Ltd. (IT Dept)');
+  const [shipToAddress, setShipToAddress] = useState<string>('Sharewealth House, Main Server Room, Thrissur - 680001, Kerala');
+  const [shipToContact, setShipToContact] = useState<string>('Attn: IT Infrastructure Team | Phone: +91 487 242 0400');
+
+  // Settings
+  const [gstType, setGstType] = useState<'intra' | 'inter'>('intra');
+  const [letterheadMarginMm, setLetterheadMarginMm] = useState<number>(0);
+  const [notes, setNotes] = useState<string>(
+    '1. Invoice must quote this Purchase Order number and include valid GSTIN.\n2. Goods must be delivered in original sealed packaging with manufacturer warranty certificates.\n3. Payment will be released via NEFT/RTGS after physical verification, installation, and inspection.\n4. All disputes are subject to Thrissur jurisdiction only.'
+  );
+
+  // Signatory
+  const [signatoryName, setSignatoryName] = useState<string>('Authorized Signatory');
+  const [signatoryDesignation, setSignatoryDesignation] = useState<string>('Head of Information Technology');
+  const [signatureImage, setSignatureImage] = useState<string | null>(null);
+
+  // Line Items
+  const [items, setItems] = useState<POItem[]>([
+    {
+      id: '1',
+      description: 'APC Smart-UPS 3kVA On-Line 230V with Rail Kit & SNMP Network Card (3 Yrs Warranty)',
+      hsnSac: '85044090',
+      qty: 1,
+      unit: 'Nos',
+      rate: 45000,
+      gstRate: 18
+    },
+    {
+      id: '2',
+      description: 'Cisco Catalyst 24-Port Gigabit Managed Layer-3 Switch (WS-C2960X-24TD-L)',
+      hsnSac: '85176290',
+      qty: 2,
+      unit: 'Nos',
+      rate: 32500,
+      gstRate: 18
+    }
+  ]);
+
+  const [generatingPdf, setGeneratingPdf] = useState(false);
+  const [poConfirmModal, setPoConfirmModal] = useState<ConfirmDialogState>(INITIAL_CONFIRM_STATE);
+  const [savingToMis, setSavingToMis] = useState(false);
+  const sheetRef = useRef<HTMLDivElement>(null);
+
+  const handleVendorSelect = (vId: string) => {
+    setSelectedVendorId(vId);
+    if (!vId) return;
+    const found = vendors.find(v => String(v.id) === String(vId));
+    if (found) {
+      setVendorName(found.vendor_name || '');
+      const addr = [found.address, found.branch, found.city, found.state].filter(Boolean).join(', ');
+      if (addr) setVendorAddress(addr);
+      if (found.gstin || found.gst_number) setVendorGstin(found.gstin || found.gst_number);
+      if (found.state) setVendorState(found.state);
+      const contact = [found.contact_person, found.phone, found.email].filter(Boolean).join(' | ');
+      if (contact) setVendorContact(contact);
+    }
+  };
+
+  const handleAddItem = () => {
+    const newItem: POItem = {
+      id: Date.now().toString(),
+      description: '',
+      hsnSac: '',
+      qty: 1,
+      unit: 'Nos',
+      rate: 0,
+      gstRate: 18
+    };
+    setItems([...items, newItem]);
+  };
+
+  const handleUpdateItem = (id: string, field: keyof POItem, value: any) => {
+    setItems(items.map(item => (item.id === id ? { ...item, [field]: value } : item)));
+  };
+
+  const handleRemoveItem = (id: string) => {
+    if (items.length <= 1) {
+      toast.error('Purchase Order must have at least one line item.');
+      return;
+    }
+    setItems(items.filter(item => item.id !== id));
+  };
+
+  const calculateTotals = () => {
+    let subtotal = 0;
+    let totalCgst = 0;
+    let totalSgst = 0;
+    let totalIgst = 0;
+
+    items.forEach(item => {
+      const taxable = (Number(item.qty) || 0) * (Number(item.rate) || 0);
+      subtotal += taxable;
+      const gst = (taxable * (Number(item.gstRate) || 0)) / 100;
+      if (gstType === 'intra') {
+        totalCgst += gst / 2;
+        totalSgst += gst / 2;
+      } else {
+        totalIgst += gst;
+      }
+    });
+
+    const totalTax = gstType === 'intra' ? (totalCgst + totalSgst) : totalIgst;
+    const rawGrandTotal = subtotal + totalTax;
+    const roundedGrandTotal = Math.round(rawGrandTotal);
+    const roundOff = Number((roundedGrandTotal - rawGrandTotal).toFixed(2));
+
+    return {
+      subtotal,
+      totalCgst,
+      totalSgst,
+      totalIgst,
+      totalTax,
+      roundOff,
+      grandTotal: roundedGrandTotal
+    };
+  };
+
+  const totals = calculateTotals();
+
+  const handleSignatureUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        toast.error('Signature image should be less than 2MB.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => setSignatureImage(reader.result as string);
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleNewPO = () => {
+    setPoConfirmModal({
+      isOpen: true,
+      title: 'Reset Purchase Order',
+      message: 'Are you sure you want to reset this Purchase Order and create a new one? Any unsaved changes will be lost.',
+      confirmLabel: 'Reset PO',
+      cancelLabel: 'Cancel',
+      isDanger: false,
+      onConfirm: () => {
+        setPoConfirmModal(INITIAL_CONFIRM_STATE);
+        setPoNumber(`SSL/IT/${new Date().getFullYear()}-${(new Date().getFullYear() + 1).toString().slice(-2)}/${Math.floor(100 + Math.random() * 900)}`);
+        setPoDate(new Date().toISOString().split('T')[0]);
+        setQuotationRef('');
+        setQuotationDate('');
+        setSelectedVendorId('');
+        setVendorName('');
+        setVendorAddress('');
+        setVendorGstin('');
+        setVendorContact('');
+        setItems([{
+          id: Date.now().toString(),
+          description: '',
+          hsnSac: '',
+          qty: 1,
+          unit: 'Nos',
+          rate: 0,
+          gstRate: 18
+        }]);
+        setSignatureImage(null);
+        toast.success('Ready for new Purchase Order.');
+      }
+    });
+  };
+
+  // --- PERFECT A4 PDF GENERATION (Semantic Table capture, Zero input artifacts) ---
+  const handleGeneratePdf = async () => {
+    if (!sheetRef.current) {
+      toast.error('PO Document element not found.');
+      return;
+    }
+
+    setGeneratingPdf(true);
+    const loadingToast = toast.loading('Generating high-resolution aligned PDF...');
+
+    try {
+      await new Promise(r => setTimeout(r, 150));
+
+      const element = sheetRef.current;
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+        scrollX: 0,
+        scrollY: 0,
+        windowWidth: 900,
+        onclone: (clonedDoc) => {
+          // Remove external stylesheets containing Tailwind v4 oklch rules
+          const existingStyles = clonedDoc.querySelectorAll('style, link[rel="stylesheet"]');
+          existingStyles.forEach(s => s.remove());
+
+          // Inject standalone, print-perfect CSS
+          const customStyle = clonedDoc.createElement('style');
+          customStyle.textContent = `
+            * {
+              box-sizing: border-box !important;
+              font-family: Arial, Helvetica, sans-serif !important;
+            }
+            body {
+              background-color: #ffffff !important;
+              color: #0f172a !important;
+              margin: 0 !important;
+              padding: 0 !important;
+            }
+            table {
+              border-collapse: collapse !important;
+            }
+            th, td {
+              box-sizing: border-box !important;
+            }
+            .no-print {
+              display: none !important;
+            }
+          `;
+          clonedDoc.head.appendChild(customStyle);
+        }
+      });
+
+      if (canvas.width === 0 || canvas.height === 0) {
+        throw new Error('Canvas render failed: blank dimensions.');
+      }
+
+      const imgData = canvas.toDataURL('image/png', 1.0);
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+        compress: true
+      });
+
+      const pageWidth = 210;
+      const pageHeight = 297;
+      const margin = 8;
+      const printWidth = pageWidth - (margin * 2);
+      const printHeight = (canvas.height * printWidth) / canvas.width;
+
+      if (printHeight <= (pageHeight - (margin * 2))) {
+        pdf.addImage(imgData, 'PNG', margin, margin, printWidth, printHeight);
+      } else {
+        let heightLeft = printHeight;
+        let position = margin;
+
+        pdf.addImage(imgData, 'PNG', margin, position, printWidth, printHeight);
+        heightLeft -= (pageHeight - (margin * 2));
+
+        while (heightLeft > 0) {
+          position = heightLeft - printHeight + margin;
+          pdf.addPage();
+          pdf.addImage(imgData, 'PNG', margin, position, printWidth, printHeight);
+          heightLeft -= (pageHeight - (margin * 2));
+        }
+      }
+
+      const cleanFilename = (poNumber || 'Purchase_Order').replace(/[^a-zA-Z0-9_-]/g, '_') + '.pdf';
+      pdf.save(cleanFilename);
+
+      toast.dismiss(loadingToast);
+      toast.success('PDF downloaded successfully!');
+    } catch (err: any) {
+      console.error('PDF Generation Error:', err);
+      toast.dismiss(loadingToast);
+      toast.error('Failed to generate PDF: ' + (err.message || 'Unknown error'));
+    } finally {
+      setGeneratingPdf(false);
+    }
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const handleExportWord = () => {
+    if (!sheetRef.current) return;
+    const content = sheetRef.current.innerHTML;
+    const fullHtml = `
+      <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+      <head><title>${poNumber}</title><meta charset='utf-8'><style>
+        body { font-family: Arial, sans-serif; font-size: 10pt; color: #111; }
+        table { border-collapse: collapse; width: 100%; margin: 8px 0; }
+        th, td { border: 1px solid #999; padding: 6px 8px; font-size: 9.5pt; }
+        th { background-color: #f2f2f2; font-weight: bold; }
+      </style></head>
+      <body>${content}</body></html>
+    `;
+    const blob = new Blob(['\ufeff', fullHtml], { type: 'application/msword' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${(poNumber || 'Purchase_Order').replace(/[^a-zA-Z0-9_-]/g, '_')}.doc`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    toast.success('Word document downloaded.');
+  };
+
+  const handleSaveRecord = async () => {
+    if (!onSaveToMIS) {
+      toast.error('Save handler not connected.');
+      return;
+    }
+    if (!vendorName && !selectedVendorId) {
+      toast.error('Please enter or select a Vendor Name.');
+      return;
+    }
+    if (totals.grandTotal <= 0) {
+      toast.error('Total Amount must be greater than 0.');
+      return;
+    }
+
+    setSavingToMis(true);
+    try {
+      const summaryItems = items.map(i => `${i.description} (Qty: ${i.qty})`).join('; ');
+      await onSaveToMIS({
+        po_number: poNumber,
+        vendor_id: selectedVendorId || undefined,
+        vendor_name: vendorName,
+        amount: totals.grandTotal,
+        po_date: poDate,
+        item_description: summaryItems || subject,
+        status: 'Raised',
+        terms: notes
+      });
+      toast.success(`Purchase Order ${poNumber} logged to MIS database!`);
+    } catch (err: any) {
+      console.error('Error saving PO to MIS:', err);
+      toast.error(err?.response?.data?.message || 'Failed to save PO to database.');
+    } finally {
+      setSavingToMis(false);
+    }
+  };
+
+  return (
+    <div className="po-generator-container space-y-6">
+      {/* ════════════════════════════════════════════════════════════
+          PRINT CSS (Only prints pristine PO sheet with deep bold contrast)
+          ════════════════════════════════════════════════════════════ */}
+      <style>{`
+        @media print {
+          body * {
+            visibility: hidden !important;
+          }
+          #po-document-sheet, #po-document-sheet * {
+            visibility: visible !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          #po-document-sheet {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 6mm !important;
+            box-shadow: none !important;
+            border: none !important;
+            color: #000000 !important;
+          }
+          .no-print {
+            display: none !important;
+          }
+        }
+      `}</style>
+
+      {/* ════════════════════════════════════════════════════════════
+          TOP ACTION TOOLBAR (No print)
+          ════════════════════════════════════════════════════════════ */}
+      <div className="no-print mis-card p-5">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-base font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+              <span>🧾</span> Purchase Order Maker & PDF Generator
+            </h2>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+              Edit your PO details in the builder below. The live sheet preview updates instantly and exports to high-resolution, perfectly aligned A4 PDF.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={handleNewPO}
+              className="mis-btn mis-btn-ghost mis-btn-sm"
+            >
+              ➕ New PO
+            </button>
+            <button
+              type="button"
+              onClick={handlePrint}
+              className="mis-btn mis-btn-ghost mis-btn-sm"
+            >
+              🖨️ Print
+            </button>
+            <button
+              type="button"
+              onClick={handleExportWord}
+              className="mis-btn mis-btn-ghost mis-btn-sm"
+            >
+              📄 Word (.doc)
+            </button>
+            <button
+              type="button"
+              onClick={handleGeneratePdf}
+              disabled={generatingPdf}
+              className="mis-btn mis-btn-sm font-bold text-white shadow-md transition-all hover:opacity-95 disabled:opacity-50 flex items-center gap-1.5"
+              style={{ background: '#059669' }}
+            >
+              {generatingPdf ? '⏳ Generating...' : '📥 Download PDF'}
+            </button>
+            {onSaveToMIS && (
+              <button
+                type="button"
+                onClick={handleSaveRecord}
+                disabled={savingToMis}
+                className="mis-btn mis-btn-primary mis-btn-sm font-bold flex items-center gap-1.5"
+              >
+                {savingToMis ? 'Saving...' : '💾 Save to MIS'}
+              </button>
+            )}
+            {onViewList && (
+              <button
+                type="button"
+                onClick={onViewList}
+                className="mis-btn mis-btn-ghost mis-btn-sm ml-auto lg:ml-2"
+              >
+                📋 View Orders
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* ════════════════════════════════════════════════════════════
+            INTERACTIVE PO BUILDER TABS
+            ════════════════════════════════════════════════════════════ */}
+        <div className="mt-4 pt-4 border-t" style={{ borderColor: 'var(--border)' }}>
+          {/* Sub tabs */}
+          <div className="mis-tabs mb-4">
+            <button
+              type="button"
+              onClick={() => setEditorTab('details')}
+              className={`mis-tab ${editorTab === 'details' ? 'active' : ''}`}
+            >
+              📝 1. PO & Vendor Details
+            </button>
+            <button
+              type="button"
+              onClick={() => setEditorTab('items')}
+              className={`mis-tab ${editorTab === 'items' ? 'active' : ''}`}
+            >
+              📦 2. Line Items ({items.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setEditorTab('terms')}
+              className={`mis-tab ${editorTab === 'terms' ? 'active' : ''}`}
+            >
+              ✍️ 3. Terms & Signature
+            </button>
+            <button
+              type="button"
+              onClick={() => setEditorTab('settings')}
+              className={`mis-tab ${editorTab === 'settings' ? 'active' : ''}`}
+            >
+              ⚙️ 4. GST & Letterhead
+            </button>
+          </div>
+
+          {/* TAB 1: PO & VENDOR DETAILS */}
+          {editorTab === 'details' && (
+            <div
+              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3.5 p-4 rounded-xl border"
+              style={{ background: 'var(--panel-inset-soft)', borderColor: 'var(--border)' }}
+            >
+              <div>
+                <label className="text-[11px] font-bold block mb-1" style={{ color: 'var(--text-secondary)' }}>PO Number *</label>
+                <input
+                  type="text"
+                  value={poNumber}
+                  onChange={e => setPoNumber(e.target.value)}
+                  className="mis-input text-xs w-full font-mono font-bold"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-bold block mb-1" style={{ color: 'var(--text-secondary)' }}>PO Date *</label>
+                <input
+                  type="date"
+                  value={poDate}
+                  onChange={e => setPoDate(e.target.value)}
+                  className="mis-input text-xs w-full"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-bold block mb-1" style={{ color: 'var(--text-secondary)' }}>Quotation Ref</label>
+                <input
+                  type="text"
+                  placeholder="e.g. QTN-2026-09"
+                  value={quotationRef}
+                  onChange={e => setQuotationRef(e.target.value)}
+                  className="mis-input text-xs w-full"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-bold block mb-1" style={{ color: 'var(--text-secondary)' }}>Quotation Date</label>
+                <input
+                  type="date"
+                  value={quotationDate}
+                  onChange={e => setQuotationDate(e.target.value)}
+                  className="mis-input text-xs w-full"
+                />
+              </div>
+
+              {/* Vendor Section */}
+              <div className="md:col-span-2 pt-3 border-t space-y-2.5" style={{ borderColor: 'var(--border)' }}>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold" style={{ color: 'var(--text-accent)' }}>🏢 Vendor / Supplier Information</span>
+                  <select
+                    value={selectedVendorId}
+                    onChange={e => handleVendorSelect(e.target.value)}
+                    className="mis-select text-xs py-1 max-w-[200px]"
+                  >
+                    <option value="">-- Quick Autofill --</option>
+                    {vendors.map(v => (
+                      <option key={v.id} value={v.id}>{v.vendor_name}</option>
+                    ))}
+                  </select>
+                </div>
+                <input
+                  type="text"
+                  placeholder="Vendor Name *"
+                  value={vendorName}
+                  onChange={e => setVendorName(e.target.value)}
+                  className="mis-input text-xs w-full font-bold"
+                />
+                <textarea
+                  rows={2}
+                  placeholder="Vendor Street Address, City, PIN"
+                  value={vendorAddress}
+                  onChange={e => setVendorAddress(e.target.value)}
+                  className="mis-input text-xs w-full"
+                />
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="text"
+                    placeholder="Vendor GSTIN (e.g. 32AAAAA0000A1Z5)"
+                    value={vendorGstin}
+                    onChange={e => setVendorGstin(e.target.value)}
+                    className="mis-input text-xs font-mono"
+                  />
+                  <input
+                    type="text"
+                    placeholder="State & Code (e.g. Kerala (32))"
+                    value={vendorState}
+                    onChange={e => setVendorState(e.target.value)}
+                    className="mis-input text-xs"
+                  />
+                </div>
+              </div>
+
+              {/* Delivery Section */}
+              <div className="md:col-span-2 pt-3 border-t space-y-2.5" style={{ borderColor: 'var(--border)' }}>
+                <span className="text-xs font-bold block" style={{ color: 'var(--text-accent)' }}>🚚 Delivery / Consignee Information</span>
+                <input
+                  type="text"
+                  placeholder="Consignee Name"
+                  value={shipToName}
+                  onChange={e => setShipToName(e.target.value)}
+                  className="mis-input text-xs w-full font-bold"
+                />
+                <textarea
+                  rows={2}
+                  placeholder="Delivery Address"
+                  value={shipToAddress}
+                  onChange={e => setShipToAddress(e.target.value)}
+                  className="mis-input text-xs w-full"
+                />
+                <input
+                  type="text"
+                  placeholder="Delivery Instructions / Attention (e.g. Attn: IT Infrastructure Team | Phone: +91 487 242 0400)"
+                  value={shipToContact}
+                  onChange={e => setShipToContact(e.target.value)}
+                  className="mis-input text-xs w-full"
+                />
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="text"
+                    placeholder="Payment Terms (e.g. 30 Days)"
+                    value={paymentTerms}
+                    onChange={e => setPaymentTerms(e.target.value)}
+                    className="mis-input text-xs"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Delivery Timeline (e.g. 7-10 Days)"
+                    value={deliveryTimeline}
+                    onChange={e => setDeliveryTimeline(e.target.value)}
+                    className="mis-input text-xs"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 2: LINE ITEMS BUILDER */}
+          {editorTab === 'items' && (
+            <div
+              className="space-y-3.5 p-4 rounded-xl border"
+              style={{ background: 'var(--panel-inset-soft)', borderColor: 'var(--border)' }}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>
+                  Manage Line Items ({items.length})
+                </span>
+                <button
+                  type="button"
+                  onClick={handleAddItem}
+                  className="mis-btn mis-btn-sm font-bold text-white shadow-sm flex items-center gap-1"
+                  style={{ background: '#059669' }}
+                >
+                  ➕ Add New Item Row
+                </button>
+              </div>
+
+              <div className="overflow-x-auto rounded-lg border" style={{ borderColor: 'var(--border)', background: 'var(--bg-card)' }}>
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr style={{ background: 'var(--table-header-bg)', borderBottom: '1px solid var(--border)', color: 'var(--text-muted)' }}>
+                      <th className="p-2 text-center w-8">#</th>
+                      <th className="p-2 text-left min-w-[200px]">Item Description & Specs *</th>
+                      <th className="p-2 text-center w-24">HSN/SAC</th>
+                      <th className="p-2 text-center w-16">Qty</th>
+                      <th className="p-2 text-center w-20">Unit</th>
+                      <th className="p-2 text-right w-28">Rate (₹)</th>
+                      <th className="p-2 text-center w-20">GST %</th>
+                      <th className="p-2 text-right w-24">Total (₹)</th>
+                      <th className="p-2 text-center w-8"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {items.map((item, idx) => {
+                      const itemTaxable = (Number(item.qty) || 0) * (Number(item.rate) || 0);
+                      const itemGst = (itemTaxable * (Number(item.gstRate) || 0)) / 100;
+                      const itemTotal = itemTaxable + itemGst;
+
+                      return (
+                        <tr key={item.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                          <td className="p-2 text-center font-bold" style={{ color: 'var(--text-muted)' }}>{idx + 1}</td>
+                          <td className="p-2">
+                            <input
+                              type="text"
+                              placeholder="Description & specs..."
+                              value={item.description}
+                              onChange={e => handleUpdateItem(item.id, 'description', e.target.value)}
+                              className="mis-input text-xs w-full font-medium"
+                            />
+                          </td>
+                          <td className="p-2">
+                            <input
+                              type="text"
+                              placeholder="8504"
+                              value={item.hsnSac}
+                              onChange={e => handleUpdateItem(item.id, 'hsnSac', e.target.value)}
+                              className="mis-input text-xs font-mono text-center"
+                            />
+                          </td>
+                          <td className="p-2">
+                            <input
+                              type="number"
+                              min={1}
+                              value={item.qty}
+                              onChange={e => handleUpdateItem(item.id, 'qty', Math.max(1, Number(e.target.value)))}
+                              className="mis-input text-xs text-center font-bold"
+                            />
+                          </td>
+                          <td className="p-2">
+                            <select
+                              value={item.unit}
+                              onChange={e => handleUpdateItem(item.id, 'unit', e.target.value)}
+                              className="mis-select text-xs py-1"
+                            >
+                              <option value="Nos">Nos</option>
+                              <option value="Pcs">Pcs</option>
+                              <option value="Lic">Lic</option>
+                              <option value="Months">Months</option>
+                              <option value="Years">Years</option>
+                              <option value="Set">Set</option>
+                              <option value="Mtr">Mtr</option>
+                            </select>
+                          </td>
+                          <td className="p-2">
+                            <input
+                              type="number"
+                              min={0}
+                              step={0.01}
+                              value={item.rate}
+                              onChange={e => handleUpdateItem(item.id, 'rate', Number(e.target.value))}
+                              className="mis-input text-xs font-mono font-bold text-right"
+                            />
+                          </td>
+                          <td className="p-2">
+                            <select
+                              value={item.gstRate}
+                              onChange={e => handleUpdateItem(item.id, 'gstRate', Number(e.target.value))}
+                              className="mis-select text-xs py-1 font-bold"
+                            >
+                              <option value={0}>0%</option>
+                              <option value={5}>5%</option>
+                              <option value={12}>12%</option>
+                              <option value={18}>18%</option>
+                              <option value={28}>28%</option>
+                            </select>
+                          </td>
+                          <td className="p-2 text-right font-mono font-bold" style={{ color: 'var(--text-primary)' }}>
+                            ₹{itemTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </td>
+                          <td className="p-2 text-center">
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveItem(item.id)}
+                              className="mis-btn-icon text-red-500 hover:text-red-400 font-bold p-1 rounded transition-colors"
+                              title="Delete Item"
+                            >
+                              ✕
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="flex flex-wrap justify-between items-center pt-2 text-xs font-bold" style={{ color: 'var(--text-secondary)' }}>
+                <span>Subtotal: <strong style={{ color: 'var(--text-primary)' }}>₹{totals.subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong></span>
+                <span>Tax: <strong style={{ color: 'var(--text-primary)' }}>₹{totals.totalTax.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong></span>
+                <span className="text-sm" style={{ color: 'var(--text-accent)' }}>
+                  Grand Total: <strong>₹{totals.grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong>
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 3: TERMS & SIGNATURE */}
+          {editorTab === 'terms' && (
+            <div
+              className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded-xl border"
+              style={{ background: 'var(--panel-inset-soft)', borderColor: 'var(--border)' }}
+            >
+              <div className="space-y-3">
+                <div>
+                  <label className="text-[11px] font-bold block mb-1" style={{ color: 'var(--text-secondary)' }}>Subject Line</label>
+                  <input
+                    type="text"
+                    value={subject}
+                    onChange={e => setSubject(e.target.value)}
+                    className="mis-input text-xs w-full font-semibold"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold block mb-1" style={{ color: 'var(--text-secondary)' }}>Terms & Conditions</label>
+                  <textarea
+                    rows={4}
+                    value={notes}
+                    onChange={e => setNotes(e.target.value)}
+                    className="mis-input text-xs w-full"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <label className="text-[11px] font-bold block mb-1" style={{ color: 'var(--text-secondary)' }}>Signatory Information</label>
+                <input
+                  type="text"
+                  placeholder="Signatory Name"
+                  value={signatoryName}
+                  onChange={e => setSignatoryName(e.target.value)}
+                  className="mis-input text-xs w-full font-bold"
+                />
+                <input
+                  type="text"
+                  placeholder="Designation"
+                  value={signatoryDesignation}
+                  onChange={e => setSignatoryDesignation(e.target.value)}
+                  className="mis-input text-xs w-full"
+                />
+                <div className="flex items-center gap-3 pt-2">
+                  <label
+                    className="cursor-pointer text-xs font-bold text-white px-3 py-1.5 rounded-lg shadow-sm hover:opacity-95 transition-opacity inline-block"
+                    style={{ background: 'var(--accent)' }}
+                  >
+                    Upload Signature Image
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleSignatureUpload}
+                      className="hidden"
+                    />
+                  </label>
+                  {signatureImage && (
+                    <button
+                      type="button"
+                      onClick={() => setSignatureImage(null)}
+                      className="text-xs font-bold text-red-500 hover:underline"
+                    >
+                      Remove Signature
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 4: SETTINGS */}
+          {editorTab === 'settings' && (
+            <div
+              className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded-xl border"
+              style={{ background: 'var(--panel-inset-soft)', borderColor: 'var(--border)' }}
+            >
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-bold" style={{ color: 'var(--text-secondary)' }}>GST Tax Mode:</label>
+                <div className="flex items-center gap-1 p-1 rounded-lg border" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+                  <button
+                    type="button"
+                    onClick={() => setGstType('intra')}
+                    className="flex-1 py-1.5 px-2 text-xs font-bold rounded-md transition-all"
+                    style={{
+                      background: gstType === 'intra' ? 'var(--accent)' : 'transparent',
+                      color: gstType === 'intra' ? '#ffffff' : 'var(--text-secondary)'
+                    }}
+                  >
+                    Intra-state (CGST + SGST)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setGstType('inter')}
+                    className="flex-1 py-1.5 px-2 text-xs font-bold rounded-md transition-all"
+                    style={{
+                      background: gstType === 'inter' ? 'var(--accent)' : 'transparent',
+                      color: gstType === 'inter' ? '#ffffff' : 'var(--text-secondary)'
+                    }}
+                  >
+                    Inter-state (IGST)
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <div className="flex justify-between">
+                  <label className="text-xs font-bold" style={{ color: 'var(--text-secondary)' }}>Letterhead Top Blank Spacing:</label>
+                  <span className="text-xs font-mono font-bold" style={{ color: 'var(--text-accent)' }}>{letterheadMarginMm} mm</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="range"
+                    min={0}
+                    max={60}
+                    step={2}
+                    value={letterheadMarginMm}
+                    onChange={e => setLetterheadMarginMm(Number(e.target.value))}
+                    className="w-full h-1.5 rounded-lg appearance-none cursor-pointer"
+                    style={{ accentColor: 'var(--accent)' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setLetterheadMarginMm(0)}
+                    className="text-[10px] px-2 py-0.5 border rounded-md"
+                    style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)', background: 'var(--bg-card)' }}
+                  >
+                    Reset
+                  </button>
+                </div>
+                <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                  {letterheadMarginMm === 0 ? 'Includes full Sharewealth company header.' : 'Leaves blank top spacing for pre-printed letterhead paper.'}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ════════════════════════════════════════════════════════════
+          LIVE DOCUMENT PREVIEW & PDF CAPTURE SHEET
+          Built with 100% pure semantic HTML tables and explicit hex styles
+          ════════════════════════════════════════════════════════════ */}
+      <div className="flex flex-col items-center overflow-x-auto py-3">
+        <div className="no-print mb-2 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
+          <span>📄</span> Live Document Preview (Matches Exported PDF Exactly)
+        </div>
+
+        <div
+          id="po-document-sheet"
+          ref={sheetRef}
+          style={{
+            width: '800px',
+            minHeight: '1080px',
+            backgroundColor: '#ffffff',
+            color: '#000000',
+            fontFamily: 'Arial, Helvetica, sans-serif',
+            padding: '32px',
+            border: '1.5px solid #000000',
+            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+            boxSizing: 'border-box'
+          }}
+        >
+          {/* Top Letterhead Spacer if configured */}
+          {letterheadMarginMm > 0 && (
+            <div
+              style={{
+                height: `${letterheadMarginMm * 3.78}px`,
+                width: '100%',
+                borderBottom: '2px dashed #000000',
+                marginBottom: '20px',
+                textAlign: 'center',
+                fontSize: '11px',
+                fontWeight: '900',
+                color: '#000000',
+                lineHeight: `${letterheadMarginMm * 3.78}px`
+              }}
+            >
+              ↑ Letterhead Area — {letterheadMarginMm} mm blank space reserved for pre-printed letterhead
+            </div>
+          )}
+
+          {/* Company Header Table (Shown when Letterhead Spacing is 0) */}
+          {letterheadMarginMm === 0 && (
+            <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '16px', borderBottom: '2.5px solid #000000', paddingBottom: '12px' }}>
+              <tbody>
+                <tr>
+                  <td style={{ width: '60px', verticalAlign: 'top', border: 'none', padding: '0 12px 12px 0' }}>
+                    <div style={{ width: '48px', height: '48px', backgroundColor: '#000000', color: '#ffffff', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '900', fontSize: '26px', lineHeight: '48px', textAlign: 'center' }}>
+                      S
+                    </div>
+                  </td>
+                  <td style={{ verticalAlign: 'top', border: 'none', padding: '0 0 12px 0' }}>
+                    <div style={{ fontSize: '19px', fontWeight: '900', color: '#000000', letterSpacing: '-0.3px', textTransform: 'uppercase' }}>
+                      {companyName}
+                    </div>
+                    <div style={{ fontSize: '11.5px', fontWeight: '700', color: '#000000', marginTop: '2px', lineHeight: '1.4' }}>
+                      {companyAddress}
+                    </div>
+                    <div style={{ fontSize: '11px', fontWeight: '800', color: '#000000', marginTop: '4px', fontFamily: 'monospace' }}>
+                      <strong>GSTIN:</strong> {companyGstin} &nbsp;|&nbsp; <strong>PAN:</strong> {companyPan} &nbsp;|&nbsp; <strong>CIN:</strong> {companyCin}
+                    </div>
+                    <div style={{ fontSize: '10.5px', fontWeight: '700', color: '#000000', marginTop: '2px' }}>
+                      {companyContact}
+                    </div>
+                  </td>
+                  <td style={{ verticalAlign: 'top', textAlign: 'right', border: 'none', padding: '0 0 12px 12px', width: '220px' }}>
+                    <div style={{ display: 'inline-block', backgroundColor: '#000000', color: '#ffffff', fontWeight: '900', fontSize: '14px', letterSpacing: '1px', padding: '6px 14px', borderRadius: '4px', textTransform: 'uppercase' }}>
+                      PURCHASE ORDER
+                    </div>
+                    <div style={{ fontSize: '10px', color: '#000000', marginTop: '5px', fontWeight: '900', letterSpacing: '0.5px' }}>
+                      ORIGINAL FOR RECIPIENT
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          )}
+
+          {letterheadMarginMm > 0 && (
+            <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '16px', borderBottom: '2.5px solid #000000', paddingBottom: '8px' }}>
+              <tbody>
+                <tr>
+                  <td style={{ border: 'none', padding: '0 0 8px 0', fontSize: '18px', fontWeight: '900', color: '#000000', textTransform: 'uppercase' }}>
+                    PURCHASE ORDER
+                  </td>
+                  <td style={{ border: 'none', padding: '0 0 8px 0', textAlign: 'right', fontSize: '11px', color: '#000000', fontWeight: '900' }}>
+                    ORIGINAL COPY
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          )}
+
+          {/* PO Metadata Bar Table */}
+          <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '16px', backgroundColor: '#f8fafc', border: '1.5px solid #000000' }}>
+            <tbody>
+              <tr>
+                <td style={{ width: '25%', padding: '7px 10px', borderRight: '1.5px solid #000000' }}>
+                  <div style={{ fontSize: '9.5px', fontWeight: '900', color: '#000000', textTransform: 'uppercase' }}>PO NUMBER:</div>
+                  <div style={{ fontSize: '12.5px', fontWeight: '900', color: '#000000', fontFamily: 'monospace', marginTop: '2px' }}>{poNumber}</div>
+                </td>
+                <td style={{ width: '25%', padding: '7px 10px', borderRight: '1.5px solid #000000' }}>
+                  <div style={{ fontSize: '9.5px', fontWeight: '900', color: '#000000', textTransform: 'uppercase' }}>PO DATE:</div>
+                  <div style={{ fontSize: '12px', fontWeight: '900', color: '#000000', marginTop: '2px' }}>{poDate}</div>
+                </td>
+                <td style={{ width: '25%', padding: '7px 10px', borderRight: '1.5px solid #000000' }}>
+                  <div style={{ fontSize: '9.5px', fontWeight: '900', color: '#000000', textTransform: 'uppercase' }}>QUOTATION REF:</div>
+                  <div style={{ fontSize: '11.5px', fontWeight: '800', color: '#000000', marginTop: '2px' }}>{quotationRef || '—'}</div>
+                </td>
+                <td style={{ width: '25%', padding: '7px 10px' }}>
+                  <div style={{ fontSize: '9.5px', fontWeight: '900', color: '#000000', textTransform: 'uppercase' }}>QUOTATION DATE:</div>
+                  <div style={{ fontSize: '11.5px', fontWeight: '800', color: '#000000', marginTop: '2px' }}>{quotationDate || '—'}</div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          {/* Vendor & Delivery Boxes Table */}
+          <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '16px' }}>
+            <tbody>
+              <tr>
+                {/* Vendor Box */}
+                <td style={{ width: '50%', verticalAlign: 'top', border: '1.5px solid #000000', padding: '10px 12px', backgroundColor: '#ffffff', borderRadius: '4px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1.5px solid #000000', paddingBottom: '4px', marginBottom: '6px' }}>
+                    <span style={{ fontSize: '10.5px', fontWeight: '900', color: '#000000', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      VENDOR / SUPPLIER DETAILS
+                    </span>
+                    <span style={{ fontSize: '9.5px', fontWeight: '900', backgroundColor: '#000000', color: '#ffffff', padding: '1px 6px', borderRadius: '3px' }}>
+                      TO
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '12.5px', fontWeight: '900', color: '#000000' }}>
+                    {vendorName || '—'}
+                  </div>
+                  <div style={{ fontSize: '11px', fontWeight: '700', color: '#000000', marginTop: '3px', lineHeight: '1.4', whiteSpace: 'pre-wrap' }}>
+                    {vendorAddress || '—'}
+                  </div>
+                  <div style={{ fontSize: '11px', fontWeight: '800', color: '#000000', marginTop: '5px', fontFamily: 'monospace' }}>
+                    <strong>GSTIN:</strong> {vendorGstin || '—'} &nbsp;|&nbsp; <strong>State:</strong> {vendorState || '—'}
+                  </div>
+                  {vendorContact && (
+                    <div style={{ fontSize: '10.5px', fontWeight: '800', color: '#000000', marginTop: '3px' }}>
+                      <strong>Contact:</strong> {vendorContact}
+                    </div>
+                  )}
+                </td>
+
+                <td style={{ width: '12px', border: 'none' }}></td>
+
+                {/* Delivery Box */}
+                <td style={{ width: '50%', verticalAlign: 'top', border: '1.5px solid #000000', padding: '10px 12px', backgroundColor: '#ffffff', borderRadius: '4px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1.5px solid #000000', paddingBottom: '4px', marginBottom: '6px' }}>
+                    <span style={{ fontSize: '10.5px', fontWeight: '900', color: '#000000', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      DELIVERY / SHIP TO
+                    </span>
+                    <span style={{ fontSize: '9.5px', fontWeight: '900', backgroundColor: '#000000', color: '#ffffff', padding: '1px 6px', borderRadius: '3px' }}>
+                      DESTINATION
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '12.5px', fontWeight: '900', color: '#000000' }}>
+                    {shipToName}
+                  </div>
+                  <div style={{ fontSize: '11px', fontWeight: '700', color: '#000000', marginTop: '3px', lineHeight: '1.4', whiteSpace: 'pre-wrap' }}>
+                    {shipToAddress}
+                  </div>
+                  <div style={{ fontSize: '10.5px', fontWeight: '800', color: '#000000', marginTop: '5px' }}>
+                    <strong>Instructions:</strong> {shipToContact}
+                  </div>
+                  <div style={{ fontSize: '10.5px', fontWeight: '800', color: '#000000', marginTop: '3px' }}>
+                    <strong>Payment Terms:</strong> {paymentTerms} &nbsp;|&nbsp; <strong>Timeline:</strong> {deliveryTimeline}
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          {/* Subject Line Bar */}
+          {subject && (
+            <div style={{ backgroundColor: '#f8fafc', borderLeft: '5px solid #000000', borderTop: '1px solid #000000', borderRight: '1px solid #000000', borderBottom: '1px solid #000000', padding: '7px 10px', marginBottom: '16px', fontSize: '12px', fontWeight: '800', color: '#000000' }}>
+              <strong>SUBJECT:</strong> {subject}
+            </div>
+          )}
+
+          {/* Line Items Table */}
+          <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '16px', border: '1.5px solid #000000' }}>
+            <thead>
+              <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '2px solid #000000' }}>
+                <th style={{ width: '35px', padding: '7px 4px', textAlign: 'center', fontSize: '11px', fontWeight: '900', color: '#000000', borderRight: '1.5px solid #000000' }}>#</th>
+                <th style={{ padding: '7px 8px', textAlign: 'left', fontSize: '11px', fontWeight: '900', color: '#000000', borderRight: '1.5px solid #000000' }}>ITEM DESCRIPTION & SPECIFICATIONS</th>
+                <th style={{ width: '70px', padding: '7px 4px', textAlign: 'center', fontSize: '11px', fontWeight: '900', color: '#000000', borderRight: '1.5px solid #000000' }}>HSN/SAC</th>
+                <th style={{ width: '45px', padding: '7px 4px', textAlign: 'center', fontSize: '11px', fontWeight: '900', color: '#000000', borderRight: '1.5px solid #000000' }}>QTY</th>
+                <th style={{ width: '50px', padding: '7px 4px', textAlign: 'center', fontSize: '11px', fontWeight: '900', color: '#000000', borderRight: '1.5px solid #000000' }}>UNIT</th>
+                <th style={{ width: '90px', padding: '7px 8px', textAlign: 'right', fontSize: '11px', fontWeight: '900', color: '#000000', borderRight: '1.5px solid #000000' }}>RATE (₹)</th>
+                <th style={{ width: '50px', padding: '7px 4px', textAlign: 'center', fontSize: '11px', fontWeight: '900', color: '#000000', borderRight: '1.5px solid #000000' }}>GST %</th>
+                <th style={{ width: '80px', padding: '7px 8px', textAlign: 'right', fontSize: '11px', fontWeight: '900', color: '#000000', borderRight: '1.5px solid #000000' }}>TAX (₹)</th>
+                <th style={{ width: '95px', padding: '7px 8px', textAlign: 'right', fontSize: '11px', fontWeight: '900', color: '#000000' }}>TOTAL (₹)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((item, idx) => {
+                const itemTaxable = (Number(item.qty) || 0) * (Number(item.rate) || 0);
+                const itemGst = (itemTaxable * (Number(item.gstRate) || 0)) / 100;
+                const itemTotal = itemTaxable + itemGst;
+
+                return (
+                  <tr key={item.id} style={{ borderBottom: '1px solid #000000' }}>
+                    <td style={{ padding: '6px 4px', textAlign: 'center', fontSize: '11.5px', color: '#000000', fontWeight: '900', borderRight: '1.5px solid #000000' }}>
+                      {idx + 1}
+                    </td>
+                    <td style={{ padding: '6px 8px', fontSize: '11.5px', fontWeight: '700', color: '#000000', borderRight: '1.5px solid #000000', lineHeight: '1.4' }}>
+                      {item.description || '—'}
+                    </td>
+                    <td style={{ padding: '6px 4px', textAlign: 'center', fontSize: '11px', fontFamily: 'monospace', fontWeight: '800', color: '#000000', borderRight: '1.5px solid #000000' }}>
+                      {item.hsnSac || '—'}
+                    </td>
+                    <td style={{ padding: '6px 4px', textAlign: 'center', fontSize: '12px', fontWeight: '900', color: '#000000', borderRight: '1.5px solid #000000' }}>
+                      {item.qty}
+                    </td>
+                    <td style={{ padding: '6px 4px', textAlign: 'center', fontSize: '11.5px', fontWeight: '800', color: '#000000', borderRight: '1.5px solid #000000' }}>
+                      {item.unit}
+                    </td>
+                    <td style={{ padding: '6px 8px', textAlign: 'right', fontSize: '11.5px', fontFamily: 'monospace', fontWeight: '800', color: '#000000', borderRight: '1.5px solid #000000' }}>
+                      ₹{Number(item.rate || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                    <td style={{ padding: '6px 4px', textAlign: 'center', fontSize: '11.5px', fontWeight: '900', color: '#000000', borderRight: '1.5px solid #000000' }}>
+                      {item.gstRate}%
+                    </td>
+                    <td style={{ padding: '6px 8px', textAlign: 'right', fontSize: '11.5px', fontFamily: 'monospace', fontWeight: '800', color: '#000000', borderRight: '1.5px solid #000000' }}>
+                      ₹{itemGst.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                    <td style={{ padding: '6px 8px', textAlign: 'right', fontSize: '12px', fontFamily: 'monospace', fontWeight: '900', color: '#000000' }}>
+                      ₹{itemTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+
+          {/* Totals & Amount in Words Table */}
+          <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '16px' }}>
+            <tbody>
+              <tr>
+                {/* Left: Amount in Words */}
+                <td style={{ width: '55%', verticalAlign: 'top', border: '1.5px solid #000000', padding: '10px 12px', backgroundColor: '#f8fafc', borderRadius: '4px' }}>
+                  <div style={{ fontSize: '9.5px', fontWeight: '900', color: '#000000', textTransform: 'uppercase', marginBottom: '4px' }}>
+                    AMOUNT IN WORDS (INR):
+                  </div>
+                  <div style={{ fontSize: '12px', fontWeight: '900', color: '#000000', lineHeight: '1.4' }}>
+                    {numberToWordsIndian(totals.grandTotal)}
+                  </div>
+                  <div style={{ marginTop: '12px', paddingTop: '8px', borderTop: '1.5px solid #000000', fontSize: '10px', fontWeight: '800', color: '#000000' }}>
+                    <strong>Billing Entity:</strong> {companyName} &nbsp;|&nbsp; <strong>GSTIN:</strong> {companyGstin}
+                  </div>
+                </td>
+
+                <td style={{ width: '12px', border: 'none' }}></td>
+
+                {/* Right: Calculations Breakdown */}
+                <td style={{ width: '45%', verticalAlign: 'top', padding: '0', border: '1.5px solid #000000', borderRadius: '4px', overflow: 'hidden' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11.5px' }}>
+                    <tbody>
+                      <tr style={{ borderBottom: '1px solid #000000' }}>
+                        <td style={{ padding: '5px 8px', fontWeight: '800', color: '#000000', border: 'none' }}>Taxable Subtotal:</td>
+                        <td style={{ padding: '5px 8px', textAlign: 'right', fontFamily: 'monospace', fontWeight: '900', color: '#000000', border: 'none' }}>
+                          ₹{totals.subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </td>
+                      </tr>
+                      {gstType === 'intra' ? (
+                        <>
+                          <tr style={{ borderBottom: '1px solid #000000' }}>
+                            <td style={{ padding: '4px 8px', fontWeight: '800', color: '#000000', border: 'none' }}>CGST (Central Tax):</td>
+                            <td style={{ padding: '4px 8px', textAlign: 'right', fontFamily: 'monospace', fontWeight: '900', color: '#000000', border: 'none' }}>
+                              ₹{totals.totalCgst.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </td>
+                          </tr>
+                          <tr style={{ borderBottom: '1px solid #000000' }}>
+                            <td style={{ padding: '4px 8px', fontWeight: '800', color: '#000000', border: 'none' }}>SGST (State Tax):</td>
+                            <td style={{ padding: '4px 8px', textAlign: 'right', fontFamily: 'monospace', fontWeight: '900', color: '#000000', border: 'none' }}>
+                              ₹{totals.totalSgst.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </td>
+                          </tr>
+                        </>
+                      ) : (
+                        <tr style={{ borderBottom: '1px solid #000000' }}>
+                          <td style={{ padding: '4px 8px', fontWeight: '800', color: '#000000', border: 'none' }}>IGST (Integrated Tax):</td>
+                          <td style={{ padding: '4px 8px', textAlign: 'right', fontFamily: 'monospace', fontWeight: '900', color: '#000000', border: 'none' }}>
+                            ₹{totals.totalIgst.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </td>
+                        </tr>
+                      )}
+                      {totals.roundOff !== 0 && (
+                        <tr style={{ borderBottom: '1px solid #000000' }}>
+                          <td style={{ padding: '4px 8px', fontWeight: '800', color: '#000000', border: 'none' }}>Round Off:</td>
+                          <td style={{ padding: '4px 8px', textAlign: 'right', fontFamily: 'monospace', fontWeight: '900', color: '#000000', border: 'none' }}>
+                            {totals.roundOff > 0 ? `+₹${totals.roundOff.toFixed(2)}` : `-₹${Math.abs(totals.roundOff).toFixed(2)}`}
+                          </td>
+                        </tr>
+                      )}
+                      <tr style={{ backgroundColor: '#000000', color: '#ffffff' }}>
+                        <td style={{ padding: '6px 8px', fontWeight: '900', fontSize: '12px', textTransform: 'uppercase', border: 'none' }}>GRAND TOTAL:</td>
+                        <td style={{ padding: '6px 8px', textAlign: 'right', fontFamily: 'monospace', fontWeight: '900', fontSize: '13.5px', border: 'none' }}>
+                          ₹{totals.grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          {/* Terms & Conditions and Authorized Signatory Table */}
+          <table style={{ width: '100%', borderCollapse: 'collapse', borderTop: '2px solid #000000', paddingTop: '10px' }}>
+            <tbody>
+              <tr>
+                {/* Terms */}
+                <td style={{ width: '60%', verticalAlign: 'top', border: 'none', padding: '8px 12px 0 0' }}>
+                  <div style={{ fontSize: '10px', fontWeight: '900', color: '#000000', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
+                    TERMS & CONDITIONS:
+                  </div>
+                  <div style={{ fontSize: '10px', fontWeight: '700', color: '#000000', lineHeight: '1.45', whiteSpace: 'pre-wrap' }}>
+                    {notes}
+                  </div>
+                </td>
+
+                {/* Signatory */}
+                <td style={{ width: '40%', verticalAlign: 'top', border: '1.5px solid #000000', padding: '10px', textAlign: 'center', backgroundColor: '#ffffff', borderRadius: '4px' }}>
+                  <div style={{ fontSize: '9.5px', fontWeight: '900', color: '#000000', textTransform: 'uppercase' }}>
+                    For {companyName}
+                  </div>
+                  <div style={{ height: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '4px 0' }}>
+                    {signatureImage ? (
+                      <img src={signatureImage} alt="Signature" style={{ maxHeight: '44px', maxWidth: '140px', objectFit: 'contain' }} />
+                    ) : (
+                      <div style={{ width: '120px', borderBottom: '2px dashed #000000', height: '30px' }}></div>
+                    )}
+                  </div>
+                  <div style={{ fontSize: '11.5px', fontWeight: '900', color: '#000000' }}>
+                    {signatoryName}
+                  </div>
+                  <div style={{ fontSize: '10px', fontWeight: '800', color: '#000000', marginTop: '1px' }}>
+                    {signatoryDesignation}
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          {/* Footer Notice */}
+          <div style={{ marginTop: '20px', paddingTop: '8px', borderTop: '1.5px solid #000000', textAlign: 'center', fontSize: '9px', fontWeight: '800', color: '#000000', fontFamily: 'monospace' }}>
+            This is a computer-generated Purchase Order issued by Sharewealth Securities Ltd. IT Department.
+          </div>
+        </div>
+        <ConfirmModal
+          isOpen={poConfirmModal.isOpen}
+          title={poConfirmModal.title}
+          message={poConfirmModal.message}
+          confirmLabel={poConfirmModal.confirmLabel}
+          cancelLabel={poConfirmModal.cancelLabel}
+          isDanger={poConfirmModal.isDanger}
+          loading={poConfirmModal.loading}
+          onConfirm={poConfirmModal.onConfirm}
+          onCancel={() => setPoConfirmModal(INITIAL_CONFIRM_STATE)}
+        />
+      </div>
+    </div>
+  );
+};
+
+const getITStatusBadgeClass = (status: string): string => {
+  const s = String(status || '').toLowerCase().trim();
+  if (['active', 'compliant', 'resolved', 'implemented', 'filed', 'approved', 'fulfilled', 'completed', 'renewed'].includes(s)) {
+    return 'mis-badge mis-badge-success';
+  }
+  if (['in progress', 'under renewal', 'renewal due', 'expiring soon', 'planning', 'investigating', 'due for review', 'in remediation', 'scheduled', 'report received', 'raised', 'under repair', 'upcoming'].includes(s)) {
+    return 'mis-badge mis-badge-warning';
+  }
+  if (['open', 'identified'].includes(s)) {
+    return 'mis-badge mis-badge-info';
+  }
+  if (['critical', 'non-compliant', 'expired', 'lapsed', 'overdue', 'terminated', 'disposed', 'cancelled', 'closed', 'retired', 'on hold'].includes(s)) {
+    return 'mis-badge mis-badge-danger';
+  }
+  return 'mis-badge mis-badge-neutral';
 };
 
 const ITDataEntryPage: React.FC = () => {
@@ -273,10 +1652,6 @@ const ITDataEntryPage: React.FC = () => {
   // landing on 'list' — read once by the tab-change effect below, then cleared.
   const pendingActiveTabRef = useRef<'list' | 'register' | null>(null);
 
-  // Quick "log this PO" form shown inline on the PO Generator tab itself —
-  // saves directly to the purchase-orders sheet without switching tabs.
-  const [poQuickForm, setPoQuickForm] = useState<any>({ status: 'Raised' });
-  const [poQuickSubmitting, setPoQuickSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState<'list' | 'register'>('list');
 
   // UI state
@@ -290,9 +1665,10 @@ const ITDataEntryPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
-  // Search & Branch filters
+  // Search, Branch & Status filters
   const [searchTerm, setSearchTerm] = useState('');
   const [branchFilter, setBranchFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
 
   // Row selection & Batch action
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -306,6 +1682,7 @@ const ITDataEntryPage: React.FC = () => {
   // CSV Import state
   const [csvModalOpen, setCsvModalOpen] = useState(false);
   const [confirmSaveModalOpen, setConfirmSaveModalOpen] = useState(false);
+  const [confirmModal, setConfirmModal] = useState<ConfirmDialogState>(INITIAL_CONFIRM_STATE);
 
   const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
   const [csvRows, setCsvRows] = useState<any[]>([]);
@@ -332,13 +1709,14 @@ const ITDataEntryPage: React.FC = () => {
     fetchEntries();
   }, [sheetTab, branchFilter, searchTerm]);
 
-  // Clean form state when tab changes
+  // Clean form state and filters when tab changes
   useEffect(() => {
     setActiveTab(pendingActiveTabRef.current || 'list');
     pendingActiveTabRef.current = null;
     setEditingId(null);
     setFormData({});
     setSelectedIds([]);
+    setStatusFilter('');
   }, [sheetTab]);
 
   const fetchBranches = async () => {
@@ -527,25 +1905,6 @@ const ITDataEntryPage: React.FC = () => {
     }
   };
 
-  const handleQuickSavePo = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!poQuickForm.item_description || !poQuickForm.amount || !poQuickForm.po_date) {
-      toast.error('Item Description, Amount, and PO Date are required.');
-      return;
-    }
-    setPoQuickSubmitting(true);
-    try {
-      const created = await itService.createEntry('purchase-orders', poQuickForm);
-      toast.success(`PO logged as ${created.po_number}.`);
-      setPoQuickForm({ status: 'Raised' });
-      if (sheetTab === 'purchase-orders') fetchEntries();
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to log PO.');
-    } finally {
-      setPoQuickSubmitting(false);
-    }
-  };
-
   const handleEdit = (record: any) => {
     setEditingId(record.id);
     const customConfig = STANDARD_FIELD_OPTIONS[sheetTab];
@@ -566,19 +1925,31 @@ const ITDataEntryPage: React.FC = () => {
     setActiveTab('register');
   };
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this record?')) return;
-    try {
-      await itService.deleteEntry(sheetTab, id);
-      toast.success('Record deleted.');
-      fetchEntries();
-      if (sheetTab === 'assets') fetchAssets();
-      if (sheetTab === 'audits') fetchAudits();
-      if (sheetTab === 'vendors') fetchVendors();
-      if (sheetTab === 'diagrams') fetchDiagrams();
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Delete operation failed.');
-    }
+  const handleDelete = (id: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete IT Record',
+      message: 'Are you sure you want to delete this record? This action cannot be undone.',
+      confirmLabel: 'Delete Record',
+      cancelLabel: 'Cancel',
+      isDanger: true,
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, loading: true }));
+        try {
+          await itService.deleteEntry(sheetTab, id);
+          toast.success('Record deleted.');
+          fetchEntries();
+          if (sheetTab === 'assets') fetchAssets();
+          if (sheetTab === 'audits') fetchAudits();
+          if (sheetTab === 'vendors') fetchVendors();
+          if (sheetTab === 'diagrams') fetchDiagrams();
+          setConfirmModal(INITIAL_CONFIRM_STATE);
+        } catch (err: any) {
+          toast.error(err.response?.data?.message || 'Delete operation failed.');
+          setConfirmModal(prev => ({ ...prev, loading: false }));
+        }
+      }
+    });
   };
 
   const handleBatchAction = async () => {
@@ -1051,6 +2422,38 @@ const ITDataEntryPage: React.FC = () => {
     );
   };
 
+  const activeFormFields = getFormFields();
+  const hasStatusColumn = activeFormFields.some(f => f.name === 'status') || entries.some(e => e.status !== undefined);
+  const displayedFields = activeFormFields.filter(f => f.name !== 'status').slice(0, 5);
+
+  const currentSheetStatuses = useMemo(() => {
+    const statuses = new Set<string>();
+    const statusField = activeFormFields.find(f => f.name === 'status');
+    if (statusField && statusField.options) {
+      statusField.options.forEach((opt: any) => {
+        if (typeof opt === 'string') statuses.add(opt);
+        else if (opt && opt.value) statuses.add(opt.value);
+      });
+    }
+    if (Array.isArray(entries)) {
+      entries.forEach((row: any) => {
+        if (row?.status && typeof row.status === 'string' && row.status.trim()) {
+          statuses.add(row.status.trim());
+        }
+      });
+    }
+    return Array.from(statuses);
+  }, [sheetTab, activeFormFields, entries]);
+
+  const filteredEntries = useMemo(() => {
+    if (!Array.isArray(entries)) return [];
+    if (!statusFilter) return entries;
+    return entries.filter((row: any) => {
+      if (!row || !row.status) return false;
+      return String(row.status).toLowerCase() === statusFilter.toLowerCase();
+    });
+  }, [entries, statusFilter]);
+
   return (
     <DashboardLayout>
       <div className="mis-page mis-animate-in max-w-7xl mx-auto space-y-8">
@@ -1130,135 +2533,82 @@ const ITDataEntryPage: React.FC = () => {
           ))}
         </div>
 
-        {/* PO Generator — external tool embedded inline (no API of its own,
-            so nothing here feeds the dashboard; see the Purchase Orders
-            sheet for that). Rendered instead of the normal list/register
-            content entirely. */}
+        {/* PO Generator — Native High-Resolution GST-Compliant Purchase Order Maker & Exporter */}
         {sheetTab === 'po-generator' ? (
-          <div className="mis-card p-5">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-3">
-              <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                Build and print your PO below, then log it here so it shows up on the dashboard — this tool doesn't save anything on its own.
-              </p>
-              <div className="flex items-center gap-2 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => { pendingActiveTabRef.current = 'list'; setSheetTab('purchase-orders'); }}
-                  className="px-3 py-1.5 border rounded-lg text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-                  style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}
-                >
-                  📋 View Purchase Orders
-                </button>
-                <a
-                  href="https://po.sharewealthindia.in/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs font-semibold whitespace-nowrap hover:underline"
-                  style={{ color: 'var(--text-accent)' }}
-                >
-                  Open in new tab ↗
-                </a>
-              </div>
-            </div>
-            <iframe
-              src="https://po.sharewealthindia.in/"
-              title="PO Generator"
-              // Without a sandbox, a framed page has no restrictions at all —
-              // notably it could navigate our top-level tab away to another
-              // URL (a classic hostile/compromised-iframe move). This grants
-              // exactly what the PO tool needs (scripts, its own storage,
-              // downloads, popups/print) while withholding top-navigation.
-              // Deliberately NOT including allow-popups-to-escape-sandbox:
-              // that token would let any popup the tool opens run fully
-              // unsandboxed, which could reach back via window.opener.top
-              // and navigate this tab anyway — closing that off entirely
-              // rather than relying on omitting top-navigation alone.
-              sandbox="allow-scripts allow-same-origin allow-forms allow-downloads allow-popups allow-modals"
-              style={{ width: '100%', height: '80vh', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}
-            />
-
-            {/* Inline "Save Record" — logs the PO built above without
-                switching tabs. Same createEntry('purchase-orders', ...)
-                call the Purchase Orders sheet's own form uses. */}
-            <form onSubmit={handleQuickSavePo} className="mt-5 pt-5 border-t" style={{ borderColor: 'var(--border)' }}>
-              <h3 className="text-sm font-bold mb-3" style={{ color: 'var(--text-primary)' }}>🧾 Log This PO</h3>
-              <p className="text-[10px] mb-3" style={{ color: 'var(--text-secondary)' }}>PO Number is assigned automatically when you save.</p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                <select
-                  value={poQuickForm.vendor_id || ''}
-                  onChange={e => setPoQuickForm({ ...poQuickForm, vendor_id: e.target.value })}
-                  className="mis-select text-xs"
-                >
-                  <option value="">Vendor (optional)</option>
-                  {vendors.map(v => <option key={v.id} value={v.id}>{v.vendor_name}</option>)}
-                </select>
-                <input
-                  type="number"
-                  placeholder="Amount (INR) *"
-                  value={poQuickForm.amount ?? ''}
-                  onChange={e => setPoQuickForm({ ...poQuickForm, amount: e.target.value })}
-                  className="mis-input text-xs"
-                />
-                <input
-                  type="date"
-                  value={poQuickForm.po_date || ''}
-                  onChange={e => setPoQuickForm({ ...poQuickForm, po_date: e.target.value })}
-                  className="mis-input text-xs"
-                />
-                <select
-                  value={poQuickForm.status || 'Raised'}
-                  onChange={e => setPoQuickForm({ ...poQuickForm, status: e.target.value })}
-                  className="mis-select text-xs"
-                >
-                  {['Raised', 'Approved', 'Fulfilled', 'Cancelled'].map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
-                <textarea
-                  placeholder="Item Description *"
-                  value={poQuickForm.item_description || ''}
-                  onChange={e => setPoQuickForm({ ...poQuickForm, item_description: e.target.value })}
-                  className="mis-input text-xs sm:col-span-2 lg:col-span-3"
-                  rows={2}
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={poQuickSubmitting}
-                className="mt-3 px-4 py-2 rounded-lg text-xs font-semibold disabled:opacity-50"
-                style={{ background: 'var(--text-accent)', color: 'white' }}
-              >
-                {poQuickSubmitting ? 'Saving...' : '💾 Save Record'}
-              </button>
-            </form>
-          </div>
+          <POGeneratorComponent
+            vendors={vendors}
+            onSaveToMIS={async (poRecord) => {
+              await itService.createEntry('purchase-orders', poRecord);
+              fetchEntries();
+            }}
+            onViewList={() => {
+              pendingActiveTabRef.current = 'list';
+              setSheetTab('purchase-orders');
+            }}
+          />
         ) : activeTab === 'list' ? (
           <div className="mis-card p-5">
             
             {/* Search and Filters toolbar */}
-            <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-5">
-              <input
-                type="text"
-                placeholder="Search records..."
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                className="mis-input text-xs w-full sm:w-64"
-              />
-              {hasMultiBranchAccess && !['audit-schedule', 'team-duties'].includes(sheetTab) && (
-                <select
-                  value={branchFilter}
-                  onChange={e => setBranchFilter(e.target.value)}
-                  className="mis-select text-xs w-full sm:w-48"
-                >
-                  <option value="">All Branches</option>
-                  {branches.map(b => (
-                    <option key={b.id} value={b.id}>{b.name}</option>
-                  ))}
-                </select>
-              )}
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-3 mb-5">
+              <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto flex-1">
+                <input
+                  type="text"
+                  placeholder="Search records..."
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)}
+                  className="mis-input text-xs w-full sm:w-60"
+                />
+
+                {currentSheetStatuses.length > 0 && (
+                  <select
+                    value={statusFilter}
+                    onChange={e => setStatusFilter(e.target.value)}
+                    className="mis-select text-xs w-full sm:w-44"
+                  >
+                    <option value="">All Statuses</option>
+                    {currentSheetStatuses.map((st: string) => (
+                      <option key={st} value={st}>{st}</option>
+                    ))}
+                  </select>
+                )}
+
+                {hasMultiBranchAccess && !['audit-schedule', 'team-duties'].includes(sheetTab) && (
+                  <select
+                    value={branchFilter}
+                    onChange={e => setBranchFilter(e.target.value)}
+                    className="mis-select text-xs w-full sm:w-44"
+                  >
+                    <option value="">All Branches</option>
+                    {branches.map(b => (
+                      <option key={b.id} value={b.id}>{b.name}</option>
+                    ))}
+                  </select>
+                )}
+
+                {(statusFilter || searchTerm || branchFilter) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchTerm('');
+                      setStatusFilter('');
+                      setBranchFilter('');
+                    }}
+                    className="text-xs font-semibold text-slate-400 hover:text-slate-200 transition-colors px-2 py-1"
+                  >
+                    ✕ Clear
+                  </button>
+                )}
+              </div>
+
+              <div className="text-xs text-slate-400 self-end sm:self-center font-medium shrink-0">
+                Showing <strong>{filteredEntries.length}</strong> of <strong>{entries.length}</strong> records
+              </div>
             </div>
 
             {loading ? (
               <div className="text-center py-10 text-gray-400">Loading department records...</div>
-            ) : entries.length === 0 ? (
+            ) : filteredEntries.length === 0 ? (
               <div className="text-center py-10 text-gray-400">No records found matching filters.</div>
             ) : (
               <div className="mis-table-wrap">
@@ -1297,14 +2647,14 @@ const ITDataEntryPage: React.FC = () => {
                       <th className="w-10 text-center">
                         <input
                           type="checkbox"
-                          checked={selectedIds.length === entries.length && entries.length > 0}
+                          checked={selectedIds.length === filteredEntries.length && filteredEntries.length > 0}
                           onChange={() => {
-                            if (selectedIds.length === entries.length) setSelectedIds([]);
-                            else setSelectedIds(entries.map(e => e.id));
+                            if (selectedIds.length === filteredEntries.length) setSelectedIds([]);
+                            else setSelectedIds(filteredEntries.map((e: any) => e.id));
                           }}
                         />
                       </th>
-                      {getFormFields().slice(0, 5).map(f => (
+                      {displayedFields.map(f => (
                         <th key={f.name}>{f.label}</th>
                       ))}
                       {sheetTab === 'assets' && (
@@ -1316,12 +2666,15 @@ const ITDataEntryPage: React.FC = () => {
                       {(sheetTab === 'audit-schedule' || sheetTab === 'amc-contracts' || sheetTab === 'software') && (
                         <th>Days to Go</th>
                       )}
+                      {hasStatusColumn && (
+                        <th>Status</th>
+                      )}
                       <th>Date Added</th>
                       <th className="text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {entries.map(row => (
+                    {filteredEntries.map((row: any) => (
                       <tr key={row.id}>
                         <td className="text-center">
                           <input
@@ -1330,7 +2683,7 @@ const ITDataEntryPage: React.FC = () => {
                             onChange={() => toggleSelectRow(row.id)}
                           />
                         </td>
-                        {getFormFields().slice(0, 5).map(f => {
+                        {displayedFields.map(f => {
                           let val = row[f.name];
                           if (f.name === 'vendor_id' && row.it_vendors) {
                             val = row.it_vendors.vendor_name;
@@ -1374,11 +2727,11 @@ const ITDataEntryPage: React.FC = () => {
                             <td className="text-green-400 font-semibold">₹{row.book_value}</td>
                             <td>
                               {row.time_to_upgrade ? (
-                                <span className="px-2 py-0.5 text-xs rounded bg-red-900/50 text-red-300 border border-red-500/30">
+                                <span className="px-2 py-0.5 text-xs rounded bg-red-900/50 text-red-300 border border-red-500/30 font-semibold">
                                   Yes (Upgrade)
                                 </span>
                               ) : (
-                                <span className="px-2 py-0.5 text-xs rounded bg-green-900/50 text-green-300 border border-green-500/30">
+                                <span className="px-2 py-0.5 text-xs rounded bg-green-900/50 text-green-300 border border-green-500/30 font-semibold">
                                   No
                                 </span>
                               )}
@@ -1388,6 +2741,17 @@ const ITDataEntryPage: React.FC = () => {
                         {(sheetTab === 'audit-schedule' || sheetTab === 'amc-contracts' || sheetTab === 'software') && (
                           <td>
                             <CountdownBadge dueDate={sheetTab === 'audit-schedule' ? row.next_due_date : row.amc_renewal_date} />
+                          </td>
+                        )}
+                        {hasStatusColumn && (
+                          <td>
+                            {row.status ? (
+                              <span className={getITStatusBadgeClass(row.status)}>
+                                {row.status}
+                              </span>
+                            ) : (
+                              <span className="text-slate-500 font-medium text-xs">—</span>
+                            )}
                           </td>
                         )}
                         <td>{new Date(row.created_at).toLocaleDateString()}</td>
@@ -1934,6 +3298,18 @@ const ITDataEntryPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        confirmLabel={confirmModal.confirmLabel}
+        cancelLabel={confirmModal.cancelLabel}
+        isDanger={confirmModal.isDanger}
+        loading={confirmModal.loading}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal(INITIAL_CONFIRM_STATE)}
+      />
 
       <ViewDetailsModal record={viewingRecord} onClose={() => setViewingRecord(null)} title="IT Record Details" />
     </DashboardLayout>

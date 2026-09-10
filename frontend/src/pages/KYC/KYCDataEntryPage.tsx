@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import ViewDetailsModal from '../../components/common/ViewDetailsModal';
+import ConfirmModal from '../../components/common/ConfirmModal';
+import { INITIAL_CONFIRM_STATE, type ConfirmDialogState } from '../../types/confirm.types';
 import CsvImportGuide from '../../components/common/CsvImportGuide';
 import { containsSampleSentinel } from '../../utils/csvBulkImportHelpers';
 import { kycService } from '../../services/kyc.service';
@@ -437,6 +439,7 @@ const KYCDataEntryPage: React.FC = () => {
   const [fetching, setFetching] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [viewingRecord, setViewingRecord] = useState<any>(null);
+  const [confirmModal, setConfirmModal] = useState<ConfirmDialogState>(INITIAL_CONFIRM_STATE);
 
   // Client Selection / Linking UX
   const [onboardedClients, setOnboardedClients] = useState<any[]>([]);
@@ -992,15 +995,27 @@ const KYCDataEntryPage: React.FC = () => {
     setActiveTab('register');
   };
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this record?')) return;
-    try {
-      await kycService.deleteEntry(getBackendSheetName(sheetTab), id);
-      toast.success('Record deleted.');
-      fetchRecords();
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Delete operation failed.');
-    }
+  const handleDelete = (id: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete KYC Record',
+      message: 'Are you sure you want to delete this record? This action cannot be undone.',
+      confirmLabel: 'Delete Record',
+      cancelLabel: 'Cancel',
+      isDanger: true,
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, loading: true }));
+        try {
+          await kycService.deleteEntry(getBackendSheetName(sheetTab), id);
+          toast.success('Record deleted.');
+          fetchRecords();
+          setConfirmModal(INITIAL_CONFIRM_STATE);
+        } catch (err: any) {
+          toast.error(err.response?.data?.message || 'Delete operation failed.');
+          setConfirmModal(prev => ({ ...prev, loading: false }));
+        }
+      }
+    });
   };
 
   // UX Component: Selector populated with clients onboarded/verified in sheet 1
@@ -2790,7 +2805,19 @@ const KYCDataEntryPage: React.FC = () => {
           </div>
         )}
 
-        <ViewDetailsModal record={viewingRecord} onClose={() => setViewingRecord(null)} title="KYC Record Details" />
+        <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        confirmLabel={confirmModal.confirmLabel}
+        cancelLabel={confirmModal.cancelLabel}
+        isDanger={confirmModal.isDanger}
+        loading={confirmModal.loading}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal(INITIAL_CONFIRM_STATE)}
+      />
+
+      <ViewDetailsModal record={viewingRecord} onClose={() => setViewingRecord(null)} title="KYC Record Details" />
       </div>
     </DashboardLayout>
   );
