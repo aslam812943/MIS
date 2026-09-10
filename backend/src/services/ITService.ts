@@ -503,15 +503,19 @@ export class ITService {
 
     let selectString = '*';
     if (sheet === 'assets') {
-      selectString = '*, it_vendors(vendor_name)';
+      selectString = '*, it_vendors(vendor_name), branches(name), profiles:created_by(full_name, email)';
     } else if (sheet === 'audit-findings') {
-      selectString = '*, it_audits(audit_name)';
+      selectString = '*, it_audits(audit_name), branches(name), profiles:created_by(full_name, email)';
     } else if (sheet === 'amc-contracts' || sheet === 'software') {
-      selectString = '*, it_vendors(vendor_name)';
+      selectString = '*, it_vendors(vendor_name), branches(name), profiles:created_by(full_name, email)';
     } else if (sheet === 'servers') {
-      selectString = '*, it_assets(asset_id), it_diagrams(diagram_name)';
+      selectString = '*, it_assets(asset_id), it_diagrams(diagram_name), branches(name), profiles:created_by(full_name, email)';
     } else if (sheet === 'team-duties') {
-      selectString = '*, profiles!it_team_duties_profile_id_fkey(full_name), reporting_to_profile:profiles!it_team_duties_reporting_to_fkey(full_name)';
+      selectString = '*, profiles!it_team_duties_profile_id_fkey(full_name), reporting_to_profile:profiles!it_team_duties_reporting_to_fkey(full_name), creator:profiles!it_team_duties_created_by_fkey(full_name, email)';
+    } else if (sheet === 'audit-schedule') {
+      selectString = '*, profiles:created_by(full_name, email)';
+    } else {
+      selectString = '*, branches(name), profiles:created_by(full_name, email)';
     }
 
     let query = client.from(table).select(selectString);

@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import ViewDetailsModal from '../../components/common/ViewDetailsModal';
+import ConfirmModal from '../../components/common/ConfirmModal';
+import { INITIAL_CONFIRM_STATE, type ConfirmDialogState } from '../../types/confirm.types';
 import CsvImportGuide from '../../components/common/CsvImportGuide';
 import { validateCsvHeaders, containsSampleSentinel, type CsvHeaderValidation } from '../../utils/csvBulkImportHelpers';
 import { hrService } from '../../services/hr.service';
@@ -93,6 +95,7 @@ const HRDataEntryPage: React.FC = () => {
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [viewingRecord, setViewingRecord] = useState<any>(null);
+  const [confirmModal, setConfirmModal] = useState<ConfirmDialogState>(INITIAL_CONFIRM_STATE);
   const [formData, setFormData] = useState<any>({});
 
   const [csvModalOpen, setCsvModalOpen] = useState(false);
@@ -323,15 +326,27 @@ const HRDataEntryPage: React.FC = () => {
     setActiveTab('register');
   };
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('Delete this record? This cannot be undone.')) return;
-    try {
-      await hrService.deleteEntry(sheetTab, id);
-      toast.success('Record deleted.');
-      fetchEntries();
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Delete failed.');
-    }
+  const handleDelete = (id: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete HR Record',
+      message: 'Delete this record? This action cannot be undone.',
+      confirmLabel: 'Delete Record',
+      cancelLabel: 'Cancel',
+      isDanger: true,
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, loading: true }));
+        try {
+          await hrService.deleteEntry(sheetTab, id);
+          toast.success('Record deleted.');
+          fetchEntries();
+          setConfirmModal(INITIAL_CONFIRM_STATE);
+        } catch (err: any) {
+          toast.error(err.response?.data?.message || 'Delete failed.');
+          setConfirmModal(prev => ({ ...prev, loading: false }));
+        }
+      }
+    });
   };
 
   const handleFileUpload = async (fieldName: string, file: File) => {
@@ -694,7 +709,19 @@ const HRDataEntryPage: React.FC = () => {
           </div>
         )}
 
-        <ViewDetailsModal record={viewingRecord} onClose={() => setViewingRecord(null)} title="HR Record Details" />
+        <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        confirmLabel={confirmModal.confirmLabel}
+        cancelLabel={confirmModal.cancelLabel}
+        isDanger={confirmModal.isDanger}
+        loading={confirmModal.loading}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal(INITIAL_CONFIRM_STATE)}
+      />
+
+      <ViewDetailsModal record={viewingRecord} onClose={() => setViewingRecord(null)} title="HR Record Details" />
       </div>
     </DashboardLayout>
   );

@@ -6,6 +6,7 @@ export interface ConfirmDialogState {
   cancelLabel: string;
   isDanger: boolean;
   onConfirm: () => void;
+  loading?: boolean;
 }
 
 export const INITIAL_CONFIRM_STATE: ConfirmDialogState = {
@@ -16,4 +17,5 @@ export const INITIAL_CONFIRM_STATE: ConfirmDialogState = {
   cancelLabel: 'Cancel',
   isDanger: true,
   onConfirm: () => {},
+  loading: false,
 };

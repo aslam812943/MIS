@@ -353,15 +353,27 @@ const IEPFDataEntryPage: React.FC = () => {
     toast.success('Loaded claim data for editing.');
   };
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this claim?')) return;
-    try {
-      await iepfService.deleteClaim(id);
-      toast.success('Claim deleted.');
-      fetchClaims();
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Delete operation failed.');
-    }
+  const handleDelete = (id: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete IEPF Claim',
+      message: 'Are you sure you want to delete this claim? This action cannot be undone.',
+      confirmLabel: 'Delete Claim',
+      cancelLabel: 'Cancel',
+      isDanger: true,
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, loading: true }));
+        try {
+          await iepfService.deleteClaim(id);
+          toast.success('Claim deleted.');
+          fetchClaims();
+          setConfirmModal(INITIAL_CONFIRM_STATE);
+        } catch (err: any) {
+          toast.error(err.response?.data?.message || 'Delete operation failed.');
+          setConfirmModal(prev => ({ ...prev, loading: false }));
+        }
+      }
+    });
   };
 
   const handleCancelEdit = () => {

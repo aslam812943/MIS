@@ -500,15 +500,27 @@ const SettlementsDataEntryPage: React.FC = () => {
     corporate_actions: 'corporate-actions',
   };
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this record?')) return;
-    try {
-      await settlementService.deleteEntry(SETTLEMENTS_SHEET_URL_SLUG[sheetTab], id);
-      toast.success('Record deleted.');
-      fetchRecords();
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Delete operation failed.');
-    }
+  const handleDelete = (id: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete Settlement Record',
+      message: 'Are you sure you want to delete this record? This action cannot be undone.',
+      confirmLabel: 'Delete Record',
+      cancelLabel: 'Cancel',
+      isDanger: true,
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, loading: true }));
+        try {
+          await settlementService.deleteEntry(SETTLEMENTS_SHEET_URL_SLUG[sheetTab], id);
+          toast.success('Record deleted.');
+          fetchRecords();
+          setConfirmModal(INITIAL_CONFIRM_STATE);
+        } catch (err: any) {
+          toast.error(err.response?.data?.message || 'Delete operation failed.');
+          setConfirmModal(prev => ({ ...prev, loading: false }));
+        }
+      }
+    });
   };
 
   // Plain-English "why are we collecting this" panel shown beside the entry

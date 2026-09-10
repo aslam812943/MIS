@@ -3,6 +3,8 @@ import DashboardLayout from '../../components/layout/DashboardLayout';
 import { socialMediaService, type SocialMediaPost, type CreatorProfile } from '../../services/socialMedia.service';
 import { authService } from '../../services/auth.service';
 import toast from 'react-hot-toast';
+import ConfirmModal from '../../components/common/ConfirmModal';
+import { INITIAL_CONFIRM_STATE, type ConfirmDialogState } from '../../types/confirm.types';
 
 const COLUMNS: Array<{ key: SocialMediaPost['status']; label: string; icon: string }> = [
   { key: 'Idea', label: 'Ideas / Concepts', icon: '??' },
@@ -27,6 +29,7 @@ const Planner: React.FC = () => {
   const [showModal, setShowModal] = useState<boolean>(false);
   const [filterPlatform, setFilterPlatform] = useState<string>('all');
   const [filterCreator, setFilterCreator] = useState<string>('all');
+  const [confirmModal, setConfirmModal] = useState<ConfirmDialogState>(INITIAL_CONFIRM_STATE);
 
   const fetchPosts = async (creatorId: string = filterCreator) => {
     try {
@@ -99,18 +102,30 @@ const Planner: React.FC = () => {
     }
   };
 
-  const handleDeletePost = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this content item?')) return;
-    try {
-      await socialMediaService.deletePost(id);
-      toast.success('Content item deleted.');
-      setShowModal(false);
-      setEditingPost(null);
-      fetchPosts(filterCreator);
-    } catch (err) {
-      console.error(err);
-      toast.error('Failed to delete content.');
-    }
+  const handleDeletePost = (id: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete Content Card',
+      message: 'Are you sure you want to delete this content item? This action cannot be undone.',
+      confirmLabel: 'Delete Card',
+      cancelLabel: 'Cancel',
+      isDanger: true,
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, loading: true }));
+        try {
+          await socialMediaService.deletePost(id);
+          toast.success('Content item deleted.');
+          setShowModal(false);
+          setEditingPost(null);
+          fetchPosts(filterCreator);
+          setConfirmModal(INITIAL_CONFIRM_STATE);
+        } catch (err) {
+          console.error(err);
+          toast.error('Failed to delete content.');
+          setConfirmModal(prev => ({ ...prev, loading: false }));
+        }
+      }
+    });
   };
 
   const movePostStatus = async (post: SocialMediaPost, nextStatus: SocialMediaPost['status']) => {
@@ -489,6 +504,17 @@ const Planner: React.FC = () => {
           </div>
         )}
       </div>
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        confirmLabel={confirmModal.confirmLabel}
+        cancelLabel={confirmModal.cancelLabel}
+        isDanger={confirmModal.isDanger}
+        loading={confirmModal.loading}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal(INITIAL_CONFIRM_STATE)}
+      />
     </DashboardLayout>
   );
 };
