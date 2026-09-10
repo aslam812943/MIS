@@ -238,20 +238,21 @@ export class ITService {
       }
     }
 
-    // Alphanumeric code formatting check
+    // Code formatting check
     if (payload.ticket_number !== undefined && payload.ticket_number !== null && String(payload.ticket_number).trim() !== '') {
-      if (!/^[A-Z0-9-]+$/i.test(String(payload.ticket_number).trim())) {
-        throw new Error('Ticket number must be alphanumeric characters.');
+      if (!/^[A-Z0-9-_/.:#\s]+$/i.test(String(payload.ticket_number).trim())) {
+        throw new Error('Ticket number must be alphanumeric characters or standard symbols.');
       }
     }
     if (payload.incident_number !== undefined && payload.incident_number !== null && String(payload.incident_number).trim() !== '') {
-      if (!/^[A-Z0-9-]+$/i.test(String(payload.incident_number).trim())) {
-        throw new Error('Incident number must be alphanumeric characters.');
+      if (!/^[A-Z0-9-_/.:#\s]+$/i.test(String(payload.incident_number).trim())) {
+        throw new Error('Incident number must be alphanumeric characters or standard symbols.');
       }
     }
     if (payload.asset_id !== undefined && payload.asset_id !== null && String(payload.asset_id).trim() !== '') {
-      if (!/^[A-Z0-9-]+$/i.test(String(payload.asset_id).trim())) {
-        throw new Error('Asset ID must be alphanumeric characters.');
+      const assetIdStr = String(payload.asset_id).trim();
+      if (assetIdStr.length > 100) {
+        throw new Error('Asset ID exceeds maximum length limit of 100 characters.');
       }
     }
 
@@ -301,27 +302,9 @@ export class ITService {
       }
     }
 
-    // audit_type means something different depending on the sheet: the old
-    // per-cycle 'audits' log (Internal/CERT-In/SEBI-Mandated/VAPT) vs. the
-    // new recurring 'audit-schedule' (System Audit/Cybersecurity Audit/VAPT).
-    if (payload.audit_type !== undefined && payload.audit_type !== null && String(payload.audit_type).trim() !== '') {
-      const allowedAuditTypes = sheet === 'audit-schedule'
-        ? ['System Audit', 'Cybersecurity Audit', 'VAPT']
-        : ['Internal', 'CERT-In Empanelled External', 'SEBI-Mandated Cyber Audit', 'VAPT'];
-      if (!allowedAuditTypes.includes(String(payload.audit_type).trim())) {
-        throw new Error('Invalid audit type.');
-      }
-    }
-
     if (payload.physical_or_virtual !== undefined && payload.physical_or_virtual !== null && String(payload.physical_or_virtual).trim() !== '') {
       if (!['Physical', 'Virtual'].includes(String(payload.physical_or_virtual).trim())) {
         throw new Error('Invalid value for Physical or Virtual.');
-      }
-    }
-
-    if (payload.domain !== undefined && payload.domain !== null && String(payload.domain).trim() !== '') {
-      if (!['Governance', 'Infrastructure', 'Data Security', 'Network Security', 'Access Control', 'Incident Management'].includes(String(payload.domain).trim())) {
-        throw new Error('Invalid compliance domain.');
       }
     }
 
@@ -639,12 +622,12 @@ export class ITService {
     delete (payload as any).id;
     delete (payload as any).created_at;
     delete (payload as any).updated_at;
-    delete (payload as any).asset_type_select;
-    delete (payload as any).asset_type_is_other;
-    delete (payload as any).custom_asset_type;
-    delete (payload as any).asset_type_select;
-    delete (payload as any).asset_type_is_other;
-    delete (payload as any).custom_asset_type;
+    // Strip temporary frontend fields for "Other" custom inputs
+    for (const key of Object.keys(payload as any)) {
+      if (key.endsWith('_select') || key.endsWith('_is_other') || key.startsWith('custom_')) {
+        delete (payload as any)[key];
+      }
+    }
 
     if (sheet === 'audit-schedule') this.computeNextAuditDueDate(payload);
 
@@ -704,6 +687,12 @@ export class ITService {
     delete (payload as any).id;
     delete (payload as any).created_at;
     delete (payload as any).updated_at;
+    // Strip temporary frontend fields for "Other" custom inputs
+    for (const key of Object.keys(payload as any)) {
+      if (key.endsWith('_select') || key.endsWith('_is_other') || key.startsWith('custom_')) {
+        delete (payload as any)[key];
+      }
+    }
 
     if (sheet === 'audit-schedule') {
       // A partial update (e.g. only changing auditor_name) shouldn't lose

@@ -1110,10 +1110,10 @@ const FinanceDataEntryPage: React.FC = () => {
 
             </div>
 
-            <div className="flex justify-end space-x-3 pt-6 mt-6 border-t border-gray-850">
+            <div className="flex justify-end space-x-3 pt-6 mt-6 border-t border-gray-800">
               <button
-                className="px-4 py-2 border rounded-lg text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-                style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}
+                type="button"
+                className="px-4 py-2 border border-gray-700 rounded-lg text-xs font-semibold text-gray-300 hover:text-white hover:bg-gray-800 hover:border-gray-600 transition-colors"
                 onClick={() => {
                   setCsvModalOpen(false);
                   setCsvHeaders([]);

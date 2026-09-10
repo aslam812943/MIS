@@ -82,11 +82,6 @@ const IconShare2 = () => (
     <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
   </svg>
 );
-const IconVideo = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <polygon points="23 7 16 12 23 17 23 7" /><rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
-  </svg>
-);
 const IconServer = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <rect x="2" y="2" width="20" height="8" rx="2" ry="2" /><rect x="2" y="14" width="20" height="8" rx="2" ry="2" />
@@ -206,10 +201,12 @@ const DashboardPage: React.FC = () => {
         })))).catch(() => {});
       }
 
-      // 2. Social Media & Content Creator data
-      socialMediaService.getAnalytics(start, end).then(setSmmAnalytics).catch(() => {});
-      socialMediaService.getPosts().then(setSmmPosts).catch(() => {});
-      socialMediaService.getCampaigns().then(setSmmCampaigns).catch(() => {});
+      // 2. Social Media & Content Creator data (non-admin)
+      if (!isAdmin) {
+        socialMediaService.getAnalytics(start, end).then(setSmmAnalytics).catch(() => {});
+        socialMediaService.getPosts().then(setSmmPosts).catch(() => {});
+        socialMediaService.getCampaigns().then(setSmmCampaigns).catch(() => {});
+      }
 
       // 3. Department Data in Parallel
       salesService.getDashboardData(undefined, start, end).then(setSalesData).catch(() => {});
@@ -259,16 +256,16 @@ const DashboardPage: React.FC = () => {
   useEffect(() => {
     const rafId = requestAnimationFrame(() => {
       const isDark = theme === 'dark';
-      const tickColor = isDark ? '#94a3b8' : '#64748b';
-      const gridColor = isDark ? 'rgba(51, 65, 85, 0.4)' : 'rgba(226, 232, 240, 0.8)';
-      const legendColor = isDark ? '#e2e8f0' : '#1e293b';
-      const tooltipBg = isDark ? 'rgba(15, 23, 42, 0.95)' : 'rgba(255, 255, 255, 0.95)';
+      const tickColor = isDark ? '#94a3b8' : '#334155';
+      const gridColor = isDark ? 'rgba(51, 65, 85, 0.4)' : 'rgba(203, 213, 225, 0.6)';
+      const legendColor = isDark ? '#e2e8f0' : '#0f172a';
+      const tooltipBg = isDark ? 'rgba(15, 23, 42, 0.95)' : 'rgba(255, 255, 255, 0.98)';
       const tooltipTitleColor = isDark ? '#f8fafc' : '#0f172a';
-      const tooltipBorderColor = isDark ? 'rgba(51, 65, 85, 0.8)' : 'rgba(226, 232, 240, 0.9)';
+      const tooltipBorderColor = isDark ? 'rgba(51, 65, 85, 0.8)' : 'rgba(203, 213, 225, 0.9)';
       const cardBgColor = isDark ? '#0f172a' : '#ffffff';
 
       // 1. SMM Follower Growth Line Chart
-      if (smmFollowersRef.current && (activeTab === 'social_media' || activeTab === 'overview')) {
+      if (smmFollowersRef.current && activeTab === 'social_media') {
         if (smmFollowersInstance.current) smmFollowersInstance.current.destroy();
         const ctx = smmFollowersRef.current.getContext('2d');
         if (ctx) {
@@ -375,7 +372,7 @@ const DashboardPage: React.FC = () => {
       }
 
       // 3. SMM Platform Reach Doughnut
-      if (smmPlatformRef.current && (activeTab === 'social_media' || activeTab === 'overview')) {
+      if (smmPlatformRef.current && activeTab === 'social_media') {
         if (smmPlatformInstance.current) smmPlatformInstance.current.destroy();
         const ctx = smmPlatformRef.current.getContext('2d');
         if (ctx) {
@@ -531,10 +528,9 @@ const DashboardPage: React.FC = () => {
           overviewVolumeInstance.current = new Chart(ctx, {
             type: 'doughnut',
             data: {
-              labels: ['Social Media', 'Sales', 'Finance', 'KYC', 'DP', 'IT', 'IEPF', 'Settlements'],
+              labels: ['Sales', 'Finance', 'KYC', 'DP', 'IT', 'IEPF', 'Settlements'],
               datasets: [{
                 data: [
-                  smmPosts.length || 24,
                   salesData?.kpis?.totalSalesCount || 18,
                   financeData?.kpis?.totalTransactions || 32,
                   kycData?.totalApplications || 40,
@@ -543,7 +539,7 @@ const DashboardPage: React.FC = () => {
                   iepfData?.totalClaims || 12,
                   settlementData?.totalRecords || 22
                 ],
-                backgroundColor: ['#a855f7', '#3b82f6', '#10b981', '#f59e0b', '#06b6d4', '#6366f1', '#ec4899', '#14b8a6'],
+                backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#06b6d4', '#6366f1', '#ec4899', '#14b8a6'],
                 borderWidth: 2,
                 borderColor: cardBgColor
               }]
@@ -665,7 +661,7 @@ const DashboardPage: React.FC = () => {
   // Tab definitions
   const allTabs: { id: DashboardTab; label: string; icon: React.ReactNode; show: boolean }[] = [
     { id: 'overview', label: 'Executive Overview', icon: <IconActivity />, show: isAdmin || isLeadership },
-    { id: 'social_media', label: 'Social Media & Content', icon: <IconShare2 />, show: isAdmin || isLeadership || isSMM || isCreator },
+    { id: 'social_media', label: 'Social Media & Content', icon: <IconShare2 />, show: !isAdmin && (isLeadership || isSMM || isCreator) },
     { id: 'sales', label: 'Sales & Revenue', icon: <IconTrendingUp />, show: isAdmin || isLeadership || user?.department_name?.toUpperCase() === 'SALES' },
     { id: 'finance', label: 'Finance & PnL', icon: <IconDollar />, show: isAdmin || isLeadership || user?.department_name?.toUpperCase() === 'FINANCE' },
     { id: 'it', label: 'IT Infrastructure', icon: <IconServer />, show: isAdmin || isLeadership || user?.department_name?.toUpperCase() === 'IT' },
@@ -700,15 +696,15 @@ const DashboardPage: React.FC = () => {
         </header>
 
         {/* Tab Navigation Bar */}
-        <div className="flex overflow-x-auto gap-2 p-1.5 rounded-xl border border-[var(--border-light)] bg-slate-900/40 backdrop-blur-md no-scrollbar">
+        <div className="flex overflow-x-auto gap-2 p-1.5 rounded-xl border border-[var(--border)] bg-[var(--bg-card)] dark:bg-slate-900/40 backdrop-blur-md shadow-sm no-scrollbar">
           {visibleTabs.map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition duration-200 whitespace-nowrap shrink-0 ${
                 activeTab === tab.id
-                  ? 'bg-sky-500 text-white shadow-lg shadow-sky-500/20'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                  ? 'bg-sky-600 dark:bg-sky-500 text-white shadow-md shadow-sky-500/20'
+                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60'
               }`}
             >
               <span>{tab.icon}</span>
@@ -729,57 +725,49 @@ const DashboardPage: React.FC = () => {
         {activeTab === 'overview' && (
           <div className="space-y-6">
             {/* Top Multi-Department KPI Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
               <div className="mis-card p-4">
-                <span className="text-[11px] font-bold uppercase tracking-wider opacity-60">Social Reach</span>
-                <span className="text-2xl font-black block mt-1 text-purple-400">
-                  {smmMetrics.impressions > 1000 ? (smmMetrics.impressions / 1000).toFixed(1) + 'k' : smmMetrics.impressions}
-                </span>
-                <span className="text-[10px] text-emerald-400 mt-0.5 block font-semibold">+{smmMetrics.net} Net Followers</span>
-              </div>
-
-              <div className="mis-card p-4">
-                <span className="text-[11px] font-bold uppercase tracking-wider opacity-60">Sales Deals</span>
-                <span className="text-2xl font-black block mt-1 text-sky-400">
+                <span className="text-[11px] font-bold uppercase tracking-wider block" style={{ color: 'var(--text-secondary)' }}>Sales Deals</span>
+                <span className="text-2xl font-black block mt-1 text-sky-600 dark:text-sky-400">
                   {salesData?.kpis?.totalSalesCount || 0}
                 </span>
-                <span className="text-[10px] text-slate-400 mt-0.5 block font-semibold">
+                <span className="text-[11px] mt-0.5 block font-medium" style={{ color: 'var(--text-secondary)' }}>
                   ₹{((salesData?.kpis?.totalRevenue || 0) / 1000).toFixed(0)}k closed
                 </span>
               </div>
 
               <div className="mis-card p-4">
-                <span className="text-[11px] font-bold uppercase tracking-wider opacity-60">Finance PnL</span>
-                <span className="text-2xl font-black block mt-1 text-emerald-400">
+                <span className="text-[11px] font-bold uppercase tracking-wider block" style={{ color: 'var(--text-secondary)' }}>Finance PnL</span>
+                <span className="text-2xl font-black block mt-1 text-emerald-600 dark:text-emerald-400">
                   ₹{((financeData?.kpis?.netProfit || 0) / 1000).toFixed(0)}k
                 </span>
-                <span className="text-[10px] text-emerald-400 mt-0.5 block font-semibold">Positive Margin</span>
+                <span className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-0.5 block font-semibold">Positive Margin</span>
               </div>
 
               <div className="mis-card p-4">
-                <span className="text-[11px] font-bold uppercase tracking-wider opacity-60">Active Headcount</span>
-                <span className="text-2xl font-black block mt-1 text-amber-400">
+                <span className="text-[11px] font-bold uppercase tracking-wider block" style={{ color: 'var(--text-secondary)' }}>Active Headcount</span>
+                <span className="text-2xl font-black block mt-1 text-amber-600 dark:text-amber-400">
                   {hrData?.kpis?.totalEmployees || systemStats.users || 0}
                 </span>
-                <span className="text-[10px] text-slate-400 mt-0.5 block font-semibold">
+                <span className="text-[11px] mt-0.5 block font-medium" style={{ color: 'var(--text-secondary)' }}>
                   {systemStats.branches || 1} Branches
                 </span>
               </div>
 
               <div className="mis-card p-4">
-                <span className="text-[11px] font-bold uppercase tracking-wider opacity-60">KYC Onboarded</span>
-                <span className="text-2xl font-black block mt-1 text-rose-400">
+                <span className="text-[11px] font-bold uppercase tracking-wider block" style={{ color: 'var(--text-secondary)' }}>KYC Onboarded</span>
+                <span className="text-2xl font-black block mt-1 text-rose-600 dark:text-rose-400">
                   {kycData?.totalApplications || 0}
                 </span>
-                <span className="text-[10px] text-slate-400 mt-0.5 block font-semibold">Demat & Trading</span>
+                <span className="text-[11px] mt-0.5 block font-medium" style={{ color: 'var(--text-secondary)' }}>Demat & Trading</span>
               </div>
 
               <div className="mis-card p-4">
-                <span className="text-[11px] font-bold uppercase tracking-wider opacity-60">IT Assets</span>
-                <span className="text-2xl font-black block mt-1 text-indigo-400">
+                <span className="text-[11px] font-bold uppercase tracking-wider block" style={{ color: 'var(--text-secondary)' }}>IT Assets</span>
+                <span className="text-2xl font-black block mt-1 text-indigo-600 dark:text-indigo-400">
                   {itData?.totalAssets || 0}
                 </span>
-                <span className="text-[10px] text-slate-400 mt-0.5 block font-semibold">99.8% Uptime</span>
+                <span className="text-[11px] mt-0.5 block font-medium" style={{ color: 'var(--text-secondary)' }}>99.8% Uptime</span>
               </div>
             </div>
 
@@ -788,83 +776,63 @@ const DashboardPage: React.FC = () => {
               <div className="mis-card p-6">
                 <div className="flex justify-between items-center mb-4">
                   <div>
-                    <h3 className="font-bold text-base" style={{ color: 'var(--text-primary)' }}>Social Follower & Growth Curve</h3>
-                    <p className="text-xs opacity-70" style={{ color: 'var(--text-secondary)' }}>Followers gained, lost, and net growth trend</p>
-                  </div>
-                  <button onClick={() => setActiveTab('social_media')} className="text-xs font-bold text-sky-400 hover:underline">
-                    View SMM Tab &rarr;
-                  </button>
-                </div>
-                <div className="h-[280px] w-full relative">
-                  <canvas ref={smmFollowersRef} />
-                </div>
-              </div>
-
-              <div className="mis-card p-6">
-                <div className="flex justify-between items-center mb-4">
-                  <div>
                     <h3 className="font-bold text-base" style={{ color: 'var(--text-primary)' }}>Department Operational Volume</h3>
-                    <p className="text-xs opacity-70" style={{ color: 'var(--text-secondary)' }}>Activity distribution across organization streams</p>
+                    <p className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Activity distribution across core organization streams</p>
                   </div>
                 </div>
                 <div className="h-[280px] w-full relative">
                   <canvas ref={overviewVolumeRef} />
                 </div>
               </div>
-            </div>
 
-            {/* Financials vs Targets Overview */}
-            <div className="mis-card p-6">
-              <h3 className="font-bold text-base mb-1" style={{ color: 'var(--text-primary)' }}>Executive Performance & Financial Overview</h3>
-              <p className="text-xs opacity-70 mb-4" style={{ color: 'var(--text-secondary)' }}>Aggregated financial benchmarks and revenue progress across departments</p>
-              <div className="h-[260px] w-full relative">
-                <canvas ref={overviewFinancialRef} />
+              <div className="mis-card p-6">
+                <div className="flex justify-between items-center mb-4">
+                  <div>
+                    <h3 className="font-bold text-base" style={{ color: 'var(--text-primary)' }}>Executive Performance & Financial Overview</h3>
+                    <p className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Aggregated financial benchmarks and revenue progress across departments</p>
+                  </div>
+                </div>
+                <div className="h-[280px] w-full relative">
+                  <canvas ref={overviewFinancialRef} />
+                </div>
               </div>
             </div>
 
             {/* Department Quick Jump Grid */}
             <div className="mis-card p-6">
               <h3 className="font-bold text-base mb-3" style={{ color: 'var(--text-primary)' }}>Department Quick Command Launch</h3>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-                <Link to={ROUTES.SMM_DASHBOARD} className="mis-btn mis-btn-ghost justify-start p-3 text-xs">
-                  <span className="mis-action-icon text-purple-400"><IconShare2 /></span>
-                  <span>Social Media Hub</span>
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-4 gap-3">
+                <Link to={ROUTES.SALES_DASHBOARD} className="mis-btn mis-btn-ghost justify-start p-3 text-xs border border-[var(--border)] hover:bg-[var(--bg-hover-2)]">
+                  <span className="mis-action-icon text-emerald-600 dark:text-emerald-400"><IconTrendingUp /></span>
+                  <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>Sales Department</span>
                 </Link>
-                <Link to={ROUTES.CREATOR_DASHBOARD} className="mis-btn mis-btn-ghost justify-start p-3 text-xs">
-                  <span className="mis-action-icon text-sky-400"><IconVideo /></span>
-                  <span>Content Creator</span>
+                <Link to={ROUTES.FINANCE_DASHBOARD} className="mis-btn mis-btn-ghost justify-start p-3 text-xs border border-[var(--border)] hover:bg-[var(--bg-hover-2)]">
+                  <span className="mis-action-icon text-emerald-600 dark:text-emerald-400"><IconDollar /></span>
+                  <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>Finance Dashboard</span>
                 </Link>
-                <Link to={ROUTES.SALES_DASHBOARD} className="mis-btn mis-btn-ghost justify-start p-3 text-xs">
-                  <span className="mis-action-icon text-emerald-400"><IconTrendingUp /></span>
-                  <span>Sales Department</span>
+                <Link to={ROUTES.IT_DASHBOARD} className="mis-btn mis-btn-ghost justify-start p-3 text-xs border border-[var(--border)] hover:bg-[var(--bg-hover-2)]">
+                  <span className="mis-action-icon text-indigo-600 dark:text-indigo-400"><IconServer /></span>
+                  <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>IT Dashboard</span>
                 </Link>
-                <Link to={ROUTES.FINANCE_DASHBOARD} className="mis-btn mis-btn-ghost justify-start p-3 text-xs">
-                  <span className="mis-action-icon text-emerald-400"><IconDollar /></span>
-                  <span>Finance Dashboard</span>
+                <Link to={ROUTES.HR_USER_MANAGEMENT} className="mis-btn mis-btn-ghost justify-start p-3 text-xs border border-[var(--border)] hover:bg-[var(--bg-hover-2)]">
+                  <span className="mis-action-icon text-amber-600 dark:text-amber-400"><IconUsers /></span>
+                  <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>HR & Personnel</span>
                 </Link>
-                <Link to={ROUTES.IT_DASHBOARD} className="mis-btn mis-btn-ghost justify-start p-3 text-xs">
-                  <span className="mis-action-icon text-indigo-400"><IconServer /></span>
-                  <span>IT Dashboard</span>
+                <Link to={ROUTES.KYC_DASHBOARD} className="mis-btn mis-btn-ghost justify-start p-3 text-xs border border-[var(--border)] hover:bg-[var(--bg-hover-2)]">
+                  <span className="mis-action-icon text-rose-600 dark:text-rose-400"><IconShieldCheck /></span>
+                  <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>KYC Verification</span>
                 </Link>
-                <Link to={ROUTES.HR_USER_MANAGEMENT} className="mis-btn mis-btn-ghost justify-start p-3 text-xs">
-                  <span className="mis-action-icon text-amber-400"><IconUsers /></span>
-                  <span>HR & Personnel</span>
+                <Link to={ROUTES.DP_DASHBOARD} className="mis-btn mis-btn-ghost justify-start p-3 text-xs border border-[var(--border)] hover:bg-[var(--bg-hover-2)]">
+                  <span className="mis-action-icon text-cyan-600 dark:text-cyan-400"><IconDashboardTile /></span>
+                  <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>DP Operations</span>
                 </Link>
-                <Link to={ROUTES.KYC_DASHBOARD} className="mis-btn mis-btn-ghost justify-start p-3 text-xs">
-                  <span className="mis-action-icon text-rose-400"><IconShieldCheck /></span>
-                  <span>KYC Verification</span>
+                <Link to={ROUTES.IEPF_DASHBOARD} className="mis-btn mis-btn-ghost justify-start p-3 text-xs border border-[var(--border)] hover:bg-[var(--bg-hover-2)]">
+                  <span className="mis-action-icon text-teal-600 dark:text-teal-400"><IconCheck /></span>
+                  <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>IEPF Claims</span>
                 </Link>
-                <Link to={ROUTES.DP_DASHBOARD} className="mis-btn mis-btn-ghost justify-start p-3 text-xs">
-                  <span className="mis-action-icon text-cyan-400"><IconDashboardTile /></span>
-                  <span>DP Operations</span>
-                </Link>
-                <Link to={ROUTES.IEPF_DASHBOARD} className="mis-btn mis-btn-ghost justify-start p-3 text-xs">
-                  <span className="mis-action-icon text-teal-400"><IconCheck /></span>
-                  <span>IEPF Claims</span>
-                </Link>
-                <Link to={ROUTES.SETTLEMENTS_DASHBOARD} className="mis-btn mis-btn-ghost justify-start p-3 text-xs">
-                  <span className="mis-action-icon text-blue-400"><IconActivity /></span>
-                  <span>Settlements</span>
+                <Link to={ROUTES.SETTLEMENTS_DASHBOARD} className="mis-btn mis-btn-ghost justify-start p-3 text-xs border border-[var(--border)] hover:bg-[var(--bg-hover-2)]">
+                  <span className="mis-action-icon text-blue-600 dark:text-blue-400"><IconActivity /></span>
+                  <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>Settlements</span>
                 </Link>
               </div>
             </div>
@@ -879,57 +847,57 @@ const DashboardPage: React.FC = () => {
             {/* SMM KPI Banner */}
             <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
               <div className="mis-card p-3.5">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400">Gained</span>
-                <span className="text-xl font-black block mt-1 text-emerald-400">+{smmMetrics.gained}</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider block" style={{ color: 'var(--text-secondary)' }}>Gained</span>
+                <span className="text-xl font-black block mt-1 text-emerald-600 dark:text-emerald-400">+{smmMetrics.gained}</span>
               </div>
               <div className="mis-card p-3.5">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-red-400">Lost</span>
-                <span className="text-xl font-black block mt-1 text-red-400">-{smmMetrics.lost}</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider block" style={{ color: 'var(--text-secondary)' }}>Lost</span>
+                <span className="text-xl font-black block mt-1 text-red-600 dark:text-red-400">-{smmMetrics.lost}</span>
               </div>
               <div className="mis-card p-3.5">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-sky-400">Net Growth</span>
-                <span className="text-xl font-black block mt-1 text-sky-400">{smmMetrics.net >= 0 ? '+' : ''}{smmMetrics.net}</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider block" style={{ color: 'var(--text-secondary)' }}>Net Growth</span>
+                <span className="text-xl font-black block mt-1 text-sky-600 dark:text-sky-400">{smmMetrics.net >= 0 ? '+' : ''}{smmMetrics.net}</span>
               </div>
               <div className="mis-card p-3.5">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-purple-400">Engagement</span>
-                <span className="text-xl font-black block mt-1 text-purple-400">{smmMetrics.engagementRate}</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider block" style={{ color: 'var(--text-secondary)' }}>Engagement</span>
+                <span className="text-xl font-black block mt-1 text-purple-600 dark:text-purple-400">{smmMetrics.engagementRate}</span>
               </div>
               <div className="mis-card p-3.5">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Impressions</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider block" style={{ color: 'var(--text-secondary)' }}>Impressions</span>
                 <span className="text-xl font-black block mt-1" style={{ color: 'var(--text-primary)' }}>
                   {smmMetrics.impressions.toLocaleString('en-IN')}
                 </span>
               </div>
               <div className="mis-card p-3.5">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400">Total Posts</span>
-                <span className="text-xl font-black block mt-1 text-amber-400">{smmMetrics.totalPosts}</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider block" style={{ color: 'var(--text-secondary)' }}>Total Posts</span>
+                <span className="text-xl font-black block mt-1 text-amber-600 dark:text-amber-400">{smmMetrics.totalPosts}</span>
               </div>
               <div className="mis-card p-3.5">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-400">Scheduled</span>
-                <span className="text-xl font-black block mt-1 text-indigo-400">{smmMetrics.scheduledPosts}</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider block" style={{ color: 'var(--text-secondary)' }}>Scheduled</span>
+                <span className="text-xl font-black block mt-1 text-indigo-600 dark:text-indigo-400">{smmMetrics.scheduledPosts}</span>
               </div>
               <div className="mis-card p-3.5">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-rose-400">Needs Review</span>
-                <span className="text-xl font-black block mt-1 text-rose-400">{smmMetrics.needsReviewPosts}</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider block" style={{ color: 'var(--text-secondary)' }}>Needs Review</span>
+                <span className="text-xl font-black block mt-1 text-rose-600 dark:text-rose-400">{smmMetrics.needsReviewPosts}</span>
               </div>
             </div>
 
             {/* Quick Action Bar for SMM */}
-            <div className="flex flex-wrap items-center gap-3 p-3 rounded-xl bg-slate-900/40 border border-[var(--border-light)]">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-400 mr-2">Management Tools:</span>
+            <div className="flex flex-wrap items-center gap-3 p-3 rounded-xl bg-[var(--bg-card)] dark:bg-slate-900/40 border border-[var(--border)]">
+              <span className="text-xs font-bold uppercase tracking-wider mr-2" style={{ color: 'var(--text-secondary)' }}>Management Tools:</span>
               <Link to={ROUTES.SMM_APPROVALS} className="mis-btn mis-btn-primary py-1.5 px-3 text-xs rounded-lg">
                 Approvals Queue ({smmMetrics.needsReviewPosts})
               </Link>
-              <Link to={ROUTES.CREATOR_PLANNER} className="mis-btn mis-btn-ghost py-1.5 px-3 text-xs rounded-lg">
+              <Link to={ROUTES.CREATOR_PLANNER} className="mis-btn mis-btn-ghost py-1.5 px-3 text-xs rounded-lg border border-[var(--border)]">
                 Content Planner
               </Link>
-              <Link to={ROUTES.CREATOR_CALENDAR} className="mis-btn mis-btn-ghost py-1.5 px-3 text-xs rounded-lg">
+              <Link to={ROUTES.CREATOR_CALENDAR} className="mis-btn mis-btn-ghost py-1.5 px-3 text-xs rounded-lg border border-[var(--border)]">
                 Schedule Calendar
               </Link>
-              <Link to={ROUTES.SMM_CAMPAIGNS} className="mis-btn mis-btn-ghost py-1.5 px-3 text-xs rounded-lg">
+              <Link to={ROUTES.SMM_CAMPAIGNS} className="mis-btn mis-btn-ghost py-1.5 px-3 text-xs rounded-lg border border-[var(--border)]">
                 Campaigns & Briefs ({smmCampaigns.length})
               </Link>
-              <Link to={ROUTES.CREATOR_ASSETS} className="mis-btn mis-btn-ghost py-1.5 px-3 text-xs rounded-lg">
+              <Link to={ROUTES.CREATOR_ASSETS} className="mis-btn mis-btn-ghost py-1.5 px-3 text-xs rounded-lg border border-[var(--border)]">
                 Asset Library
               </Link>
             </div>
@@ -939,7 +907,7 @@ const DashboardPage: React.FC = () => {
               {/* 1. Follower Growth Line Curve */}
               <div className="mis-card p-6">
                 <h3 className="font-bold text-base mb-1" style={{ color: 'var(--text-primary)' }}>Follower Trend Curve</h3>
-                <p className="text-xs opacity-70 mb-4" style={{ color: 'var(--text-secondary)' }}>Audience acquisition vs churn trajectory</p>
+                <p className="text-xs font-medium mb-4" style={{ color: 'var(--text-secondary)' }}>Audience acquisition vs churn trajectory</p>
                 <div className="h-[280px] w-full relative">
                   <canvas ref={smmFollowersRef} />
                 </div>
@@ -948,7 +916,7 @@ const DashboardPage: React.FC = () => {
               {/* 2. Engagement & Impressions Trend */}
               <div className="mis-card p-6">
                 <h3 className="font-bold text-base mb-1" style={{ color: 'var(--text-primary)' }}>Engagement & Reach Distribution</h3>
-                <p className="text-xs opacity-70 mb-4" style={{ color: 'var(--text-secondary)' }}>Daily/weekly volume of views, reactions, and shares</p>
+                <p className="text-xs font-medium mb-4" style={{ color: 'var(--text-secondary)' }}>Daily/weekly volume of views, reactions, and shares</p>
                 <div className="h-[280px] w-full relative">
                   <canvas ref={smmEngagementRef} />
                 </div>
@@ -957,7 +925,7 @@ const DashboardPage: React.FC = () => {
               {/* 3. Content Production Pipeline Funnel */}
               <div className="mis-card p-6">
                 <h3 className="font-bold text-base mb-1" style={{ color: 'var(--text-primary)' }}>Content Production Pipeline Funnel</h3>
-                <p className="text-xs opacity-70 mb-4" style={{ color: 'var(--text-secondary)' }}>Posts by production stage (Idea &rarr; Scripting &rarr; Scheduled &rarr; Published)</p>
+                <p className="text-xs font-medium mb-4" style={{ color: 'var(--text-secondary)' }}>Posts by production stage (Idea &rarr; Scripting &rarr; Scheduled &rarr; Published)</p>
                 <div className="h-[280px] w-full relative">
                   <canvas ref={smmPipelineRef} />
                 </div>
@@ -966,7 +934,7 @@ const DashboardPage: React.FC = () => {
               {/* 4. Platform Audience Share */}
               <div className="mis-card p-6">
                 <h3 className="font-bold text-base mb-1" style={{ color: 'var(--text-primary)' }}>Platform Share Breakdown</h3>
-                <p className="text-xs opacity-70 mb-4" style={{ color: 'var(--text-secondary)' }}>Content volume distributed by social network</p>
+                <p className="text-xs font-medium mb-4" style={{ color: 'var(--text-secondary)' }}>Content volume distributed by social network</p>
                 <div className="h-[280px] w-full relative">
                   <canvas ref={smmPlatformRef} />
                 </div>
@@ -977,7 +945,7 @@ const DashboardPage: React.FC = () => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="mis-card p-6">
                 <h3 className="font-bold text-base mb-1" style={{ color: 'var(--text-primary)' }}>Content Formats</h3>
-                <p className="text-xs opacity-70 mb-4" style={{ color: 'var(--text-secondary)' }}>Reels, Shorts, Carousels, Stories, Videos</p>
+                <p className="text-xs font-medium mb-4" style={{ color: 'var(--text-secondary)' }}>Reels, Shorts, Carousels, Stories, Videos</p>
                 <div className="h-[240px] w-full relative">
                   <canvas ref={smmFormatsRef} />
                 </div>
@@ -985,7 +953,7 @@ const DashboardPage: React.FC = () => {
 
               <div className="mis-card p-6 lg:col-span-2">
                 <h3 className="font-bold text-base mb-1" style={{ color: 'var(--text-primary)' }}>Creator Output & Productivity</h3>
-                <p className="text-xs opacity-70 mb-4" style={{ color: 'var(--text-secondary)' }}>Scheduled vs Published posts by team member</p>
+                <p className="text-xs font-medium mb-4" style={{ color: 'var(--text-secondary)' }}>Scheduled vs Published posts by team member</p>
                 <div className="h-[240px] w-full relative">
                   <canvas ref={smmCreatorRef} />
                 </div>
@@ -997,24 +965,24 @@ const DashboardPage: React.FC = () => {
               <div className="mis-card p-6">
                 <div className="flex justify-between items-center mb-3">
                   <h3 className="font-bold text-base" style={{ color: 'var(--text-primary)' }}>Upcoming Scheduled Posts</h3>
-                  <Link to={ROUTES.CREATOR_CALENDAR} className="text-xs text-sky-400 font-bold hover:underline">
+                  <Link to={ROUTES.CREATOR_CALENDAR} className="text-xs text-sky-600 dark:text-sky-400 font-bold hover:underline">
                     View Calendar &rarr;
                   </Link>
                 </div>
                 {smmPosts.filter(p => p.status === 'Scheduled').length === 0 ? (
-                  <p className="text-xs opacity-60 py-6 text-center">No posts currently scheduled for automated publish.</p>
+                  <p className="text-xs py-6 text-center" style={{ color: 'var(--text-secondary)' }}>No posts currently scheduled for automated publish.</p>
                 ) : (
                   <div className="space-y-2.5 max-h-[220px] overflow-y-auto">
                     {smmPosts
                       .filter(p => p.status === 'Scheduled')
                       .slice(0, 5)
                       .map(p => (
-                        <div key={p.id} className="p-2.5 rounded-lg border border-[var(--border-light)] bg-slate-900/30 flex justify-between items-center text-xs">
+                        <div key={p.id} className="p-2.5 rounded-lg border border-[var(--border)] bg-[var(--bg-card-2)] dark:bg-slate-900/30 flex justify-between items-center text-xs">
                           <div>
                             <span className="font-bold block" style={{ color: 'var(--text-primary)' }}>{p.title}</span>
-                            <span className="text-[10px] opacity-60">{p.platform} &bull; {p.content_type} &bull; {p.creator_name || 'Creator'}</span>
+                            <span className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>{p.platform} &bull; {p.content_type} &bull; {p.creator_name || 'Creator'}</span>
                           </div>
-                          <span className="px-2 py-0.5 rounded bg-sky-500/20 text-sky-400 font-semibold text-[10px]">
+                          <span className="px-2 py-0.5 rounded bg-sky-500/10 text-sky-600 dark:text-sky-400 font-semibold text-[10px]">
                             {p.scheduled_at ? new Date(p.scheduled_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : 'Scheduled'}
                           </span>
                         </div>
@@ -1026,21 +994,21 @@ const DashboardPage: React.FC = () => {
               <div className="mis-card p-6">
                 <div className="flex justify-between items-center mb-3">
                   <h3 className="font-bold text-base" style={{ color: 'var(--text-primary)' }}>Active Marketing Campaigns</h3>
-                  <Link to={ROUTES.SMM_CAMPAIGNS} className="text-xs text-sky-400 font-bold hover:underline">
+                  <Link to={ROUTES.SMM_CAMPAIGNS} className="text-xs text-sky-600 dark:text-sky-400 font-bold hover:underline">
                     Manage Campaigns &rarr;
                   </Link>
                 </div>
                 {smmCampaigns.length === 0 ? (
-                  <p className="text-xs opacity-60 py-6 text-center">No active marketing campaigns created yet.</p>
+                  <p className="text-xs py-6 text-center" style={{ color: 'var(--text-secondary)' }}>No active marketing campaigns created yet.</p>
                 ) : (
                   <div className="space-y-2.5 max-h-[220px] overflow-y-auto">
                     {smmCampaigns.slice(0, 5).map(c => (
-                      <div key={c.id} className="p-2.5 rounded-lg border border-[var(--border-light)] bg-slate-900/30 flex justify-between items-center text-xs">
+                      <div key={c.id} className="p-2.5 rounded-lg border border-[var(--border)] bg-[var(--bg-card-2)] dark:bg-slate-900/30 flex justify-between items-center text-xs">
                         <div>
                           <span className="font-bold block" style={{ color: 'var(--text-primary)' }}>{c.title}</span>
-                          <span className="text-[10px] opacity-60 truncate max-w-[200px] block">{c.description || 'Campaign initiative'}</span>
+                          <span className="text-[10px] truncate max-w-[200px] block" style={{ color: 'var(--text-secondary)' }}>{c.description || 'Campaign initiative'}</span>
                         </div>
-                        <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-semibold text-[10px]">
+                        <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold text-[10px]">
                           Active
                         </span>
                       </div>
@@ -1059,28 +1027,28 @@ const DashboardPage: React.FC = () => {
           <div className="space-y-6">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               <div className="mis-card p-5">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Closed Revenue</span>
-                <span className="text-3xl font-black block mt-1 text-emerald-400">
+                <span className="text-xs font-bold uppercase tracking-wider block" style={{ color: 'var(--text-secondary)' }}>Total Closed Revenue</span>
+                <span className="text-3xl font-black block mt-1 text-emerald-600 dark:text-emerald-400">
                   ₹{((salesData?.kpis?.totalRevenue || 0) / 1000).toFixed(1)}k
                 </span>
-                <span className="text-xs opacity-60 mt-1 block">Completed sales</span>
+                <span className="text-xs mt-1 block font-medium" style={{ color: 'var(--text-secondary)' }}>Completed sales</span>
               </div>
               <div className="mis-card p-5">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Deals</span>
-                <span className="text-3xl font-black block mt-1 text-sky-400">
+                <span className="text-xs font-bold uppercase tracking-wider block" style={{ color: 'var(--text-secondary)' }}>Total Deals</span>
+                <span className="text-3xl font-black block mt-1 text-sky-600 dark:text-sky-400">
                   {salesData?.kpis?.totalSalesCount || 0}
                 </span>
-                <span className="text-xs opacity-60 mt-1 block">In selected timeframe</span>
+                <span className="text-xs mt-1 block font-medium" style={{ color: 'var(--text-secondary)' }}>In selected timeframe</span>
               </div>
               <div className="mis-card p-5">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Pipeline Target</span>
-                <span className="text-3xl font-black block mt-1 text-amber-400">
+                <span className="text-xs font-bold uppercase tracking-wider block" style={{ color: 'var(--text-secondary)' }}>Pipeline Target</span>
+                <span className="text-3xl font-black block mt-1 text-amber-600 dark:text-amber-400">
                   ₹{((salesData?.kpis?.totalTarget || 150000) / 1000).toFixed(1)}k
                 </span>
-                <span className="text-xs opacity-60 mt-1 block">Target threshold</span>
+                <span className="text-xs mt-1 block font-medium" style={{ color: 'var(--text-secondary)' }}>Target threshold</span>
               </div>
               <div className="mis-card p-5">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Direct Actions</span>
+                <span className="text-xs font-bold uppercase tracking-wider block" style={{ color: 'var(--text-secondary)' }}>Direct Actions</span>
                 <div className="mt-2">
                   <Link to={ROUTES.SALES_DASHBOARD} className="mis-btn mis-btn-primary py-1.5 px-3 text-xs w-full block text-center rounded-lg">
                     Full Sales Dashboard &rarr;
@@ -1091,7 +1059,7 @@ const DashboardPage: React.FC = () => {
 
             <div className="mis-card p-6">
               <h3 className="font-bold text-base mb-1" style={{ color: 'var(--text-primary)' }}>Sales Performance Overview</h3>
-              <p className="text-xs opacity-70 mb-4" style={{ color: 'var(--text-secondary)' }}>Closed revenue vs target breakdown</p>
+              <p className="text-xs font-medium mb-4" style={{ color: 'var(--text-secondary)' }}>Closed revenue vs target breakdown</p>
               <div className="h-[280px] w-full relative">
                 <canvas ref={overviewFinancialRef} />
               </div>
@@ -1106,25 +1074,25 @@ const DashboardPage: React.FC = () => {
           <div className="space-y-6">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               <div className="mis-card p-5">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Income</span>
-                <span className="text-3xl font-black block mt-1 text-emerald-400">
+                <span className="text-xs font-bold uppercase tracking-wider block" style={{ color: 'var(--text-secondary)' }}>Total Income</span>
+                <span className="text-3xl font-black block mt-1 text-emerald-600 dark:text-emerald-400">
                   ₹{((financeData?.kpis?.totalIncome || 0) / 1000).toFixed(1)}k
                 </span>
               </div>
               <div className="mis-card p-5">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Expenses</span>
-                <span className="text-3xl font-black block mt-1 text-rose-400">
+                <span className="text-xs font-bold uppercase tracking-wider block" style={{ color: 'var(--text-secondary)' }}>Total Expenses</span>
+                <span className="text-3xl font-black block mt-1 text-rose-600 dark:text-rose-400">
                   ₹{((financeData?.kpis?.totalExpenses || 0) / 1000).toFixed(1)}k
                 </span>
               </div>
               <div className="mis-card p-5">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Net Profit / Loss</span>
-                <span className="text-3xl font-black block mt-1 text-sky-400">
+                <span className="text-xs font-bold uppercase tracking-wider block" style={{ color: 'var(--text-secondary)' }}>Net Profit / Loss</span>
+                <span className="text-3xl font-black block mt-1 text-sky-600 dark:text-sky-400">
                   ₹{((financeData?.kpis?.netProfit || 0) / 1000).toFixed(1)}k
                 </span>
               </div>
               <div className="mis-card p-5">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Direct Actions</span>
+                <span className="text-xs font-bold uppercase tracking-wider block" style={{ color: 'var(--text-secondary)' }}>Direct Actions</span>
                 <div className="mt-2">
                   <Link to={ROUTES.FINANCE_DASHBOARD} className="mis-btn mis-btn-primary py-1.5 px-3 text-xs w-full block text-center rounded-lg">
                     Full Finance Dashboard &rarr;
@@ -1135,7 +1103,7 @@ const DashboardPage: React.FC = () => {
 
             <div className="mis-card p-6">
               <h3 className="font-bold text-base mb-1" style={{ color: 'var(--text-primary)' }}>Income vs Expenses Summary</h3>
-              <p className="text-xs opacity-70 mb-4" style={{ color: 'var(--text-secondary)' }}>Fiscal cashflow analysis</p>
+              <p className="text-xs font-medium mb-4" style={{ color: 'var(--text-secondary)' }}>Fiscal cashflow analysis</p>
               <div className="h-[280px] w-full relative">
                 <canvas ref={overviewFinancialRef} />
               </div>
@@ -1150,20 +1118,20 @@ const DashboardPage: React.FC = () => {
           <div className="space-y-6">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               <div className="mis-card p-5">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Assets</span>
-                <span className="text-3xl font-black block mt-1 text-indigo-400">{itData?.totalAssets || 0}</span>
-                <span className="text-xs opacity-60 mt-1 block">Hardware & Software</span>
+                <span className="text-xs font-bold uppercase tracking-wider block" style={{ color: 'var(--text-secondary)' }}>Total Assets</span>
+                <span className="text-3xl font-black block mt-1 text-indigo-600 dark:text-indigo-400">{itData?.totalAssets || 0}</span>
+                <span className="text-xs mt-1 block font-medium" style={{ color: 'var(--text-secondary)' }}>Hardware & Software</span>
               </div>
               <div className="mis-card p-5">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Active Licenses</span>
-                <span className="text-3xl font-black block mt-1 text-emerald-400">{itData?.activeLicenses || 0}</span>
+                <span className="text-xs font-bold uppercase tracking-wider block" style={{ color: 'var(--text-secondary)' }}>Active Licenses</span>
+                <span className="text-3xl font-black block mt-1 text-emerald-600 dark:text-emerald-400">{itData?.activeLicenses || 0}</span>
               </div>
               <div className="mis-card p-5">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Open Tickets</span>
-                <span className="text-3xl font-black block mt-1 text-amber-400">{itData?.openTickets || 0}</span>
+                <span className="text-xs font-bold uppercase tracking-wider block" style={{ color: 'var(--text-secondary)' }}>Open Tickets</span>
+                <span className="text-3xl font-black block mt-1 text-amber-600 dark:text-amber-400">{itData?.openTickets || 0}</span>
               </div>
               <div className="mis-card p-5">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Direct Actions</span>
+                <span className="text-xs font-bold uppercase tracking-wider block" style={{ color: 'var(--text-secondary)' }}>Direct Actions</span>
                 <div className="mt-2">
                   <Link to={ROUTES.IT_DASHBOARD} className="mis-btn mis-btn-primary py-1.5 px-3 text-xs w-full block text-center rounded-lg">
                     Full IT Dashboard &rarr;
@@ -1181,48 +1149,48 @@ const DashboardPage: React.FC = () => {
           <div className="space-y-6">
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
               <div className="mis-card p-4">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Employees</span>
-                <span className="text-2xl font-bold mt-1 block" style={{ color: 'var(--accent)' }}>{hrData?.kpis?.totalEmployees || 0}</span>
-                <span className="text-[10px] opacity-60 mt-0.5 block">Active headcount</span>
+                <span className="text-[11px] font-bold uppercase tracking-wider block" style={{ color: 'var(--text-secondary)' }}>Employees</span>
+                <span className="text-2xl font-bold mt-1 block text-indigo-600 dark:text-indigo-400">{hrData?.kpis?.totalEmployees || 0}</span>
+                <span className="text-[10px] mt-0.5 block font-medium" style={{ color: 'var(--text-secondary)' }}>Active headcount</span>
               </div>
               <div className="mis-card p-4">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Joiners</span>
-                <span className="text-2xl font-bold mt-1 block text-emerald-400">+{hrData?.kpis?.newJoiners || 0}</span>
-                <span className="text-[10px] opacity-60 mt-0.5 block">In period</span>
+                <span className="text-[11px] font-bold uppercase tracking-wider block" style={{ color: 'var(--text-secondary)' }}>Joiners</span>
+                <span className="text-2xl font-bold mt-1 block text-emerald-600 dark:text-emerald-400">+{hrData?.kpis?.newJoiners || 0}</span>
+                <span className="text-[10px] mt-0.5 block font-medium" style={{ color: 'var(--text-secondary)' }}>In period</span>
               </div>
               <div className="mis-card p-4">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Resignations</span>
-                <span className="text-2xl font-bold mt-1 block text-red-400">-{hrData?.kpis?.resignations || 0}</span>
-                <span className="text-[10px] opacity-60 mt-0.5 block">In period</span>
+                <span className="text-[11px] font-bold uppercase tracking-wider block" style={{ color: 'var(--text-secondary)' }}>Resignations</span>
+                <span className="text-2xl font-bold mt-1 block text-red-600 dark:text-red-400">-{hrData?.kpis?.resignations || 0}</span>
+                <span className="text-[10px] mt-0.5 block font-medium" style={{ color: 'var(--text-secondary)' }}>In period</span>
               </div>
               <div className="mis-card p-4">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Attrition</span>
-                <span className="text-2xl font-bold mt-1 block text-purple-400">{hrData?.kpis?.attritionRate || 0}%</span>
-                <span className="text-[10px] opacity-60 mt-0.5 block">Turnover</span>
+                <span className="text-[11px] font-bold uppercase tracking-wider block" style={{ color: 'var(--text-secondary)' }}>Attrition</span>
+                <span className="text-2xl font-bold mt-1 block text-purple-600 dark:text-purple-400">{hrData?.kpis?.attritionRate || 0}%</span>
+                <span className="text-[10px] mt-0.5 block font-medium" style={{ color: 'var(--text-secondary)' }}>Turnover</span>
               </div>
               <div className="mis-card p-4">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Open Positions</span>
-                <span className="text-2xl font-bold mt-1 block text-teal-400">{hrOpsData?.kpis?.openPositions || 0}</span>
-                <span className="text-[10px] opacity-60 mt-0.5 block">Hiring active</span>
+                <span className="text-[11px] font-bold uppercase tracking-wider block" style={{ color: 'var(--text-secondary)' }}>Open Positions</span>
+                <span className="text-2xl font-bold mt-1 block text-teal-600 dark:text-teal-400">{hrOpsData?.kpis?.openPositions || 0}</span>
+                <span className="text-[10px] mt-0.5 block font-medium" style={{ color: 'var(--text-secondary)' }}>Hiring active</span>
               </div>
               <div className="mis-card p-4">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Active Policies</span>
-                <span className="text-2xl font-bold mt-1 block text-lime-400">{hrOpsData?.kpis?.activePolicies || 0}</span>
-                <span className="text-[10px] opacity-60 mt-0.5 block">In effect</span>
+                <span className="text-[11px] font-bold uppercase tracking-wider block" style={{ color: 'var(--text-secondary)' }}>Active Policies</span>
+                <span className="text-2xl font-bold mt-1 block text-amber-600 dark:text-amber-400">{hrOpsData?.kpis?.activePolicies || 0}</span>
+                <span className="text-[10px] mt-0.5 block font-medium" style={{ color: 'var(--text-secondary)' }}>In effect</span>
               </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="mis-card p-6">
                 <h3 className="font-bold text-base mb-1" style={{ color: 'var(--text-primary)' }}>Employee Growth Trend</h3>
-                <p className="text-xs opacity-70 mb-4" style={{ color: 'var(--text-secondary)' }}>Headcount curve over time</p>
+                <p className="text-xs font-medium mb-4" style={{ color: 'var(--text-secondary)' }}>Headcount curve over time</p>
                 <div className="h-[280px] w-full relative">
                   <canvas ref={hrGrowthRef} />
                 </div>
               </div>
               <div className="mis-card p-6">
                 <h3 className="font-bold text-base mb-1" style={{ color: 'var(--text-primary)' }}>Department Distribution</h3>
-                <p className="text-xs opacity-70 mb-4" style={{ color: 'var(--text-secondary)' }}>Employees divided across departments</p>
+                <p className="text-xs font-medium mb-4" style={{ color: 'var(--text-secondary)' }}>Employees divided across departments</p>
                 <div className="h-[280px] w-full relative">
                   <canvas ref={hrDeptRef} />
                 </div>
@@ -1294,17 +1262,17 @@ const DashboardPage: React.FC = () => {
               <h2 className="mis-section-title">Admin Quick Controls</h2>
               <p className="mis-section-desc">Management shortcuts</p>
               <div className="flex flex-col gap-2 mt-4">
-                <Link to={ROUTES.ADMIN_PANEL} className="mis-btn mis-btn-ghost mis-action-row">
-                  <span className="mis-action-icon text-sky-400"><IconShieldCheck /></span>
-                  <span>Open Full Admin Panel (User & Role Config)</span>
+                <Link to={ROUTES.ADMIN_PANEL} className="mis-btn mis-btn-ghost mis-action-row border border-[var(--border)] hover:bg-[var(--bg-hover-2)]">
+                  <span className="mis-action-icon text-sky-600 dark:text-sky-400"><IconShieldCheck /></span>
+                  <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>Open Full Admin Panel (User & Role Config)</span>
                 </Link>
-                <Link to={ROUTES.HR_USER_MANAGEMENT} className="mis-btn mis-btn-ghost mis-action-row">
-                  <span className="mis-action-icon text-emerald-400"><IconUser /></span>
-                  <span>Create / Onboard New Staff</span>
+                <Link to={ROUTES.HR_USER_MANAGEMENT} className="mis-btn mis-btn-ghost mis-action-row border border-[var(--border)] hover:bg-[var(--bg-hover-2)]">
+                  <span className="mis-action-icon text-emerald-600 dark:text-emerald-400"><IconUser /></span>
+                  <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>Create / Onboard New Staff</span>
                 </Link>
-                <Link to={ROUTES.PROFILE} className="mis-btn mis-btn-ghost mis-action-row">
-                  <span className="mis-action-icon text-amber-400"><IconEdit /></span>
-                  <span>Update Profile & System Settings</span>
+                <Link to={ROUTES.PROFILE} className="mis-btn mis-btn-ghost mis-action-row border border-[var(--border)] hover:bg-[var(--bg-hover-2)]">
+                  <span className="mis-action-icon text-amber-600 dark:text-amber-400"><IconEdit /></span>
+                  <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>Update Profile & System Settings</span>
                 </Link>
               </div>
             </div>

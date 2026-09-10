@@ -190,9 +190,9 @@ const Sidebar: React.FC = () => {
   const isCreator = role === 'content_creator' || (isCreatorDept && (isHOD || isEmployee));
   const isSMM = role === 'social_media_manager';
 
-  // SMM & Content Creation navigation visible to staff, HOD, and executive management (CEO/Admin/MD/Director)
-  const showSMM = isSMM || isAdmin || isLeadership;
-  const showCreator = isCreator || isSMM || isAdmin || isLeadership;
+  // SMM & Content Creation navigation visible to staff, HOD, and executive management (CEO/MD/Director)
+  const showSMM = isSMM || isLeadership;
+  const showCreator = isCreator || isSMM || isLeadership;
 
   // HR Dashboard and Administration visibility
   const showHRDashboard = isAdmin || isHR || isLeadership;
