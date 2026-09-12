@@ -349,17 +349,19 @@ export class RAService {
 
     const currentList = this.readFallbackPackages();
     const idx = currentList.findIndex((p) => p.id === id || (payload.name && p.name.toLowerCase() === payload.name.toLowerCase()));
-    if (idx < 0) {
+    if (idx < 0 || !currentList[idx]) {
       throw new Error("Package with ID " + id + " not found.");
     }
 
-    currentList[idx] = {
-      ...currentList[idx],
+    const existingPkg = currentList[idx]!;
+    const updatedPkg: RAPackage = {
+      ...existingPkg,
       ...payload,
       updated_at: new Date().toISOString()
     };
+    currentList[idx] = updatedPkg;
     this.writeFallbackPackages(currentList);
-    return currentList[idx];
+    return updatedPkg;
   }
 
   async deletePackage(id: string, userId: string): Promise<boolean> {
