@@ -270,7 +270,7 @@ export const Sidebar: React.FC = () => {
         />
 
         {/* Generic Data Entry if no dedicated department */}
-        {(!hasDedicatedDeptEntry || isAdmin) && (
+        {(!hasDedicatedDeptEntry && !isAdmin && !isLeadership) && (
           <NavItem
             to={ROUTES.DATA_ENTRY}
             icon={<IconDataEntry />}
@@ -280,7 +280,7 @@ export const Sidebar: React.FC = () => {
         )}
 
         {/* Verification Hub */}
-        {(isAdmin || isHOD) && (
+        {(!isAdmin && !isLeadership && isHOD) && (
           <NavItem
             to={ROUTES.VERIFY_ENTRIES}
             icon={<IconVerify />}
@@ -560,28 +560,6 @@ export const Sidebar: React.FC = () => {
               label="RA Dashboard"
               onClick={closeOnMobile}
             />
-            {!isRAUser && (
-              <>
-                <NavItem
-                  to={ROUTES.RA_DATA_ENTRY}
-                  icon={<IconIEPFEntry />}
-                  label="RA Data Entry"
-                  onClick={closeOnMobile}
-                />
-                <NavItem
-                  to={ROUTES.RA_TESTIMONIALS}
-                  icon={<IconStar />}
-                  label="Testimonials Hub"
-                  onClick={closeOnMobile}
-                />
-                <NavItem
-                  to={ROUTES.RA_REPORTS}
-                  icon={<IconReport />}
-                  label="Weekly & Monthly Reports"
-                  onClick={closeOnMobile}
-                />
-              </>
-            )}
           </>
         )}
 

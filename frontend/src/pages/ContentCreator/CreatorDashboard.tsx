@@ -120,7 +120,7 @@ const CreatorDashboard: React.FC = () => {
 
   return (
     <DashboardLayout>
-      <div className="w-full space-y-6 mis-animate-in">
+      <div className="mis-page mis-animate-in max-w-7xl mx-auto space-y-6">
         {/* Header with Title & Creator Filter */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
