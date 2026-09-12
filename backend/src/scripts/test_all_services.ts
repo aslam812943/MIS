@@ -1,13 +1,13 @@
-import { supabaseAdmin } from '../config/supabase';
-import { ITService } from '../services/ITService';
-import { IEPFService } from '../services/IEPFService';
-import { SettlementService } from '../services/SettlementService';
-import { KYCService } from '../services/KYCService';
-import { DPService } from '../services/DPService';
-import { FinanceService } from '../services/FinanceService';
-import { SalesService } from '../services/SalesService';
-import { HRService } from '../services/HRService';
-import { RAService } from '../services/RAService';
+import { supabaseAdmin } from '../config/supabase.js';
+import { ITService } from '../services/ITService.js';
+import { IEPFService } from '../services/IEPFService.js';
+import { SettlementService } from '../services/SettlementService.js';
+import { KYCService } from '../services/KYCService.js';
+import { DPService } from '../services/DPService.js';
+import { FinanceService } from '../services/FinanceService.js';
+import { SalesService } from '../services/SalesService.js';
+import { HRService } from '../services/HRService.js';
+import { RAService } from '../services/RAService.js';
 
 async function testAllServices() {
   console.log('==============================================');
