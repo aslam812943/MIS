@@ -22,6 +22,9 @@ import { getDefaultPeriod } from '../utils/periodRange';
 Chart.register(...registerables);
 
 const EMPLOYEE_DEPT_ENTRY_ROUTE: Record<string, string> = {
+  RA: ROUTES.RA_DATA_ENTRY,
+  'RESEARCH ANALYST': ROUTES.RA_DATA_ENTRY,
+  'RESEARCH & ANALYSIS': ROUTES.RA_DATA_ENTRY,
   IEPF: ROUTES.IEPF_DATA_ENTRY,
   SETTLEMENTS: ROUTES.SETTLEMENTS_DATA_ENTRY,
   KYC: ROUTES.KYC_DATA_ENTRY,
@@ -105,6 +108,7 @@ export type DashboardTab =
   | 'dp'
   | 'iepf'
   | 'settlements'
+  | 'ra'
   | 'system';
 
 /**
@@ -124,6 +128,9 @@ const DashboardPage: React.FC = () => {
   // Employee redirection to their dedicated department workspace
   if (isEmployee) {
     const dept = user?.department_name?.toUpperCase() || '';
+    if (dept === 'RA' || dept === 'RESEARCH ANALYST' || dept === 'RESEARCH & ANALYSIS') {
+      return <Navigate to={ROUTES.RA_DASHBOARD} replace />;
+    }
     const redirectRoute = EMPLOYEE_DEPT_ENTRY_ROUTE[dept] || ROUTES.DATA_ENTRY;
     return <Navigate to={redirectRoute} replace />;
   }
@@ -670,6 +677,7 @@ const DashboardPage: React.FC = () => {
     { id: 'dp', label: 'DP Demat', icon: <IconDashboardTile />, show: isAdmin || isLeadership || user?.department_name?.toUpperCase() === 'DP' },
     { id: 'iepf', label: 'IEPF Claims', icon: <IconCheck />, show: isAdmin || isLeadership || user?.department_name?.toUpperCase() === 'IEPF' },
     { id: 'settlements', label: 'Settlements', icon: <IconActivity />, show: isAdmin || isLeadership || user?.department_name?.toUpperCase() === 'SETTLEMENTS' },
+    { id: 'ra', label: 'Research Analyst (RA)', icon: <IconDashboardTile />, show: isAdmin || isLeadership || user?.department_name?.toUpperCase() === 'RA' || user?.department_name?.toUpperCase() === 'RESEARCH ANALYST' },
     { id: 'system', label: 'System & Org', icon: <IconServer />, show: isAdmin },
   ];
 
@@ -1202,6 +1210,55 @@ const DashboardPage: React.FC = () => {
         {/* ══════════════════════════════════════════════════════
             TAB 7: KYC, DP, IEPF, SETTLEMENTS
             ══════════════════════════════════════════════════════ */}
+        {activeTab === 'ra' && (
+          <div className="space-y-6">
+            <div className="mis-card p-8 text-center space-y-4">
+              <span className="text-4xl block">📈</span>
+              <h3 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>
+                Research Analyst (RA) Portfolio & Analytics
+              </h3>
+              <p className="text-sm max-w-md mx-auto" style={{ color: 'var(--text-secondary)' }}>
+                Access client advisory packages, collections, KRA compliance tracking, testimonials, and periodic reports.
+              </p>
+              <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+                <Link
+                  to={ROUTES.RA_DASHBOARD}
+                  className="mis-btn mis-btn-primary px-5 py-2.5 text-xs font-bold inline-flex items-center gap-2 rounded-xl"
+                >
+                  <IconDashboardTile />
+                  Open RA Dashboard
+                </Link>
+                <Link
+                  to={ROUTES.RA_DATA_ENTRY}
+                  className="px-5 py-2.5 text-xs font-bold inline-flex items-center gap-2 rounded-xl bg-[var(--accent)] text-slate-950 hover:bg-[var(--accent-hover)] transition shadow-sm"
+                >
+                  <IconEdit />
+                  Open RA Data Entry
+                </Link>
+                <Link
+                  to="/ra-entry?tab=kyc"
+                  className="px-5 py-2.5 text-xs font-bold inline-flex items-center gap-2 rounded-xl bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500/30 border border-cyan-500/30 transition shadow-sm"
+                >
+                  <IconShieldCheck />
+                  KYC / KRA Tracking
+                </Link>
+                <Link
+                  to={ROUTES.RA_TESTIMONIALS}
+                  className="px-5 py-2.5 text-xs font-bold inline-flex items-center gap-2 rounded-xl bg-purple-500/20 text-purple-300 hover:bg-purple-500/30 border border-purple-500/30 transition shadow-sm"
+                >
+                  ★ Testimonials Hub
+                </Link>
+                <Link
+                  to={ROUTES.RA_REPORTS}
+                  className="px-5 py-2.5 text-xs font-bold inline-flex items-center gap-2 rounded-xl bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border border-emerald-500/30 transition shadow-sm"
+                >
+                  📊 Weekly & Monthly Reports
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
+
         {(activeTab === 'kyc' || activeTab === 'dp' || activeTab === 'iepf' || activeTab === 'settlements') && (
           <div className="space-y-6">
             <div className="mis-card p-8 text-center space-y-4">
