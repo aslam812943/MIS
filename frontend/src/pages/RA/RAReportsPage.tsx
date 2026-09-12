@@ -120,7 +120,7 @@ export const RAReportsPage: React.FC = () => {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6 pb-16">
+      <div className="mis-page mis-animate-in max-w-7xl mx-auto space-y-6 pb-16">
         {/* Style tag for print layout optimization */}
         <style dangerouslySetInnerHTML={{ __html: `
           @media print {

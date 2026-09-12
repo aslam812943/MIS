@@ -1,0 +1,123 @@
+{
+  "exportDate": "2026-09-12T09:24:11.274Z",
+  "projectUrl": "https://riucsbxolrkitdzmqdjg.supabase.co",
+  "totalTables": 23,
+  "totalRows": 867,
+  "tables": [
+    {
+      "table": "profiles",
+      "rowCount": 28,
+      "status": "SUCCESS"
+    },
+    {
+      "table": "branches",
+      "rowCount": 2,
+      "status": "SUCCESS"
+    },
+    {
+      "table": "departments",
+      "rowCount": 13,
+      "status": "SUCCESS"
+    },
+    {
+      "table": "modules",
+      "rowCount": 0,
+      "status": "SUCCESS"
+    },
+    {
+      "table": "data_entries",
+      "rowCount": 0,
+      "status": "SUCCESS"
+    },
+    {
+      "table": "tasks",
+      "rowCount": 6,
+      "status": "SUCCESS"
+    },
+    {
+      "table": "notifications",
+      "rowCount": 55,
+      "status": "SUCCESS"
+    },
+    {
+      "table": "iepf_claims",
+      "rowCount": 5,
+      "status": "SUCCESS"
+    },
+    {
+      "table": "it_assets",
+      "rowCount": 2,
+      "status": "SUCCESS"
+    },
+    {
+      "table": "it_asset_inventory",
+      "rowCount": 0,
+      "status": "SUCCESS"
+    },
+    {
+      "table": "it_amc_contracts",
+      "rowCount": 0,
+      "status": "SUCCESS"
+    },
+    {
+      "table": "it_audits",
+      "rowCount": 1,
+      "status": "SUCCESS"
+    },
+    {
+      "table": "it_audit_findings",
+      "rowCount": 0,
+      "status": "SUCCESS"
+    },
+    {
+      "table": "it_audit_schedule",
+      "rowCount": 8,
+      "status": "SUCCESS"
+    },
+    {
+      "table": "hr_documents",
+      "rowCount": 1,
+      "status": "SUCCESS"
+    },
+    {
+      "table": "hr_open_positions",
+      "rowCount": 1,
+      "status": "SUCCESS"
+    },
+    {
+      "table": "hr_policies",
+      "rowCount": 0,
+      "status": "SUCCESS"
+    },
+    {
+      "table": "ra_clients",
+      "rowCount": 3,
+      "status": "SUCCESS"
+    },
+    {
+      "table": "ra_testimonials",
+      "rowCount": 1,
+      "status": "SUCCESS"
+    },
+    {
+      "table": "social_media_posts",
+      "rowCount": 6,
+      "status": "SUCCESS"
+    },
+    {
+      "table": "social_media_campaigns",
+      "rowCount": 1,
+      "status": "SUCCESS"
+    },
+    {
+      "table": "social_media_analytics",
+      "rowCount": 90,
+      "status": "SUCCESS"
+    },
+    {
+      "table": "audit_logs",
+      "rowCount": 644,
+      "status": "SUCCESS"
+    }
+  ]
+}

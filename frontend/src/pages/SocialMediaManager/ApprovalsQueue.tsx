@@ -86,7 +86,7 @@ const ApprovalsQueue: React.FC = () => {
 
   return (
     <DashboardLayout>
-      <div className="w-full space-y-6 mis-animate-in">
+      <div className="mis-page mis-animate-in max-w-7xl mx-auto space-y-6">
         {/* Top Header */}
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold" style={{ color: 'var(--text-primary)' }}>

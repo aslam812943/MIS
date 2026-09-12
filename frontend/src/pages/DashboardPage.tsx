@@ -685,7 +685,7 @@ const DashboardPage: React.FC = () => {
 
   return (
     <DashboardLayout>
-      <div className="w-full space-y-6 mis-animate-in pb-12">
+      <div className="mis-page mis-animate-in max-w-7xl mx-auto space-y-6 pb-12">
         {/* Top Header */}
         <header className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
           <div>

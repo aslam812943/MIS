@@ -1,0 +1,15 @@
+[
+  {
+    "id": "b2c5c97a-1ce3-4851-adb9-dc13af5e42d0",
+    "employee_id": "368faf62-de6e-4709-826f-ef978f6a1055",
+    "document_type": "Aadhaar",
+    "document_reference": "AADHAAR-1234",
+    "upload_date": "2026-09-02",
+    "expiry_date": null,
+    "file_url": "https://example.com/doc.pdf",
+    "confidentiality_level": "Standard",
+    "created_by": "368faf62-de6e-4709-826f-ef978f6a1055",
+    "created_at": "2026-09-02T09:07:06.83653+00:00",
+    "updated_at": "2026-09-02T09:07:06.83653+00:00"
+  }
+]

@@ -1,0 +1,18 @@
+[
+  {
+    "id": "9a92e2ab-4c3e-4020-8594-7ad5dbc940f8",
+    "client_id": "8fd20bf0-f808-432b-842b-7df66aca5dc6",
+    "client_name": "Rajesh Sharma",
+    "rating": 5,
+    "feedback_text": "Outstanding research quality and disciplined risk management. Reaped 28% alpha in 3 months!",
+    "testimonial_date": "2026-09-11",
+    "package_name": "Diamond Equity Portfolio",
+    "screenshot_url": null,
+    "is_featured": true,
+    "is_verified": true,
+    "branch_id": "c92679be-6977-40bb-a4d1-5a5ff9b7a607",
+    "created_by": "d61e443d-be16-4f94-bba2-73317d0d1a61",
+    "created_at": "2026-09-11T10:46:00.100168+00:00",
+    "updated_at": "2026-09-11T12:34:25.57+00:00"
+  }
+]
