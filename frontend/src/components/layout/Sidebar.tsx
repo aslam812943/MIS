@@ -84,120 +84,121 @@ const IconIEPFEntry = () => (
 
 const IconIEPFDashboard = () => (
   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="18" y1="20" x2="18" y2="10"/>
-    <line x1="12" y1="20" x2="12" y2="4"/>
-    <line x1="6" y1="20" x2="6" y2="14"/>
-  </svg>
-);
-
-const IconBell = () => (
-  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9"/>
-    <path d="M13.73 21a2 2 0 01-3.46 0"/>
+    <path d="M21.21 15.89A10 10 0 118 2.83"/>
+    <path d="M22 12A10 10 0 0012 2v10z"/>
   </svg>
 );
 
 const IconTask = () => (
   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="5" width="18" height="16" rx="2"/>
-    <path d="M3 10h18"/>
-    <path d="M8 3v4M16 3v4"/>
-    <path d="M8 15l2 2 4-4"/>
+    <path d="M9 11l3 3L22 4"/>
+    <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
   </svg>
 );
 
-/* ── Nav Item ─────────────────────────────────────────────── */
+const IconRA = () => (
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+  </svg>
+);
+
+const IconStar = () => (
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+  </svg>
+);
+
+const IconReport = () => (
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+    <polyline points="14 2 14 8 20 8"/>
+    <line x1="16" y1="13" x2="8" y2="13"/>
+    <line x1="16" y1="17" x2="8" y2="17"/>
+    <polyline points="10 9 9 9 8 9"/>
+  </svg>
+);
+
+/* ── Nav Item Component ───────────────────────────────────── */
 interface NavItemProps {
   to: string;
   icon: React.ReactNode;
   label: string;
   badge?: string;
+  count?: number;
   onClick?: () => void;
 }
-const NavItem: React.FC<NavItemProps> = ({ to, icon, label, badge, onClick }) => (
+
+const NavItem: React.FC<NavItemProps> = ({ to, icon, label, badge, count, onClick }) => (
   <NavLink
     to={to}
+    className={({ isActive }) => `mis-nav-item${isActive ? ' active' : ''}`}
     onClick={onClick}
-    className={({ isActive }) =>
-      `mis-nav-item${isActive ? ' active' : ''}`
-    }
   >
-    {icon}
-    <span className="flex-1 min-w-0">{label}</span>
+    <span className="mis-nav-icon">{icon}</span>
+    <span className="mis-nav-label">{label}</span>
     {badge && <span className="mis-nav-badge">{badge}</span>}
+    {count !== undefined && count > 0 && <span className="mis-nav-count">{count}</span>}
   </NavLink>
 );
 
-let savedNavScrollTop = 0;
-
-/* ── Sidebar Component ────────────────────────────────────── */
-const Sidebar: React.FC = () => {
+/* ── Main Sidebar Component ──────────────────────────────── */
+export const Sidebar: React.FC = () => {
   const { sidebarOpen, setSidebarOpen } = useLayout();
+  const { theme, toggleTheme } = useTheme();
+  const user = authService.getCurrentUser();
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [taskCount, setTaskCount] = useState(0);
   const navRef = useRef<HTMLElement | null>(null);
 
   useLayoutEffect(() => {
-    if (navRef.current) {
-      navRef.current.scrollTop = savedNavScrollTop;
+    const nav = navRef.current;
+    if (!nav) return;
+    const saved = sessionStorage.getItem('mis_sidebar_scroll');
+    if (saved !== null) {
+      nav.scrollTop = Number(saved);
     }
+    const handleScroll = () => {
+      sessionStorage.setItem('mis_sidebar_scroll', String(nav.scrollTop));
+    };
+    nav.addEventListener('scroll', handleScroll, { passive: true });
+    return () => nav.removeEventListener('scroll', handleScroll);
   }, []);
 
-  const handleNavScroll = () => {
-    if (navRef.current) {
-      savedNavScrollTop = navRef.current.scrollTop;
+  // Fetch initial unread count
+  useEffect(() => {
+    notificationService.getUnreadCount().then(setUnreadCount).catch(() => {});
+  }, []);
+
+  // Fetch initial assigned task count
+  useEffect(() => {
+    const fetchTasks = async () => {
+      try {
+        const tasks = await taskService.getTasks('mine');
+        const pendingCount = tasks.filter(
+          (t: any) => t.status !== 'Completed' && t.status !== 'Cancelled'
+        ).length;
+        setTaskCount(pendingCount);
+      } catch (err) {
+        console.error('Failed to load initial task count in sidebar:', err);
+      }
+    };
+    if (user?.id) {
+      fetchTasks();
     }
-  };
+  }, [user?.id]);
 
-  const { theme, toggleTheme } = useTheme();
-  const user = authService.getCurrentUser();
+  const isAdmin = user?.role === 'admin';
+  const isLeadership = ['ceo', 'managing_director', 'director', 'executive'].includes(user?.role || '');
+  const isHOD = user?.role === 'hod';
+  const isHR = user?.role === 'hr' || user?.department_name?.toUpperCase() === 'HR';
+  const isEmployee = user?.role === 'employee';
 
-  const [unreadCount, setUnreadCount] = useState(0);
-  useEffect(() => {
-    let cancelled = false;
-    const fetchUnread = () => {
-      notificationService.getUnreadCount()
-        .then((count) => { if (!cancelled) setUnreadCount(count); })
-        .catch(() => { /* silent */ });
-    };
-    fetchUnread();
-    const interval = setInterval(fetchUnread, 60000);
-    return () => { cancelled = true; clearInterval(interval); };
-  }, []);
+  const isCreatorDept = user?.department_name?.toUpperCase() === 'CREATIVE' || user?.department_name?.toUpperCase() === 'MARKETING';
+  const isSMM = user?.role === 'social_media_manager' || (isCreatorDept && (isHOD || isAdmin));
+  const isCreator = user?.role === 'content_creator' || isCreatorDept;
 
-  const [openTaskCount, setOpenTaskCount] = useState(0);
-  useEffect(() => {
-    let cancelled = false;
-    const fetchOpenTasks = () => {
-      taskService.getTasks('mine')
-        .then((tasks) => {
-          if (cancelled) return;
-          const open = tasks.filter((t) => !['Completed', 'Cancelled'].includes(t.status)).length;
-          setOpenTaskCount(open);
-        })
-        .catch(() => { /* silent */ });
-    };
-    fetchOpenTasks();
-    const interval = setInterval(fetchOpenTasks, 60000);
-    return () => { cancelled = true; clearInterval(interval); };
-  }, []);
+  const showHRDashboard = isAdmin || isHR;
 
-  const role = user?.role || '';
-  const isAdmin = role === 'admin';
-  const isLeadership = ['ceo', 'managing_director', 'director', 'executive'].includes(role);
-  const isHOD = role === 'hod';
-  const isEmployee = role === 'employee';
-  const isHR = role === 'hr';
-  const isCreatorDept = user?.department_name?.toUpperCase() === 'CONTENT CREATION' || user?.department_name?.toUpperCase() === 'CONTENT CREATOR';
-  const isCreator = role === 'content_creator' || (isCreatorDept && (isHOD || isEmployee));
-  const isSMM = role === 'social_media_manager';
-
-  // SMM & Content Creation navigation visible to staff, HOD, and executive management (CEO/MD/Director)
-  const showSMM = isSMM || isLeadership;
-  const showCreator = isCreator || isSMM || isLeadership;
-
-  // HR Dashboard and Administration visibility
-  const showHRDashboard = isAdmin || isHR || isLeadership;
-  
-  // Department specific visibility
   const isIEPFUser = user?.department_name?.toUpperCase() === 'IEPF';
   const showIEPFDashboard = isAdmin || isLeadership || (isIEPFUser && (isHOD || isEmployee));
 
@@ -213,70 +214,63 @@ const Sidebar: React.FC = () => {
   const isFinanceUser = user?.department_name?.toUpperCase() === 'FINANCE';
   const showFinanceDashboard = isAdmin || isLeadership || (isFinanceUser && (isHOD || isEmployee));
 
+  const isRAUser = user?.department_name?.toUpperCase() === 'RA' || user?.department_name?.toUpperCase() === 'RESEARCH ANALYST';
+  const showRADashboard = isAdmin || isLeadership || (isRAUser && (isHOD || isEmployee));
+
   const isSalesUser = user?.department_name?.toUpperCase() === 'SALES';
   const showSalesDashboard = isAdmin || isLeadership || (isSalesUser && (isHOD || isEmployee));
 
   const isSettlementsUser = user?.department_name?.toUpperCase() === 'SETTLEMENTS';
   const showSettlementsDashboard = isAdmin || isLeadership || (isSettlementsUser && (isHOD || isEmployee));
 
-  const hasDedicatedDeptEntry = isIEPFUser || isSettlementsUser || isKYCUser || isDPUser || isITUser || isFinanceUser || isSalesUser || isCreatorDept || isCreator;
+  const hasDedicatedDeptEntry = isIEPFUser || isSettlementsUser || isKYCUser || isDPUser || isITUser || isFinanceUser || isSalesUser || isCreatorDept || isCreator || isRAUser;
 
   const closeOnMobile = () => setSidebarOpen(false);
 
   const initials = user?.full_name
     ? user.full_name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()
-    : 'U';
+    : (user?.email?.slice(0, 2).toUpperCase() || 'U');
 
   return (
     <aside className={`mis-sidebar${sidebarOpen ? ' open' : ''}`}>
-      {/* Header */}
+      {/* Brand Header */}
       <div className="mis-sidebar-header">
-        <div className="mis-sidebar-logo">
-          <div className="mis-logo-icon">M</div>
+        <NavLink to={ROUTES.DASHBOARD} className="mis-sidebar-logo" onClick={closeOnMobile}>
+          <div className="mis-logo-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="12 2 2 7 12 12 22 7 12 2"/>
+              <polyline points="2 17 12 22 22 17"/>
+              <polyline points="2 12 12 17 22 12"/>
+            </svg>
+          </div>
           <div className="mis-logo-text">
             <span className="mis-logo-name">MIS Portal</span>
-            <span className="mis-logo-sub">Management System</span>
+            <span className="mis-logo-sub">Management Suite</span>
           </div>
-        </div>
+        </NavLink>
+
         <button
           className="mis-sidebar-close"
           onClick={() => setSidebarOpen(false)}
-          aria-label="Close sidebar"
+          aria-label="Close menu"
         >
           <IconClose />
         </button>
       </div>
 
-      {/* Navigation */}
-      <nav className="mis-sidebar-nav" ref={navRef} onScroll={handleNavScroll}>
+      {/* Navigation Links */}
+      <nav className="mis-sidebar-nav" ref={navRef}>
         <span className="mis-sidebar-section-label">Main</span>
 
-        {!isEmployee && (
-          <NavItem
-            to={ROUTES.DASHBOARD}
-            icon={<IconDashboard />}
-            label="Executive Dashboard"
-            onClick={closeOnMobile}
-          />
-        )}
-
         <NavItem
-          to={ROUTES.NOTIFICATIONS}
-          icon={<IconBell />}
-          label="Notifications"
-          badge={unreadCount > 0 ? String(unreadCount) : undefined}
+          to={isRAUser ? ROUTES.RA_DASHBOARD : ROUTES.DASHBOARD}
+          icon={<IconDashboard />}
+          label="Dashboard"
           onClick={closeOnMobile}
         />
 
-        <NavItem
-          to={ROUTES.TASKS}
-          icon={<IconTask />}
-          label="Tasks"
-          badge={openTaskCount > 0 ? String(openTaskCount) : undefined}
-          onClick={closeOnMobile}
-        />
-
-        {(isEmployee || isHOD) && !hasDedicatedDeptEntry && (
+        {/* Generic Data Entry if no dedicated department */}
+        {(!hasDedicatedDeptEntry || isAdmin) && (
           <NavItem
             to={ROUTES.DATA_ENTRY}
             icon={<IconDataEntry />}
@@ -285,39 +279,47 @@ const Sidebar: React.FC = () => {
           />
         )}
 
-        {/* Social Media Management Navigation */}
-        {showSMM && (
-          <>
-            <span className="mis-sidebar-section-label">Social Media Management</span>
-            <NavItem
-              to={ROUTES.SMM_DASHBOARD}
-              icon={<IconDashboard />}
-              label="Analytics Dashboard"
-              onClick={closeOnMobile}
-            />
-            <NavItem
-              to={ROUTES.SMM_APPROVALS}
-              icon={<IconVerify />}
-              label="Approvals Queue"
-              onClick={closeOnMobile}
-            />
-            <NavItem
-              to={ROUTES.SMM_CAMPAIGNS}
-              icon={<IconIEPFDashboard />}
-              label="Campaigns & Briefs"
-              onClick={closeOnMobile}
-            />
-          </>
+        {/* Verification Hub */}
+        {(isAdmin || isHOD) && (
+          <NavItem
+            to={ROUTES.VERIFY_ENTRIES}
+            icon={<IconVerify />}
+            label="Verify Entries"
+            onClick={closeOnMobile}
+          />
         )}
 
-        {/* Content Creation Navigation */}
-        {showCreator && (
+        {/* Tasks Hub */}
+        <NavItem
+          to={ROUTES.TASKS}
+          icon={<IconTask />}
+          label="Tasks"
+          count={taskCount}
+          onClick={closeOnMobile}
+        />
+
+        {/* Notifications Hub */}
+        <NavItem
+          to={ROUTES.NOTIFICATIONS}
+          icon={
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+              <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+            </svg>
+          }
+          label="Notifications"
+          count={unreadCount}
+          onClick={closeOnMobile}
+        />
+
+        {/* Creator Hub */}
+        {isCreator && (
           <>
             <span className="mis-sidebar-section-label">Content Creation</span>
             <NavItem
               to={ROUTES.CREATOR_DASHBOARD}
               icon={<IconDashboard />}
-              label="Creator Dashboard"
+              label="Creator Studio"
               onClick={closeOnMobile}
             />
             <NavItem
@@ -326,19 +328,27 @@ const Sidebar: React.FC = () => {
               label="Content Planner"
               onClick={closeOnMobile}
             />
-            <NavItem
-              to={ROUTES.CREATOR_CALENDAR}
-              icon={<IconTask />}
-              label="Schedule Calendar"
-              onClick={closeOnMobile}
-            />
-            <NavItem
-              to={ROUTES.CREATOR_ASSETS}
-              icon={<IconIEPFEntry />}
-              label="Asset Library"
-              onClick={closeOnMobile}
-            />
           </>
+        )}
+
+        {/* Content Review / Approvals */}
+        {isSMM && (
+          <NavItem
+            to={ROUTES.SMM_APPROVALS}
+            icon={<IconVerify />}
+            label="Review & Approve"
+            onClick={closeOnMobile}
+          />
+        )}
+
+        {/* Social Media Manager / Lead - Creator Performance */}
+        {(isSMM || isAdmin) && (
+          <NavItem
+            to={ROUTES.SMM_DASHBOARD}
+            icon={<IconDashboard />}
+            label="SMM Dashboard"
+            onClick={closeOnMobile}
+          />
         )}
 
         {/* IEPF Department Navigation */}
@@ -369,7 +379,7 @@ const Sidebar: React.FC = () => {
         {/* Settlements Department Navigation */}
         {isSettlementsUser && (
           <>
-            <span className="mis-sidebar-section-label">Settlements Department</span>
+            <span className="mis-sidebar-section-label">Settlements Dept</span>
             <NavItem
               to={ROUTES.SETTLEMENTS_DATA_ENTRY}
               icon={<IconIEPFEntry />}
@@ -381,7 +391,7 @@ const Sidebar: React.FC = () => {
 
         {showSettlementsDashboard && (
           <>
-            {!isSettlementsUser && <span className="mis-sidebar-section-label">Settlements Department</span>}
+            {!isSettlementsUser && <span className="mis-sidebar-section-label">Settlements Dept</span>}
             <NavItem
               to={ROUTES.SETTLEMENTS_DASHBOARD}
               icon={<IconIEPFDashboard />}
@@ -513,6 +523,65 @@ const Sidebar: React.FC = () => {
               label="Sales Dashboard"
               onClick={closeOnMobile}
             />
+          </>
+        )}
+
+        {/* Research Analyst (RA) Department Navigation */}
+        {isRAUser && (
+          <>
+            <span className="mis-sidebar-section-label">RA Department</span>
+            <NavItem
+              to={ROUTES.RA_DATA_ENTRY}
+              icon={<IconIEPFEntry />}
+              label="RA Data Entry"
+              onClick={closeOnMobile}
+            />
+            <NavItem
+              to={ROUTES.RA_TESTIMONIALS}
+              icon={<IconStar />}
+              label="Testimonials Hub"
+              onClick={closeOnMobile}
+            />
+            <NavItem
+              to={ROUTES.RA_REPORTS}
+              icon={<IconReport />}
+              label="Weekly & Monthly Reports"
+              onClick={closeOnMobile}
+            />
+          </>
+        )}
+
+        {showRADashboard && (
+          <>
+            {!isRAUser && <span className="mis-sidebar-section-label">RA Department</span>}
+            <NavItem
+              to={ROUTES.RA_DASHBOARD}
+              icon={<IconRA />}
+              label="RA Dashboard"
+              onClick={closeOnMobile}
+            />
+            {!isRAUser && (
+              <>
+                <NavItem
+                  to={ROUTES.RA_DATA_ENTRY}
+                  icon={<IconIEPFEntry />}
+                  label="RA Data Entry"
+                  onClick={closeOnMobile}
+                />
+                <NavItem
+                  to={ROUTES.RA_TESTIMONIALS}
+                  icon={<IconStar />}
+                  label="Testimonials Hub"
+                  onClick={closeOnMobile}
+                />
+                <NavItem
+                  to={ROUTES.RA_REPORTS}
+                  icon={<IconReport />}
+                  label="Weekly & Monthly Reports"
+                  onClick={closeOnMobile}
+                />
+              </>
+            )}
           </>
         )}
 

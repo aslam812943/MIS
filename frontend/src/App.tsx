@@ -31,6 +31,10 @@ import AssetLibrary from './pages/ContentCreator/AssetLibrary';
 import SMMDashboard from './pages/SocialMediaManager/SMMDashboard';
 import ApprovalsQueue from './pages/SocialMediaManager/ApprovalsQueue';
 import CampaignsManager from './pages/SocialMediaManager/CampaignsManager';
+import RADashboardPage from './pages/RA/RADashboardPage';
+import RADataEntryPage from './pages/RA/RADataEntryPage';
+import RATestimonialsPage from './pages/RA/RATestimonialsPage';
+import RAReportsPage from './pages/RA/RAReportsPage';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 
 import { ROUTES } from './constants/routes';
@@ -318,6 +322,52 @@ function App() {
           element={
             <ProtectedRoute>
               <TaskManagementPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Research Analyst (RA) Department Routes */}
+        <Route
+          path={ROUTES.RA_DASHBOARD}
+          element={
+            <ProtectedRoute>
+              <RADashboardPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path={ROUTES.RA_DATA_ENTRY}
+          element={
+            <ProtectedRoute>
+              <RADataEntryPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path={ROUTES.RA_KYC}
+          element={
+            <ProtectedRoute>
+              <RADataEntryPage defaultTab="kyc" />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path={ROUTES.RA_TESTIMONIALS}
+          element={
+            <ProtectedRoute>
+              <RATestimonialsPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path={ROUTES.RA_REPORTS}
+          element={
+            <ProtectedRoute>
+              <RAReportsPage />
             </ProtectedRoute>
           }
         />

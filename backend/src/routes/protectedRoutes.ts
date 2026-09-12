@@ -1,3 +1,4 @@
+import { raController } from '../controllers/RAController.js';
 import { Router } from 'express';
 import { requireAuth } from '../middlewares/requireAuth.js';
 import { requireAdmin } from '../middlewares/requireAdmin.js';
@@ -336,5 +337,37 @@ router.get('/notifications/unread-count', requireAuth, notificationController.ge
 router.patch('/notifications/:id/read', requireAuth, notificationController.markAsRead);
 router.post('/notifications/mark-all-read', requireAuth, notificationController.markAllAsRead);
 router.post('/notifications/run-check', requireAuth, requireAdmin, notificationController.runCheck);
+
+
+/**
+ * RA (Research Analyst) Department endpoints
+ */
+router.get('/ra/dashboard', requireAuth, (req, res) => raController.getDashboardStats(req, res));
+router.get('/ra/clients', requireAuth, (req, res) => raController.getClients(req, res));
+router.post('/ra/clients', requireAuth, (req, res) => raController.createClient(req, res));
+router.get('/ra/clients/:id', requireAuth, (req, res) => raController.getClientById(req, res));
+router.put('/ra/clients/:id', requireAuth, (req, res) => raController.updateClient(req, res));
+router.patch('/ra/clients/:id', requireAuth, (req, res) => raController.updateClient(req, res));
+router.delete('/ra/clients/:id', requireAuth, (req, res) => raController.deleteClient(req, res));
+
+// RA Packages Catalog
+router.get('/ra/packages', requireAuth, (req, res) => raController.getPackages(req, res));
+router.post('/ra/packages', requireAuth, (req, res) => raController.createPackage(req, res));
+router.put('/ra/packages/:id', requireAuth, (req, res) => raController.updatePackage(req, res));
+router.patch('/ra/packages/:id', requireAuth, (req, res) => raController.updatePackage(req, res));
+router.delete('/ra/packages/:id', requireAuth, (req, res) => raController.deletePackage(req, res));
+router.get('/ra/packages/report', requireAuth, (req, res) => raController.getPackageReport(req, res));
+router.get('/ra/payments', requireAuth, (req, res) => raController.getPayments(req, res));
+router.get('/ra/renewals', requireAuth, (req, res) => raController.getRenewals(req, res));
+router.get('/ra/expired', requireAuth, (req, res) => raController.getExpired(req, res));
+router.get('/ra/kyc', requireAuth, (req, res) => raController.getKycReport(req, res));
+
+router.get('/ra/testimonials', requireAuth, (req, res) => raController.getTestimonials(req, res));
+router.post('/ra/testimonials', requireAuth, (req, res) => raController.createTestimonial(req, res));
+router.put('/ra/testimonials/:id', requireAuth, (req, res) => raController.updateTestimonial(req, res));
+router.patch('/ra/testimonials/:id', requireAuth, (req, res) => raController.updateTestimonial(req, res));
+router.delete('/ra/testimonials/:id', requireAuth, (req, res) => raController.deleteTestimonial(req, res));
+
+router.get('/ra/reports/periodic', requireAuth, (req, res) => raController.getPeriodicReport(req, res));
 
 export default router;
