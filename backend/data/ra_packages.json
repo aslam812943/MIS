@@ -1,0 +1,57 @@
+[
+  {
+    "id": "pkg-default-1",
+    "name": "Diamond Equity Portfolio",
+    "description": "Long term high conviction equity advisory with disciplined rebalancing",
+    "segment": "Equity",
+    "price": 50000,
+    "duration_days": 90,
+    "is_active": true,
+    "created_at": "2026-09-12T11:17:25.788Z",
+    "updated_at": "2026-09-12T11:17:25.789Z"
+  },
+  {
+    "id": "pkg-default-2",
+    "name": "Platinum Momentum Pro",
+    "description": "High alpha momentum equity swing trading recommendations",
+    "segment": "Equity",
+    "price": 35000,
+    "duration_days": 90,
+    "is_active": true,
+    "created_at": "2026-09-12T11:17:25.789Z",
+    "updated_at": "2026-09-12T11:17:25.789Z"
+  },
+  {
+    "id": "pkg-default-3",
+    "name": "Options & Futures Alpha",
+    "description": "Index and stock options strategies with strict risk-to-reward hedging",
+    "segment": "Futures & Options",
+    "price": 25000,
+    "duration_days": 30,
+    "is_active": true,
+    "created_at": "2026-09-12T11:17:25.789Z",
+    "updated_at": "2026-09-12T11:17:25.789Z"
+  },
+  {
+    "id": "pkg-default-4",
+    "name": "Gold Commodity Specialist",
+    "description": "Bullion and crude oil swing trading advisory signals",
+    "segment": "Commodity",
+    "price": 20000,
+    "duration_days": 30,
+    "is_active": true,
+    "created_at": "2026-09-12T11:17:25.789Z",
+    "updated_at": "2026-09-12T11:17:25.789Z"
+  },
+  {
+    "id": "pkg-default-5",
+    "name": "HNI Wealth Advisory Multi-Cap",
+    "description": "Exclusive bespoke multi-asset allocation for high net-worth investors",
+    "segment": "HNI Alpha",
+    "price": 100000,
+    "duration_days": 365,
+    "is_active": true,
+    "created_at": "2026-09-12T11:17:25.789Z",
+    "updated_at": "2026-09-12T11:17:25.789Z"
+  }
+]

@@ -407,7 +407,7 @@ export const RADataEntryPage: React.FC<RADataEntryPageProps> = ({ defaultTab }) 
       loadData();
     } catch (err: any) {
       console.error('Failed to save package:', err);
-      toast.error(err.message || 'Failed to save package');
+      toast.error(err.response?.data?.error || err.response?.data?.message || err.message || 'Failed to save package');
     } finally {
       setSavingPackage(false);
     }
@@ -420,7 +420,7 @@ export const RADataEntryPage: React.FC<RADataEntryPageProps> = ({ defaultTab }) 
       toast.success(`Package "${pkg.name}" is now ${!pkg.is_active ? 'Active' : 'Inactive'}`);
       loadData();
     } catch (err: any) {
-      toast.error(err.message || 'Failed to update status');
+      toast.error(err.response?.data?.error || err.response?.data?.message || err.message || 'Failed to update status');
     }
   };
 
@@ -434,7 +434,7 @@ export const RADataEntryPage: React.FC<RADataEntryPageProps> = ({ defaultTab }) 
       toast.success(`Package "${pkg.name}" removed`);
       loadData();
     } catch (err: any) {
-      toast.error(err.message || 'Failed to delete package');
+      toast.error(err.response?.data?.error || err.response?.data?.message || err.message || 'Failed to delete package');
     }
   };
 
@@ -477,7 +477,7 @@ export const RADataEntryPage: React.FC<RADataEntryPageProps> = ({ defaultTab }) 
       toast.success(`Feedback added for ${selectedClientForTestimonial.client_name}!`);
       setIsTestimonialModalOpen(false);
     } catch (err: any) {
-      toast.error(err.message || 'Failed to save testimonial');
+      toast.error(err.response?.data?.error || err.response?.data?.message || err.message || 'Failed to save testimonial');
     } finally {
       setSaving(false);
     }
