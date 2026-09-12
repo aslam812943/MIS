@@ -1,5 +1,5 @@
-import { supabaseAdmin } from '../config/supabase';
-import { ITService } from '../services/ITService';
+import { supabaseAdmin } from '../config/supabase.js';
+import { ITService } from '../services/ITService.js';
 
 async function testITWithDates() {
   const { data: adminUser } = await supabaseAdmin
@@ -15,7 +15,7 @@ async function testITWithDates() {
   try {
     const s1 = await it.getDashboardStats(adminUser.id);
     console.log('✅ s1 (no dates) passed');
-  } catch (e) {
+  } catch (e: any) {
     console.error('❌ s1 error:', e.message);
   }
 
@@ -23,7 +23,7 @@ async function testITWithDates() {
   try {
     const s2 = await it.getDashboardStats(adminUser.id, undefined, '2026-09-01', '2026-09-30');
     console.log('✅ s2 (with dates) passed');
-  } catch (e) {
+  } catch (e: any) {
     console.error('❌ s2 error:', e.message);
   }
 }

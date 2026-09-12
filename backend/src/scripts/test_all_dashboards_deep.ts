@@ -1,13 +1,13 @@
-import { supabaseAdmin } from '../config/supabase';
-import { IEPFService } from '../services/IEPFService';
-import { SalesService } from '../services/SalesService';
-import { SettlementService } from '../services/SettlementService';
-import { KYCService } from '../services/KYCService';
-import { DPService } from '../services/DPService';
-import { ITService } from '../services/ITService';
-import { HRService } from '../services/HRService';
-import { FinanceService } from '../services/FinanceService';
-import { RAService } from '../services/RAService';
+import { supabaseAdmin } from '../config/supabase.js';
+import { IEPFService } from '../services/IEPFService.js';
+import { SalesService } from '../services/SalesService.js';
+import { SettlementService } from '../services/SettlementService.js';
+import { KYCService } from '../services/KYCService.js';
+import { DPService } from '../services/DPService.js';
+import { ITService } from '../services/ITService.js';
+import { HRService } from '../services/HRService.js';
+import { FinanceService } from '../services/FinanceService.js';
+import { RAService } from '../services/RAService.js';
 
 async function testAllControllers() {
   console.log('=====================================================');

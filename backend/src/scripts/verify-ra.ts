@@ -1,5 +1,5 @@
-import { supabase } from '../config/supabase';
-import { RAService } from '../services/RAService';
+import { supabase } from '../config/supabase.js';
+import { RAService } from '../services/RAService.js';
 
 async function runVerification() {
   console.log('=====================================================');
