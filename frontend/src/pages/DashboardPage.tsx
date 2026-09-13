@@ -22,6 +22,8 @@ import { getDefaultPeriod } from '../utils/periodRange';
 Chart.register(...registerables);
 
 const EMPLOYEE_DEPT_ENTRY_ROUTE: Record<string, string> = {
+  'PRIVILEGE ACCOUNT': ROUTES.PRIVILEGE_DATA_ENTRY,
+  PRIVILEGE: ROUTES.PRIVILEGE_DATA_ENTRY,
   RA: ROUTES.RA_DATA_ENTRY,
   'RESEARCH ANALYST': ROUTES.RA_DATA_ENTRY,
   'RESEARCH & ANALYSIS': ROUTES.RA_DATA_ENTRY,
@@ -125,11 +127,22 @@ const DashboardPage: React.FC = () => {
   const isCreatorDept = user?.department_name?.toUpperCase() === 'CONTENT CREATION' || user?.department_name?.toUpperCase() === 'CONTENT CREATOR';
   const isCreator = role === 'content_creator' || (isCreatorDept && role === 'hod');
 
-  // Employee redirection to their dedicated department workspace
+  const dept = user?.department_name?.toUpperCase() || '';
+  const isPrivilegeUser = dept === 'PRIVILEGE ACCOUNT' || dept === 'PRIVILEGE';
+  const isHOD = role === 'hod';
+
+  // 1. Privilege HOD redirection
+  if (isHOD && isPrivilegeUser) {
+    return <Navigate to={ROUTES.PRIVILEGE_DASHBOARD} replace />;
+  }
+
+  // 2. Employee redirection to their dedicated department workspace
   if (isEmployee) {
-    const dept = user?.department_name?.toUpperCase() || '';
     if (dept === 'RA' || dept === 'RESEARCH ANALYST' || dept === 'RESEARCH & ANALYSIS') {
       return <Navigate to={ROUTES.RA_DASHBOARD} replace />;
+    }
+    if (isPrivilegeUser) {
+      return <Navigate to={ROUTES.PRIVILEGE_DATA_ENTRY} replace />;
     }
     const redirectRoute = EMPLOYEE_DEPT_ENTRY_ROUTE[dept] || ROUTES.DATA_ENTRY;
     return <Navigate to={redirectRoute} replace />;
@@ -1228,13 +1241,7 @@ const DashboardPage: React.FC = () => {
                   <IconDashboardTile />
                   Open RA Dashboard
                 </Link>
-                <Link
-                  to={ROUTES.RA_DATA_ENTRY}
-                  className="px-5 py-2.5 text-xs font-bold inline-flex items-center gap-2 rounded-xl bg-[var(--accent)] text-slate-950 hover:bg-[var(--accent-hover)] transition shadow-sm"
-                >
-                  <IconEdit />
-                  Open RA Data Entry
-                </Link>
+                
                 <Link
                   to="/ra-entry?tab=kyc"
                   className="px-5 py-2.5 text-xs font-bold inline-flex items-center gap-2 rounded-xl bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500/30 border border-cyan-500/30 transition shadow-sm"

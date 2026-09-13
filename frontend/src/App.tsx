@@ -1,3 +1,5 @@
+import PrivilegeDashboardPage from './pages/Privilege/PrivilegeDashboardPage';
+import PrivilegeDataEntryPage from './pages/Privilege/PrivilegeDataEntryPage';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
@@ -368,6 +370,26 @@ function App() {
           element={
             <ProtectedRoute>
               <RAReportsPage />
+            </ProtectedRoute>
+          }
+        />
+
+        
+        {/* Privilege Account Department Routes */}
+        <Route
+          path={ROUTES.PRIVILEGE_DASHBOARD}
+          element={
+            <ProtectedRoute>
+              <PrivilegeDashboardPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path={ROUTES.PRIVILEGE_DATA_ENTRY}
+          element={
+            <ProtectedRoute>
+              <PrivilegeDataEntryPage />
             </ProtectedRoute>
           }
         />

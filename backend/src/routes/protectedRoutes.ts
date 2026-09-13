@@ -1,3 +1,4 @@
+import { privilegeController } from '../controllers/PrivilegeController.js';
 import { raController } from '../controllers/RAController.js';
 import { Router } from 'express';
 import { requireAuth } from '../middlewares/requireAuth.js';
@@ -42,6 +43,8 @@ import { DashboardPermissionController } from '../controllers/DashboardPermissio
 import { TaskService } from '../services/TaskService.js';
 import { TaskController } from '../controllers/TaskController.js';
 import multer from 'multer';
+
+const privilegeUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 const router = Router();
 
@@ -369,5 +372,19 @@ router.patch('/ra/testimonials/:id', requireAuth, (req, res) => raController.upd
 router.delete('/ra/testimonials/:id', requireAuth, (req, res) => raController.deleteTestimonial(req, res));
 
 router.get('/ra/reports/periodic', requireAuth, (req, res) => raController.getPeriodicReport(req, res));
+
+
+/**
+ * Privilege Account Department endpoints
+ */
+router.get('/privilege/dashboard', requireAuth, (req, res) => privilegeController.getDashboardStats(req, res));
+router.get('/privilege/accounts', requireAuth, (req, res) => privilegeController.getAccounts(req, res));
+router.post('/privilege/accounts', requireAuth, (req, res) => privilegeController.saveAccount(req, res));
+router.post('/privilege/accounts/bulk', requireAuth, (req, res) => privilegeController.bulkImport(req, res));
+router.delete('/privilege/accounts/:code', requireAuth, (req, res) => privilegeController.deleteAccount(req, res));
+router.get('/privilege/uploads', requireAuth, (req, res) => privilegeController.getUploads(req, res));
+router.post('/privilege/uploads', requireAuth, privilegeUpload.single('file'), (req, res) => privilegeController.uploadFile(req, res));
+router.get('/privilege/uploads/:id/download', requireAuth, (req, res) => privilegeController.downloadFile(req, res));
+router.delete('/privilege/uploads/:id', requireAuth, (req, res) => privilegeController.deleteUpload(req, res));
 
 export default router;

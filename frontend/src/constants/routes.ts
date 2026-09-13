@@ -40,6 +40,8 @@ export const ROUTES = {
   SMM_DASHBOARD: '/smm/dashboard',
   SMM_APPROVALS: '/smm/approvals',
   SMM_CAMPAIGNS: '/smm/campaigns',
+  PRIVILEGE_DASHBOARD: '/privilege-dashboard',
+  PRIVILEGE_DATA_ENTRY: '/privilege-entry',
   ROOT: '/',
 } as const;
 

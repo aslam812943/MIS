@@ -223,7 +223,11 @@ export const Sidebar: React.FC = () => {
   const isSettlementsUser = user?.department_name?.toUpperCase() === 'SETTLEMENTS';
   const showSettlementsDashboard = isAdmin || isLeadership || (isSettlementsUser && (isHOD || isEmployee));
 
-  const hasDedicatedDeptEntry = isIEPFUser || isSettlementsUser || isKYCUser || isDPUser || isITUser || isFinanceUser || isSalesUser || isCreatorDept || isCreator || isRAUser;
+  
+  const isPrivilegeUser = user?.department_name?.toUpperCase() === 'PRIVILEGE ACCOUNT' || user?.department_name?.toUpperCase() === 'PRIVILEGE';
+  const showPrivilegeDashboard = isAdmin || isLeadership || (isPrivilegeUser && (isHOD || isEmployee));
+
+  const hasDedicatedDeptEntry = isIEPFUser || isSettlementsUser || isKYCUser || isDPUser || isITUser || isFinanceUser || isSalesUser || isCreatorDept || isCreator || isRAUser || isPrivilegeUser;
 
   const closeOnMobile = () => setSidebarOpen(false);
 
@@ -263,7 +267,13 @@ export const Sidebar: React.FC = () => {
         <span className="mis-sidebar-section-label">Main</span>
 
         <NavItem
-          to={isRAUser ? ROUTES.RA_DASHBOARD : ROUTES.DASHBOARD}
+          to={
+            isRAUser
+              ? ROUTES.RA_DASHBOARD
+              : isPrivilegeUser
+              ? ROUTES.PRIVILEGE_DASHBOARD
+              : ROUTES.DASHBOARD
+          }
           icon={<IconDashboard />}
           label="Dashboard"
           onClick={closeOnMobile}
@@ -280,7 +290,7 @@ export const Sidebar: React.FC = () => {
         )}
 
         {/* Verification Hub */}
-        {(!isAdmin && !isLeadership && isHOD) && (
+        {(!isAdmin && !isLeadership && isHOD && !isPrivilegeUser) && (
           <NavItem
             to={ROUTES.VERIFY_ENTRIES}
             icon={<IconVerify />}
@@ -558,6 +568,38 @@ export const Sidebar: React.FC = () => {
               to={ROUTES.RA_DASHBOARD}
               icon={<IconRA />}
               label="RA Dashboard"
+              onClick={closeOnMobile}
+            />
+          </>
+        )}
+
+        
+        {/* Privilege Account Department Navigation */}
+        {isPrivilegeUser && (
+          <>
+            <span className="mis-sidebar-section-label">Privilege Account</span>
+            <NavItem
+              to={ROUTES.PRIVILEGE_DASHBOARD}
+              icon={<IconDashboard />}
+              label="Privilege Dashboard"
+              onClick={closeOnMobile}
+            />
+            <NavItem
+              to={ROUTES.PRIVILEGE_DATA_ENTRY}
+              icon={<IconDataEntry />}
+              label={isHOD ? "Client Accounts" : "Privilege Accounts"}
+              onClick={closeOnMobile}
+            />
+          </>
+        )}
+
+        {showPrivilegeDashboard && !isPrivilegeUser && (
+          <>
+            <span className="mis-sidebar-section-label">Privilege Account</span>
+            <NavItem
+              to={ROUTES.PRIVILEGE_DASHBOARD}
+              icon={<IconDashboard />}
+              label="Privilege Dashboard"
               onClick={closeOnMobile}
             />
           </>
