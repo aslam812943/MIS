@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import DataEntryForm from '../../components/DataEntry/DataEntryForm';
 import { orgService, type Module } from '../../services/org.service';
@@ -15,7 +15,8 @@ const DataEntryPage: React.FC = () => {
 
   const currentUser = authService.getCurrentUser();
   const deptName = currentUser?.department_name?.toUpperCase() || '';
-  const isRA = deptName.includes('RA') || deptName.includes('RESEARCH');
+  const isRA = deptName === 'RA' || deptName === 'RESEARCH ANALYST' || deptName === 'RESEARCH & ANALYSIS' || deptName === 'RESEARCH';
+  const isPrivilege = deptName === 'PRIVILEGE ACCOUNT' || deptName === 'PRIVILEGE';
 
   useEffect(() => {
     const fetchModules = async () => {
@@ -45,6 +46,10 @@ const DataEntryPage: React.FC = () => {
   }, []);
 
   const selectedModule = modules.find(m => m.id === selectedModuleId);
+
+  if (isPrivilege) {
+    return <Navigate to={ROUTES.PRIVILEGE_DATA_ENTRY} replace />;
+  }
 
   return (
     <DashboardLayout>

@@ -13,6 +13,10 @@ export const RATestimonialsPage: React.FC = () => {
   const isHOD = currentUser?.role === 'hod';
   const hasMultiBranchAccess = isAdmin || isLeadership || isHOD;
 
+  // Admin, CEO, Leadership, and HOD are strictly view-only (no add or edit).
+  // Only department operational employees are permitted to create/edit testimonials.
+  const canEdit = currentUser?.role === 'employee' && !isHOD && !isAdmin && !isLeadership;
+
   const [testimonials, setTestimonials] = useState<RATestimonial[]>([]);
   const [clients, setClients] = useState<RAClient[]>([]);
   const [branches, setBranches] = useState<any[]>([]);
@@ -27,6 +31,7 @@ export const RATestimonialsPage: React.FC = () => {
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<RATestimonial | null>(null);
+  const [viewingDetailItem, setViewingDetailItem] = useState<RATestimonial | null>(null);
   const [saving, setSaving] = useState(false);
 
   // Form State
@@ -77,8 +82,12 @@ export const RATestimonialsPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedBranch, featuredOnly]);
 
-  // Open Modal for Create
+  // Open Modal for Create (Employees only)
   const handleOpenCreateModal = () => {
+    if (!canEdit) {
+      toast.error('Admin and Leadership roles have view-only access.');
+      return;
+    }
     setEditingItem(null);
     setFormData({
       client_id: '',
@@ -95,8 +104,12 @@ export const RATestimonialsPage: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  // Open Modal for Edit
+  // Open Modal for Edit (Employees only)
   const handleOpenEditModal = (item: RATestimonial) => {
+    if (!canEdit) {
+      toast.error('Admin and Leadership roles have view-only access.');
+      return;
+    }
     setEditingItem(item);
     setFormData({
       client_id: item.client_id || '',
@@ -132,6 +145,10 @@ export const RATestimonialsPage: React.FC = () => {
   // Save Testimonial
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canEdit) {
+      toast.error('Admin and Leadership roles have view-only access.');
+      return;
+    }
     if (!formData.client_name.trim() || !formData.feedback_text.trim()) {
       toast.error('Client name and feedback content are required');
       return;
@@ -164,10 +181,13 @@ export const RATestimonialsPage: React.FC = () => {
 
   // Delete Testimonial
   const handleDelete = async (id: string, name: string) => {
-    if (!window.confirm(`Delete testimonial from "${name}"?`)) return;
+    if (!canEdit) {
+      toast.error('Admin and Leadership roles have view-only access.');
+      return;
+    }
     try {
       await raService.deleteTestimonial(id);
-      toast.success('Testimonial deleted');
+      toast.success(`Testimonial from "${name}" deleted`);
       loadData();
     } catch (err: any) {
       toast.error(err.message || 'Failed to delete testimonial');
@@ -176,6 +196,7 @@ export const RATestimonialsPage: React.FC = () => {
 
   // Toggle Featured Quick Action
   const handleToggleFeatured = async (item: RATestimonial) => {
+    if (!canEdit) return;
     try {
       await raService.updateTestimonial(item.id, { is_featured: !item.is_featured });
       toast.success(item.is_featured ? 'Removed from featured' : 'Marked as featured');
@@ -224,7 +245,9 @@ export const RATestimonialsPage: React.FC = () => {
                   Client Testimonials & Feedback Hub
                 </h1>
                 <p className="text-sm text-[var(--text-secondary)]">
-                  Track client appreciation, WhatsApp proof screenshots, ratings, and testimonials linked to RA subscriptions.
+                  {canEdit
+                    ? 'Track client appreciation, WhatsApp proof screenshots, ratings, and testimonials linked to RA subscriptions.'
+                    : 'View client ratings, verified reviews, appreciation quotes, and WhatsApp proof screenshots.'}
                 </p>
               </div>
             </div>
@@ -244,15 +267,18 @@ export const RATestimonialsPage: React.FC = () => {
               </select>
             )}
 
-            <button
-              onClick={handleOpenCreateModal}
-              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl bg-purple-600 text-white hover:bg-purple-700 shadow transition"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
-              </svg>
-              Add Testimonial
-            </button>
+            {/* Add Testimonial is shown ONLY to department operational employees */}
+            {canEdit && (
+              <button
+                onClick={handleOpenCreateModal}
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl bg-purple-600 text-white hover:bg-purple-700 shadow transition"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                </svg>
+                Add Testimonial
+              </button>
+            )}
           </div>
         </div>
 
@@ -313,7 +339,7 @@ export const RATestimonialsPage: React.FC = () => {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search testimonials..."
+                placeholder="Search testimonials by name, package or text..."
                 className="w-full pl-9 pr-3 py-2 text-sm rounded-xl border border-[var(--border)] bg-[var(--bg-base)] text-[var(--text-primary)]"
               />
               <svg className="w-4 h-4 text-[var(--text-muted)] absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -321,18 +347,19 @@ export const RATestimonialsPage: React.FC = () => {
               </svg>
             </div>
 
-            <label className="flex items-center gap-2 text-sm text-[var(--text-secondary)] cursor-pointer ml-2">
-              <input
-                type="checkbox"
-                checked={featuredOnly}
-                onChange={(e) => setFeaturedOnly(e.target.checked)}
-                className="rounded text-purple-600 focus:ring-purple-500"
-              />
-              <span>Featured Only</span>
-            </label>
+            <button
+              onClick={() => setFeaturedOnly(!featuredOnly)}
+              className={`px-3 py-2 text-xs font-semibold rounded-xl border transition flex items-center gap-1.5 ${
+                featuredOnly
+                  ? 'bg-amber-500/15 text-amber-500 border-amber-500/30'
+                  : 'border-[var(--border)] bg-[var(--bg-base)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover-2)]'
+              }`}
+            >
+              ★ Featured Only
+            </button>
           </div>
 
-          <div className="flex items-center rounded-xl bg-[var(--bg-hover-2)] p-1 border border-[var(--border)] dark:border-gray-600">
+          <div className="flex items-center gap-1 bg-[var(--bg-base)] p-1 rounded-xl border border-[var(--border)]">
             <button
               onClick={() => setViewMode('cards')}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
@@ -369,20 +396,27 @@ export const RATestimonialsPage: React.FC = () => {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
             </svg>
             <h3 className="text-lg font-bold text-[var(--text-primary)]">No testimonials found</h3>
-            <p className="text-xs mt-1">Start collecting client feedback and appreciation to build social proof.</p>
-            <button
-              onClick={handleOpenCreateModal}
-              className="mt-4 inline-flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl bg-purple-600 text-white hover:bg-purple-700"
-            >
-              Add First Testimonial
-            </button>
+            <p className="text-xs mt-1">
+              {canEdit
+                ? 'Start collecting client feedback and appreciation to build social proof.'
+                : 'Client testimonials will appear here once recorded by the RA advisory team.'}
+            </p>
+            {canEdit && (
+              <button
+                onClick={handleOpenCreateModal}
+                className="mt-4 inline-flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl bg-purple-600 text-white hover:bg-purple-700"
+              >
+                Add First Testimonial
+              </button>
+            )}
           </div>
         ) : viewMode === 'cards' ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredTestimonials.map((item) => (
               <div
                 key={item.id}
-                className="bg-[var(--bg-card)] rounded-2xl p-6 shadow-sm border border-[var(--border)] flex flex-col justify-between hover:shadow-md transition"
+                onClick={() => setViewingDetailItem(item)}
+                className="bg-[var(--bg-card)] rounded-2xl p-6 shadow-sm border border-[var(--border)] flex flex-col justify-between hover:shadow-md transition cursor-pointer group"
               >
                 <div>
                   {/* Top line: Stars & Badges */}
@@ -413,36 +447,36 @@ export const RATestimonialsPage: React.FC = () => {
                   </div>
 
                   {/* Feedback Quote */}
-                  <blockquote className="text-[var(--text-primary)] text-sm leading-relaxed mb-4 italic">
+                  <blockquote className="text-[var(--text-primary)] text-sm leading-relaxed mb-4 italic group-hover:text-purple-400 transition">
                     "{item.feedback_text}"
                   </blockquote>
                 </div>
 
                 {/* Bottom author & package info */}
-                <div className="pt-4 border-t border-gray-100 dark:border-gray-700/60">
+                <div className="pt-4 border-t border-[var(--border)]">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-purple-500 to-indigo-600 flex items-center justify-center text-white font-bold text-xs uppercase shadow-sm">
+                      <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-purple-500 to-indigo-600 flex items-center justify-center text-white font-bold text-xs uppercase shadow-sm flex-shrink-0">
                         {item.client_name.substring(0, 2)}
                       </div>
-                      <div>
-                        <div className="text-sm font-bold text-[var(--text-primary)]">
+                      <div className="min-w-0">
+                        <div className="text-sm font-bold text-[var(--text-primary)] truncate">
                           {item.client_name}
                         </div>
-                        <div className="text-xs text-[var(--text-secondary)]">
+                        <div className="text-xs text-[var(--text-secondary)] truncate">
                           {item.package_name || 'RA Advisory'}
                         </div>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                       {item.screenshot_url && (
                         <a
                           href={item.screenshot_url}
                           target="_blank"
                           rel="noreferrer"
                           title="View Screenshot Proof"
-                          className="p-1.5 rounded-lg text-emerald-600 hover:bg-[var(--bg-hover-2)] dark:hover:bg-emerald-900/30 transition"
+                          className="p-1.5 rounded-lg text-emerald-500 hover:bg-emerald-500/10 transition"
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -451,38 +485,41 @@ export const RATestimonialsPage: React.FC = () => {
                         </a>
                       )}
 
-                      <button
-                        onClick={() => handleToggleFeatured(item)}
-                        title={item.is_featured ? 'Remove from featured' : 'Pin to showcase'}
-                        className={`p-1.5 rounded-lg transition ${
-                          item.is_featured
-                            ? 'text-yellow-500 hover:bg-yellow-50 dark:hover:bg-yellow-900/30'
-                            : 'text-[var(--text-muted)] hover:bg-[var(--bg-hover-2)]'
-                        }`}
-                      >
-                        ★
-                      </button>
+                      {/* Edit & Delete are visible only to operational employees */}
+                      {canEdit && (
+                        <>
+                          <button
+                            onClick={() => handleToggleFeatured(item)}
+                            title={item.is_featured ? 'Remove from featured' : 'Pin to showcase'}
+                            className={`p-1.5 rounded-lg transition ${
+                              item.is_featured
+                                ? 'text-yellow-500 hover:bg-yellow-500/10'
+                                : 'text-[var(--text-muted)] hover:bg-[var(--bg-hover-2)]'
+                            }`}
+                          >
+                            ★
+                          </button>
 
-                      <button
-                        onClick={() => handleOpenEditModal(item)}
-                        title="Edit Feedback"
-                        className="p-1.5 rounded-lg text-blue-600 hover:bg-[var(--bg-hover-2)] dark:text-blue-400 dark:hover:bg-blue-900/30 transition"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                        </svg>
-                      </button>
+                          <button
+                            onClick={() => handleOpenEditModal(item)}
+                            title="Edit Feedback"
+                            className="p-1.5 rounded-lg text-blue-500 hover:bg-blue-500/10 transition"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                          </button>
 
-                      {(isAdmin || isHOD) && (
-                        <button
-                          onClick={() => handleDelete(item.id, item.client_name)}
-                          title="Delete Feedback"
-                          className="p-1.5 rounded-lg text-rose-600 hover:bg-[var(--bg-hover-2)] dark:hover:bg-rose-900/30 transition"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        </button>
+                          <button
+                            onClick={() => handleDelete(item.id, item.client_name)}
+                            title="Delete Feedback"
+                            className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-500/10 transition"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        </>
                       )}
                     </div>
                   </div>
@@ -496,60 +533,79 @@ export const RATestimonialsPage: React.FC = () => {
               <table className="w-full text-left text-sm">
                 <thead className="text-xs uppercase bg-[var(--panel-inset-soft)] text-[var(--text-secondary)] border-b border-[var(--border)]">
                   <tr>
-                    <th className="py-3 px-4">Client Name</th>
-                    <th className="py-3 px-4">Package</th>
-                    <th className="py-3 px-4 text-center">Rating</th>
-                    <th className="py-3 px-4">Feedback Quote</th>
-                    <th className="py-3 px-4 text-center">Badges</th>
-                    <th className="py-3 px-4 text-xs text-gray-500">Date Added</th>
-                    <th className="py-3 px-4 text-right">Actions</th>
+                    <th className="py-3.5 px-4">Client Name</th>
+                    <th className="py-3.5 px-4">Package</th>
+                    <th className="py-3.5 px-4 text-center">Rating</th>
+                    <th className="py-3.5 px-4">Feedback Quote</th>
+                    <th className="py-3.5 px-4 text-center">Badges</th>
+                    <th className="py-3.5 px-4 text-xs text-gray-500">Date Added</th>
+                    <th className="py-3.5 px-4 text-right">Proof / View</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--border)]">
                   {filteredTestimonials.map((item) => (
-                    <tr key={item.id} className="hover:bg-[var(--bg-hover-2)] transition">
-                      <td className="py-3 px-4 font-bold text-[var(--text-primary)]">
+                    <tr
+                      key={item.id}
+                      onClick={() => setViewingDetailItem(item)}
+                      className="hover:bg-[var(--bg-hover)] transition cursor-pointer"
+                    >
+                      <td className="py-3.5 px-4 font-bold text-[var(--text-primary)]">
                         {item.client_name}
                       </td>
-                      <td className="py-3 px-4 text-xs font-semibold text-[var(--text-secondary)]">
+                      <td className="py-3.5 px-4 text-xs font-semibold text-[var(--text-secondary)]">
                         {item.package_name || 'Standard'}
                       </td>
-                      <td className="py-3 px-4 text-center text-amber-500 font-bold">
+                      <td className="py-3.5 px-4 text-center text-amber-500 font-bold">
                         {item.rating} ★
                       </td>
-                      <td className="py-3 px-4 text-xs text-[var(--text-secondary)] max-w-xs truncate">
+                      <td className="py-3.5 px-4 text-xs text-[var(--text-secondary)] max-w-xs truncate">
                         "{item.feedback_text}"
                       </td>
-                      <td className="py-3 px-4 text-center space-x-1">
+                      <td className="py-3.5 px-4 text-center space-x-1">
                         {item.is_verified && (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/15 text-blue-400 border border-blue-500/30">
                             Verified
                           </span>
                         )}
                         {item.is_featured && (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/15 text-purple-400 border border-purple-500/30">
                             Featured
                           </span>
                         )}
                       </td>
-                      <td className="py-3 px-4 text-xs text-gray-500">
+                      <td className="py-3.5 px-4 text-xs text-[var(--text-muted)]">
                         {item.testimonial_date ? new Date(item.testimonial_date).toLocaleDateString('en-IN') : '-'}
                       </td>
-                      <td className="py-3 px-4 text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <button
-                            onClick={() => handleOpenEditModal(item)}
-                            className="p-1 rounded text-blue-600 hover:bg-[var(--bg-hover-2)]"
-                          >
-                            Edit
-                          </button>
-                          {(isAdmin || isHOD) && (
-                            <button
-                              onClick={() => handleDelete(item.id, item.client_name)}
-                              className="p-1 rounded text-rose-600 hover:bg-[var(--bg-hover-2)] ml-1"
+                      <td className="py-3.5 px-4 text-right" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-1.5">
+                          {item.screenshot_url && (
+                            <a
+                              href={item.screenshot_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              title="Open Screenshot"
+                              className="p-1 rounded text-emerald-500 hover:bg-emerald-500/10 text-xs font-semibold inline-flex items-center gap-1"
                             >
-                              Delete
-                            </button>
+                              Proof ↗
+                            </a>
+                          )}
+
+                          {/* Edit / Delete only for employees */}
+                          {canEdit && (
+                            <>
+                              <button
+                                onClick={() => handleOpenEditModal(item)}
+                                className="p-1 rounded text-blue-500 hover:bg-blue-500/10 text-xs font-semibold"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => handleDelete(item.id, item.client_name)}
+                                className="p-1 rounded text-rose-500 hover:bg-rose-500/10 text-xs font-semibold ml-1"
+                              >
+                                Delete
+                              </button>
+                            </>
                           )}
                         </div>
                       </td>
@@ -561,8 +617,109 @@ export const RATestimonialsPage: React.FC = () => {
           </div>
         )}
 
-        {/* Modal: Add/Edit Testimonial */}
-        {isModalOpen && (
+        {/* ── Read-Only Details View Modal (For Admin, CEO, HOD, and anyone clicking a card) ── */}
+        {viewingDetailItem && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn"
+            onClick={() => setViewingDetailItem(null)}
+          >
+            <div
+              className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between p-5 border-b border-[var(--border)]">
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-purple-400">
+                    Testimonial Details
+                  </span>
+                  <h3 className="text-base font-bold text-[var(--text-primary)] mt-0.5">
+                    {viewingDetailItem.client_name}
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setViewingDetailItem(null)}
+                  className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="p-5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1 text-amber-400 text-lg">
+                    {[...Array(5)].map((_, i) => (
+                      <span key={i} className={i < viewingDetailItem.rating ? 'text-amber-400' : 'text-gray-300 dark:text-gray-700'}>
+                        ★
+                      </span>
+                    ))}
+                    <span className="text-xs font-bold text-[var(--text-secondary)] ml-1.5">
+                      {viewingDetailItem.rating} / 5 Stars
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    {viewingDetailItem.is_verified && (
+                      <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-500/15 text-blue-400 border border-blue-500/30">
+                        Verified
+                      </span>
+                    )}
+                    {viewingDetailItem.is_featured && (
+                      <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-purple-500/15 text-purple-400 border border-purple-500/30">
+                        Featured
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-xl bg-[var(--bg-base)] border border-[var(--border)]">
+                  <div className="text-xs text-[var(--text-muted)] mb-1">Package / Advisory Service</div>
+                  <div className="text-sm font-semibold text-[var(--text-primary)]">
+                    {viewingDetailItem.package_name || 'Standard RA Advisory'}
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-xl bg-[var(--bg-base)] border border-[var(--border)]">
+                  <div className="text-xs text-[var(--text-muted)] mb-1">Client Feedback Quote</div>
+                  <p className="text-sm text-[var(--text-primary)] leading-relaxed italic">
+                    "{viewingDetailItem.feedback_text}"
+                  </p>
+                </div>
+
+                {viewingDetailItem.screenshot_url && (
+                  <div className="p-4 rounded-xl bg-[var(--bg-base)] border border-[var(--border)] flex items-center justify-between">
+                    <div>
+                      <div className="text-xs text-[var(--text-muted)]">Screenshot / WhatsApp Proof</div>
+                      <div className="text-xs font-semibold text-emerald-400 mt-0.5 truncate max-w-xs">
+                        {viewingDetailItem.screenshot_url}
+                      </div>
+                    </div>
+                    <a
+                      href={viewingDetailItem.screenshot_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="px-3 py-1.5 rounded-xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 text-xs font-semibold hover:bg-emerald-500/25 transition"
+                    >
+                      Open Proof ↗
+                    </a>
+                  </div>
+                )}
+              </div>
+
+              <div className="p-4 border-t border-[var(--border)] bg-[var(--bg-base)]/50 flex justify-end">
+                <button
+                  onClick={() => setViewingDetailItem(null)}
+                  className="px-4 py-2 text-sm font-medium rounded-xl border border-[var(--border)] bg-[var(--bg-card)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Modal: Add/Edit Testimonial (Employees only) ── */}
+        {isModalOpen && canEdit && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
             <div className="bg-[var(--bg-card)] w-full max-w-lg rounded-2xl shadow-2xl border border-[var(--border)] overflow-hidden">
               <div className="flex items-center justify-between p-6 border-b border-[var(--border)] bg-[var(--bg-card-2)]">

@@ -319,15 +319,7 @@ export const RADashboardPage: React.FC = () => {
               Refresh
             </button>
 
-            <Link
-              to={ROUTES.RA_DATA_ENTRY}
-              className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-xl bg-[var(--accent)] text-slate-950 font-semibold hover:bg-[var(--accent-hover)] transition shadow-sm hover:shadow"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-              </svg>
-              Data Entry
-            </Link>
+            
           </div>
         </div>
 
@@ -395,9 +387,7 @@ export const RADashboardPage: React.FC = () => {
                   Distribution by client packages
                 </p>
               </div>
-              <Link to={ROUTES.RA_DATA_ENTRY} className="text-xs text-[var(--accent)] hover:underline">
-                View All →
-              </Link>
+              
             </div>
             <div className="h-72 relative flex items-center justify-center">
               {stats?.packageRevenue && Object.keys(stats.packageRevenue).length > 0 ? (
@@ -423,12 +413,7 @@ export const RADashboardPage: React.FC = () => {
                   Upcoming Renewals Watchlist (Next 30 Days)
                 </h2>
               </div>
-              <Link
-                to={ROUTES.RA_DATA_ENTRY}
-                className="text-xs font-semibold text-[var(--accent)] hover:underline"
-              >
-                Open Data Entry →
-              </Link>
+              
             </div>
 
             {stats?.upcomingRenewals && stats.upcomingRenewals.length > 0 ? (
