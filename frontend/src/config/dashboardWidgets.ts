@@ -17,6 +17,17 @@ export interface DashboardWidget {
  * saved admin configuration for that widget (it silently reverts to visible).
  */
 export const DASHBOARD_WIDGETS: Record<string, DashboardWidget[]> = {
+  'SW Global': [
+    { key: 'sw_global.kpi.total_accounts', label: 'Total Accounts', type: 'kpi' },
+    { key: 'sw_global.kpi.unique_clients', label: 'Unique Clients', type: 'kpi' },
+    { key: 'sw_global.kpi.pending_applications', label: 'Pending Applications', type: 'kpi' },
+    { key: 'sw_global.kpi.conversion_rate', label: 'Event Conversion Rate', type: 'kpi' },
+    { key: 'sw_global.kpi.conducted_events', label: 'Conducted Events', type: 'kpi' },
+    { key: 'sw_global.chart.account_status_breakdown', label: 'Account Status Breakdown', type: 'chart' },
+    { key: 'sw_global.chart.event_conversion_performance', label: 'Event Conversion Performance', type: 'chart' },
+    { key: 'sw_global.chart.pending_attention_queue', label: 'Pending Applications Queue', type: 'chart' },
+  ],
+
   IT: [
     { key: 'it.kpi.total_users', label: 'Total Users', type: 'kpi' },
     { key: 'it.kpi.active_devices', label: 'Active Devices', type: 'kpi' },

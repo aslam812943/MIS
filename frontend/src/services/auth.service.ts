@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { ROUTES } from '../constants/routes';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? '/api' : 'http://localhost:5000/api');
 
 import type { User } from '../types/user.types';
 

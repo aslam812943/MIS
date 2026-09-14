@@ -36,6 +36,9 @@ const EMPLOYEE_DEPT_ENTRY_ROUTE: Record<string, string> = {
   SALES: ROUTES.SALES_DATA_ENTRY,
   'CONTENT CREATION': ROUTES.CREATOR_PLANNER,
   'CONTENT CREATOR': ROUTES.CREATOR_PLANNER,
+  'SW GLOBAL': ROUTES.SW_GLOBAL_DATA_ENTRY,
+  'SW-GLOBAL': ROUTES.SW_GLOBAL_DATA_ENTRY,
+  'GLOBAL': ROUTES.SW_GLOBAL_DATA_ENTRY,
 };
 
 /* ── SVG Icons ─────────────────────────────────────────────── */
@@ -129,6 +132,7 @@ const DashboardPage: React.FC = () => {
 
   const dept = user?.department_name?.toUpperCase() || '';
   const isPrivilegeUser = dept === 'PRIVILEGE ACCOUNT' || dept === 'PRIVILEGE';
+  const isSWGlobalUser = dept === 'SW GLOBAL' || dept === 'SW-GLOBAL' || dept === 'GLOBAL';
   const isHOD = role === 'hod';
 
   // 1. Privilege HOD redirection
@@ -136,13 +140,21 @@ const DashboardPage: React.FC = () => {
     return <Navigate to={ROUTES.PRIVILEGE_DASHBOARD} replace />;
   }
 
-  // 2. Employee redirection to their dedicated department workspace
+  // 2. SW Global HOD redirection
+  if (isHOD && isSWGlobalUser) {
+    return <Navigate to={ROUTES.SW_GLOBAL_DASHBOARD} replace />;
+  }
+
+  // 3. Employee redirection to their dedicated department workspace
   if (isEmployee) {
     if (dept === 'RA' || dept === 'RESEARCH ANALYST' || dept === 'RESEARCH & ANALYSIS') {
       return <Navigate to={ROUTES.RA_DASHBOARD} replace />;
     }
     if (isPrivilegeUser) {
       return <Navigate to={ROUTES.PRIVILEGE_DATA_ENTRY} replace />;
+    }
+    if (isSWGlobalUser) {
+      return <Navigate to={ROUTES.SW_GLOBAL_DATA_ENTRY} replace />;
     }
     const redirectRoute = EMPLOYEE_DEPT_ENTRY_ROUTE[dept] || ROUTES.DATA_ENTRY;
     return <Navigate to={redirectRoute} replace />;

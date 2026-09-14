@@ -17,6 +17,14 @@ const DataEntryPage: React.FC = () => {
   const deptName = currentUser?.department_name?.toUpperCase() || '';
   const isRA = deptName === 'RA' || deptName === 'RESEARCH ANALYST' || deptName === 'RESEARCH & ANALYSIS' || deptName === 'RESEARCH';
   const isPrivilege = deptName === 'PRIVILEGE ACCOUNT' || deptName === 'PRIVILEGE';
+  const isSWGlobal = deptName === 'SW GLOBAL' || deptName === 'SW-GLOBAL' || deptName === 'GLOBAL';
+  const isIEPF = deptName === 'IEPF';
+  const isSettlements = deptName === 'SETTLEMENTS';
+  const isKYC = deptName === 'KYC';
+  const isDP = deptName === 'DP';
+  const isIT = deptName === 'IT';
+  const isFinance = deptName === 'FINANCE';
+  const isSales = deptName === 'SALES';
 
   useEffect(() => {
     const fetchModules = async () => {
@@ -49,6 +57,38 @@ const DataEntryPage: React.FC = () => {
 
   if (isPrivilege) {
     return <Navigate to={ROUTES.PRIVILEGE_DATA_ENTRY} replace />;
+  }
+
+  if (isSWGlobal) {
+    return <Navigate to={ROUTES.SW_GLOBAL_DATA_ENTRY} replace />;
+  }
+
+  if (isIEPF) {
+    return <Navigate to={ROUTES.IEPF_DATA_ENTRY} replace />;
+  }
+
+  if (isSettlements) {
+    return <Navigate to={ROUTES.SETTLEMENTS_DATA_ENTRY} replace />;
+  }
+
+  if (isKYC) {
+    return <Navigate to={ROUTES.KYC_DATA_ENTRY} replace />;
+  }
+
+  if (isDP) {
+    return <Navigate to={ROUTES.DP_DATA_ENTRY} replace />;
+  }
+
+  if (isIT) {
+    return <Navigate to={ROUTES.IT_DATA_ENTRY} replace />;
+  }
+
+  if (isFinance) {
+    return <Navigate to={ROUTES.FINANCE_DATA_ENTRY} replace />;
+  }
+
+  if (isSales) {
+    return <Navigate to={ROUTES.SALES_DATA_ENTRY} replace />;
   }
 
   return (

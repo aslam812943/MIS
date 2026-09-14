@@ -1,0 +1,158 @@
+.sw-global-container {
+  color: var(--text-primary);
+}
+
+.sw-report-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 20px 28px;
+  padding: 20px 24px;
+  background: var(--bg-card);
+  border-block: 1px solid var(--border);
+}
+.sw-report-period { min-width: 0; }
+.sw-report-period h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 12px;
+  font-size: 14px;
+  font-weight: 700;
+}
+.sw-report-period h2 svg { color: var(--accent); }
+.sw-report-segments, .sw-report-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.sw-report-segments button, .sw-report-actions > button:not(.sw-report-summary), .sw-report-branch select {
+  min-height: 36px;
+  border-radius: 999px;
+  padding: 8px 14px;
+  background: var(--bg-base);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.sw-report-segments button.selected, .sw-report-actions > .sw-report-download {
+  background: var(--accent);
+  color: #061b19;
+}
+.sw-report-branch { display: grid; gap: 6px; font-size: 12px; color: var(--text-secondary); width: 212px; max-width: 100%; }
+.sw-report-branch select { width: 100%; color: var(--text-primary); }
+.sw-report-actions { margin-left: auto; }
+.sw-report-actions > button:not(.sw-report-summary) { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.sw-report-summary { font-size: 12px; color: var(--text-muted); margin-right: 4px; text-align: left; overflow-wrap: anywhere; }
+.sw-report-summary:hover:not(:disabled) { color: var(--text-primary); }
+.sw-report-toolbar button:disabled { opacity: .5; cursor: not-allowed; }
+.sw-report-toolbar button:focus-visible, .sw-report-toolbar select:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.sw-report-dates { display: flex; flex-wrap: wrap; gap: 16px; flex-basis: 100%; }
+.sw-report-dates label { display: grid; gap: 6px; font-size: 12px; }
+@media (max-width: 640px) {
+  .sw-report-toolbar { padding: 16px; gap: 16px; }
+  .sw-report-period, .sw-report-branch, .sw-report-actions { width: 100%; }
+  .sw-report-summary { flex-basis: 100%; }
+  .sw-report-actions { margin-left: 0; }
+  .sw-report-dates label { width: 100%; }
+}
+
+.sw-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.65rem;
+  border-radius: 9999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: capitalize;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+}
+
+.sw-tag.active {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.sw-tag.pending {
+  background: rgba(245, 158, 11, 0.12);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+.sw-tag.closed {
+  background: rgba(148, 163, 184, 0.12);
+  color: #94a3b8;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+.sw-tag.conducted,
+.sw-tag.qualified {
+  background: rgba(59, 130, 246, 0.12);
+  color: #3b82f6;
+  border: 1px solid rgba(59, 130, 246, 0.25);
+}
+
+.sw-tag.planned,
+.sw-tag.contacted {
+  background: rgba(168, 85, 247, 0.12);
+  color: #a855f7;
+  border: 1px solid rgba(168, 85, 247, 0.25);
+}
+
+.sw-tag.cancelled,
+.sw-tag.not-interested {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+.sw-tag.converted {
+  background: rgba(16, 185, 129, 0.15);
+  color: #059669;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.sw-tag.new {
+  background: rgba(6, 182, 212, 0.12);
+  color: #06b6d4;
+  border: 1px solid rgba(6, 182, 212, 0.25);
+}
+
+.sw-avatar {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.65rem;
+  background: linear-gradient(135deg, var(--accent, #3b82f6) 0%, #1d4ed8 100%);
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.8rem;
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.sw-ring-progress {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.sw-ring-progress-inner {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  background: var(--bg-card);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+}
