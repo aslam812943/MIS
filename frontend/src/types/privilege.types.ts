@@ -1,6 +1,16 @@
 export interface PrivilegeAccount {
+  sl_no: number;
   code: string;
   name: string;
+  account_date: string;
+  mobile_no: string;
+  scheme: string;
+  introducer: string;
+  rm: string;
+  dealer: string;
+  branch: string;
+  trading_started: boolean;
+  remarks?: string;
   location: string;
   occupation: string;
   contact: string;

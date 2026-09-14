@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import DashboardLayout from '../../components/layout/DashboardLayout';
@@ -11,17 +12,6 @@ import type {
   KRAUpdationStatus,
   CalculatedSubscriptionStatus
 } from '../../types/ra.types';
-
-// Segments for packages
-const PACKAGE_SEGMENTS = [
-  'Equity',
-  'Futures & Options',
-  'Commodity',
-  'Currency',
-  'Combo / Multi-Asset',
-  'HNI Alpha',
-  'Other'
-];
 
 const KRA_STATUSES: KRAUpdationStatus[] = ['Pending', 'In Progress', 'Completed', 'Updated'];
 
@@ -81,6 +71,8 @@ export const RADataEntryPage: React.FC<RADataEntryPageProps> = ({ defaultTab }) 
   const [isPackageModalOpen, setIsPackageModalOpen] = useState(false);
   const [editingPackage, setEditingPackage] = useState<RAPackage | null>(null);
   const [savingPackage, setSavingPackage] = useState(false);
+  const [packageToDelete, setPackageToDelete] = useState<RAPackage | null>(null);
+  const [deletingPackage, setDeletingPackage] = useState(false);
 
   // Modal States - Quick Testimonial
   const [isTestimonialModalOpen, setIsTestimonialModalOpen] = useState(false);
@@ -115,7 +107,6 @@ export const RADataEntryPage: React.FC<RADataEntryPageProps> = ({ defaultTab }) 
   const [packageFormData, setPackageFormData] = useState({
     name: '',
     description: '',
-    segment: 'Equity',
     price: 25000,
     duration_days: 90,
     is_active: true
@@ -356,7 +347,6 @@ export const RADataEntryPage: React.FC<RADataEntryPageProps> = ({ defaultTab }) 
     setPackageFormData({
       name: '',
       description: '',
-      segment: 'Equity',
       price: 25000,
       duration_days: 90,
       is_active: true
@@ -370,7 +360,6 @@ export const RADataEntryPage: React.FC<RADataEntryPageProps> = ({ defaultTab }) 
     setPackageFormData({
       name: pkg.name,
       description: pkg.description || '',
-      segment: pkg.segment || 'Equity',
       price: Number(pkg.price) || 0,
       duration_days: Number(pkg.duration_days) || 90,
       is_active: pkg.is_active
@@ -426,15 +415,22 @@ export const RADataEntryPage: React.FC<RADataEntryPageProps> = ({ defaultTab }) 
 
   // Delete Package
   const handleDeletePackage = async (pkg: RAPackage) => {
-    if (!window.confirm(`Are you sure you want to delete package "${pkg.name}"?`)) {
-      return;
-    }
+    setPackageToDelete(pkg);
+  };
+
+  const confirmDeletePackage = async () => {
+    if (!packageToDelete || deletingPackage) return;
     try {
-      await raService.deletePackage(pkg.id);
-      toast.success(`Package "${pkg.name}" removed`);
-      loadData();
+      setDeletingPackage(true);
+      await raService.deletePackage(packageToDelete.id);
+      setPackagesList((current) => current.filter((pkg) => pkg.id !== packageToDelete.id));
+      toast.success(`Package "${packageToDelete.name}" permanently removed`);
+      setPackageToDelete(null);
+      await loadData();
     } catch (err: any) {
       toast.error(err.response?.data?.error || err.response?.data?.message || err.message || 'Failed to delete package');
+    } finally {
+      setDeletingPackage(false);
     }
   };
 
@@ -1672,6 +1668,37 @@ export const RADataEntryPage: React.FC<RADataEntryPageProps> = ({ defaultTab }) 
           </div>
         )}
 
+        {packageToDelete && createPortal(
+          <div
+            className="fixed inset-0 z-[100000] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-package-title"
+            onClick={() => !deletingPackage && setPackageToDelete(null)}
+          >
+            <div className="w-full max-w-md rounded-2xl border border-rose-500/25 bg-[var(--bg-card)] shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+              <div className="p-6 text-center">
+                <div className="mx-auto mb-4 w-14 h-14 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-500 flex items-center justify-center">
+                  <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                </div>
+                <h2 id="delete-package-title" className="text-lg font-bold text-[var(--text-primary)]">Delete advisory package?</h2>
+                <p className="mt-2 text-sm text-[var(--text-secondary)]">
+                  <strong className="text-[var(--text-primary)]">{packageToDelete.name}</strong> will be permanently removed and will no longer appear during client onboarding.
+                </p>
+                <p className="mt-2 text-xs text-rose-400">This action cannot be undone.</p>
+              </div>
+              <div className="flex gap-3 justify-end px-6 py-4 border-t border-[var(--border)] bg-[var(--bg-base)]/50">
+                <button type="button" disabled={deletingPackage} onClick={() => setPackageToDelete(null)} className="px-4 py-2.5 text-sm font-semibold rounded-xl border border-[var(--border)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] disabled:opacity-50">Keep Package</button>
+                <button type="button" disabled={deletingPackage} onClick={confirmDeletePackage} className="px-4 py-2.5 text-sm font-semibold rounded-xl bg-rose-500 text-white hover:bg-rose-600 disabled:opacity-50 inline-flex items-center gap-2">
+                  {deletingPackage && <span className="w-4 h-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />}
+                  {deletingPackage ? 'Deleting…' : 'Delete Permanently'}
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
+
         {/* ── PACKAGE CREATE / EDIT MODAL ────────────────── */}
         {isPackageModalOpen && (
           <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 sm:p-6 bg-black/75 backdrop-blur-sm overflow-y-auto" style={{ minHeight: '100vh', width: '100vw' }}>
@@ -1717,21 +1744,7 @@ export const RADataEntryPage: React.FC<RADataEntryPageProps> = ({ defaultTab }) 
                   />
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">Segment / Asset Class</label>
-                    <select
-                      value={packageFormData.segment}
-                      onChange={(e) => setPackageFormData({ ...packageFormData, segment: e.target.value })}
-                      className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-[var(--border)] bg-[var(--bg-base)] text-[var(--text-primary)] focus:ring-1 focus:ring-[var(--accent)] outline-none"
-                    >
-                      {PACKAGE_SEGMENTS.map((s) => (
-                        <option key={s} value={s}>{s}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
+                <div>
                     <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">Base Fee (₹)</label>
                     <input
                       type="number"
@@ -1741,7 +1754,6 @@ export const RADataEntryPage: React.FC<RADataEntryPageProps> = ({ defaultTab }) 
                       required
                       className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-[var(--border)] bg-[var(--bg-base)] text-emerald-400 font-bold focus:ring-1 focus:ring-[var(--accent)] outline-none"
                     />
-                  </div>
                 </div>
 
                 <div>

@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
+import { jsPDF } from 'jspdf';
 
 import toast from 'react-hot-toast';
 import DashboardLayout from '../../components/layout/DashboardLayout';
@@ -19,7 +21,10 @@ import {
   FileUp,
   LayoutDashboard,
   ShieldCheck,
-  RefreshCw
+  RefreshCw,
+  CalendarDays,
+  Printer,
+  Download
 } from 'lucide-react';
 
 const formatMoney = (n: number | string | undefined | null) => {
@@ -34,8 +39,18 @@ const formatMoney = (n: number | string | undefined | null) => {
 };
 
 const FORM_FIELDS: [keyof PrivilegeAccount, string][] = [
+  ['sl_no', 'Sl No'],
   ['name', 'Client name'],
   ['code', 'Client code'],
+  ['account_date', 'Date'],
+  ['mobile_no', 'Mobile No'],
+  ['scheme', 'Scheme'],
+  ['introducer', 'Introducer'],
+  ['rm', 'RM'],
+  ['dealer', 'Dealer'],
+  ['branch', 'Branch'],
+  ['trading_started', 'Trading Started'],
+  ['remarks', 'Remarks'],
   ['location', 'Location'],
   ['occupation', 'Occupation'],
   ['contact', 'Contact'],
@@ -57,6 +72,9 @@ export const PrivilegeDashboardPage: React.FC = () => {
   const [files, setFiles] = useState<PrivilegeUpload[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [period, setPeriod] = useState<'week' | 'month' | 'year' | 'custom' | 'all'>('month');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
 
   const fetchData = async (showToast = false) => {
     try {
@@ -72,7 +90,9 @@ export const PrivilegeDashboardPage: React.FC = () => {
       if (showToast) toast.success('Privilege dashboard updated');
     } catch (err: any) {
       console.error('Failed to load privilege dashboard:', err);
-      toast.error(err.message || 'Failed to load dashboard data');
+      const message = err?.response?.data?.error || err?.response?.data?.message ||
+        (!err?.response ? 'Unable to connect to the server. Check your connection and try again.' : 'The dashboard could not be loaded. Please try again.');
+      toast.error(message);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -84,16 +104,70 @@ export const PrivilegeDashboardPage: React.FC = () => {
   }, []);
 
   const accounts = stats?.accounts || [];
-  const filteredAccounts = accounts.filter((a) =>
-    [a.name, a.code, a.location, a.stocks].join(' ').toLowerCase().includes(query.toLowerCase())
+  const periodRange = useMemo(() => {
+    if (period === 'all') return { start: null, end: null, label: 'All dates' };
+    if (period === 'custom') return { start: fromDate || null, end: toDate || null, label: fromDate && toDate ? `${fromDate} to ${toDate}` : 'Custom range' };
+    const end = new Date();
+    const start = new Date(end);
+    if (period === 'week') start.setDate(end.getDate() - 6);
+    if (period === 'month') start.setMonth(end.getMonth() - 1);
+    if (period === 'year') start.setFullYear(end.getFullYear() - 1);
+    const iso = (d: Date) => d.toISOString().slice(0, 10);
+    return { start: iso(start), end: iso(end), label: `Last ${period}` };
+  }, [period, fromDate, toDate]);
+
+  const periodAccounts = useMemo(() => accounts.filter((a) => {
+    if (!a.account_date) return period === 'all';
+    return (!periodRange.start || a.account_date >= periodRange.start) && (!periodRange.end || a.account_date <= periodRange.end);
+  }), [accounts, period, periodRange]);
+  const filteredAccounts = periodAccounts.filter((a) =>
+    [a.name, a.code, a.mobile_no, a.scheme, a.rm, a.dealer, a.branch, a.location, a.stocks].join(' ').toLowerCase().includes(query.toLowerCase())
   );
 
-  const ratio = stats?.utilisationRatio || 0;
-  const aum = stats?.totalAUM || 0;
-  const used = stats?.totalUtilised || 0;
-  const available = stats?.availableCapital || 0;
-  const avgUtilised = stats?.avgUtilised || 0;
-  const totalAccounts = stats?.totalAccounts || 0;
+  const aum = periodAccounts.reduce((sum, a) => sum + Number(a.aum || 0), 0);
+  const used = periodAccounts.reduce((sum, a) => sum + Number(a.utilised || 0), 0);
+  const available = Math.max(0, aum - used);
+  const ratio = aum > 0 ? (used / aum) * 100 : 0;
+  const totalAccounts = periodAccounts.length;
+  const avgUtilised = totalAccounts ? used / totalAccounts : 0;
+  const topAccounts = [...periodAccounts].sort((a, b) => Number(b.utilised) - Number(a.utilised)).slice(0, 5);
+
+  const reportTitle = `Privilege Account Report - ${periodRange.label}`;
+  const reportRows = filteredAccounts.map((a) => [
+    String(a.sl_no || ''), a.code, a.name, a.account_date || '', a.mobile_no || '', a.scheme || '',
+    a.introducer || '', a.rm || '', a.dealer || '', a.branch || '', a.trading_started ? 'Yes' : 'No',
+    formatMoney(a.aum), formatMoney(a.utilised), a.remarks || ''
+  ]);
+
+  const downloadPdf = () => {
+    if (!filteredAccounts.length) return toast.error('No records are available for the selected report period.');
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    doc.setFontSize(16); doc.text(reportTitle, 10, 12);
+    doc.setFontSize(9); doc.text(`Generated: ${new Date().toLocaleString('en-IN')}   Accounts: ${totalAccounts}   AUM: ${formatMoney(aum)}   Utilised: ${formatMoney(used)}`, 10, 19);
+    const headers = ['Sl', 'Code', 'Name', 'Date', 'Mobile', 'Scheme', 'Introducer', 'RM', 'Dealer', 'Branch', 'Trade', 'AUM', 'Utilised', 'Remarks'];
+    const widths = [8, 17, 25, 19, 23, 20, 20, 18, 18, 18, 12, 22, 22, 30];
+    let y = 28;
+    const drawRow = (row: string[], bold = false) => {
+      doc.setFont('helvetica', bold ? 'bold' : 'normal'); doc.setFontSize(6.5);
+      let x = 6;
+      row.forEach((cell, i) => { doc.text(String(cell).slice(0, 22), x, y, { maxWidth: widths[i] - 1 }); x += widths[i]; });
+      y += 7;
+    };
+    drawRow(headers, true);
+    reportRows.forEach((row) => { if (y > 195) { doc.addPage(); y = 12; drawRow(headers, true); } drawRow(row); });
+    doc.save(`privilege-report-${new Date().toISOString().slice(0, 10)}.pdf`);
+    toast.success('PDF report downloaded');
+  };
+
+  const printReport = () => {
+    if (!filteredAccounts.length) return toast.error('No records are available for the selected report period.');
+    const escape = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
+    const headers = ['Sl No', 'Client Code', 'Client Name', 'Date', 'Mobile No', 'Scheme', 'Introducer', 'RM', 'Dealer', 'Branch', 'Trading', 'AUM', 'Funds Utilised', 'Remarks'];
+    const popup = window.open('', '_blank');
+    if (!popup) return toast.error('Allow pop-ups to print the report.');
+    popup.document.write(`<html><head><title>${escape(reportTitle)}</title><style>@page{size:landscape;margin:10mm}body{font-family:Arial;color:#111}h1{font-size:18px;margin:0 0 6px}.meta{font-size:11px;margin-bottom:14px}table{width:100%;border-collapse:collapse;font-size:8px}th,td{border:1px solid #bbb;padding:5px;text-align:left;vertical-align:top}th{background:#eee}tr{break-inside:avoid}</style></head><body><h1>${escape(reportTitle)}</h1><div class="meta">Generated: ${escape(new Date().toLocaleString('en-IN'))} | Accounts: ${totalAccounts} | AUM: ${escape(formatMoney(aum))} | Funds Utilised: ${escape(formatMoney(used))}</div><table><thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${reportRows.map(row => `<tr>${row.map(v => `<td>${escape(v)}</td>`).join('')}</tr>`).join('')}</tbody></table><script>window.onload=()=>{window.print();window.close()}</script></body></html>`);
+    popup.document.close();
+  };
 
   return (
     <DashboardLayout>
@@ -197,6 +271,32 @@ export const PrivilegeDashboardPage: React.FC = () => {
             </div>
           )}
         </div>
+
+        {(tab === 'Overview' || tab === 'Accounts') && (
+          <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl p-4 shadow-sm flex flex-col xl:flex-row xl:items-end justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)] mb-2">
+                <CalendarDays className="w-4 h-4 text-[var(--accent)]" /> Date-wise Analysis
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {([['week', 'Weekly'], ['month', 'Monthly'], ['year', 'Yearly'], ['all', 'All Dates'], ['custom', 'Custom Date']] as const).map(([value, label]) => (
+                  <button key={value} type="button" onClick={() => setPeriod(value)} className={`px-3 py-2 rounded-xl text-xs font-semibold border transition ${period === value ? 'bg-[var(--accent)] text-slate-950 border-[var(--accent)]' : 'bg-[var(--bg-base)] text-[var(--text-secondary)] border-[var(--border)] hover:text-[var(--text-primary)]'}`}>{label}</button>
+                ))}
+              </div>
+            </div>
+            {period === 'custom' && (
+              <div className="flex flex-wrap items-end gap-2">
+                <label className="text-xs text-[var(--text-secondary)]">From<input type="date" value={fromDate} max={toDate || undefined} onChange={(e) => setFromDate(e.target.value)} className="block mt-1 px-3 py-2 rounded-xl bg-[var(--bg-base)] border border-[var(--border)] text-[var(--text-primary)]" /></label>
+                <label className="text-xs text-[var(--text-secondary)]">To<input type="date" value={toDate} min={fromDate || undefined} onChange={(e) => setToDate(e.target.value)} className="block mt-1 px-3 py-2 rounded-xl bg-[var(--bg-base)] border border-[var(--border)] text-[var(--text-primary)]" /></label>
+              </div>
+            )}
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs text-[var(--text-muted)] mr-1">{periodRange.label} · {filteredAccounts.length} records</span>
+              <button type="button" onClick={downloadPdf} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-[var(--accent)] text-slate-950"><Download className="w-4 h-4" /> Download PDF</button>
+              <button type="button" onClick={printReport} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border border-[var(--border)] text-[var(--text-primary)] bg-[var(--bg-base)]"><Printer className="w-4 h-4" /> Print Report</button>
+            </div>
+          </div>
+        )}
 
         {/* Loading Skeleton */}
         {loading ? (
@@ -370,23 +470,24 @@ export const PrivilegeDashboardPage: React.FC = () => {
                     </div>
 
                     <div className="space-y-3.5 py-1">
-                      {stats?.topAccounts && stats.topAccounts.length > 0 ? (
-                        stats.topAccounts.map((item) => (
-                          <div key={item.code} className="flex items-center gap-3">
+                      {topAccounts.length > 0 ? (
+                        topAccounts.map((item) => {
+                          const itemRatio = Number(item.aum) > 0 ? (Number(item.utilised) / Number(item.aum)) * 100 : 0;
+                          return <div key={item.code} className="flex items-center gap-3">
                             <span className="w-20 sm:w-24 text-xs font-semibold text-[var(--text-primary)] truncate">
-                              {item.shortName}
+                              {item.name}
                             </span>
                             <div className="flex-1 h-2.5 rounded-full bg-slate-200 dark:bg-slate-700/60 overflow-hidden">
                               <div
                                 className="h-full rounded-full bg-[var(--accent)] transition-all duration-500"
-                                style={{ width: `${Math.min(100, Math.max(0, item.ratio))}%` }}
+                                style={{ width: `${Math.min(100, Math.max(0, itemRatio))}%` }}
                               />
                             </div>
                             <span className="w-12 text-right text-xs font-bold text-[var(--text-primary)] tabular-nums">
-                              {item.ratio}%
+                              {itemRatio.toFixed(0)}%
                             </span>
-                          </div>
-                        ))
+                          </div>;
+                        })
                       ) : (
                         <div className="text-center py-8 text-xs text-[var(--text-muted)]">
                           No account records found.
@@ -399,10 +500,16 @@ export const PrivilegeDashboardPage: React.FC = () => {
                 {/* Account Summary Table */}
                 <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl shadow-sm overflow-hidden">
                   <div className="overflow-x-auto w-full">
-                    <table className="w-full text-left text-sm text-[var(--text-secondary)] min-w-[750px]">
+                    <table className="w-full text-left text-sm text-[var(--text-secondary)] min-w-[1450px]">
                       <thead className="bg-[var(--table-header-bg)] text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider border-b border-[var(--border)]">
                         <tr>
                           <th className="py-3.5 px-6 min-w-[190px]">Client</th>
+                          <th className="py-3.5 px-4">Date</th>
+                          <th className="py-3.5 px-4">Mobile No</th>
+                          <th className="py-3.5 px-4">Scheme</th>
+                          <th className="py-3.5 px-4">RM / Dealer</th>
+                          <th className="py-3.5 px-4">Branch</th>
+                          <th className="py-3.5 px-4">Trading</th>
                           <th className="py-3.5 px-6 min-w-[120px]">Location</th>
                           <th className="py-3.5 px-6 min-w-[120px]">AUM</th>
                           <th className="py-3.5 px-6 min-w-[150px]">Funds Utilised</th>
@@ -444,6 +551,12 @@ export const PrivilegeDashboardPage: React.FC = () => {
                                   </div>
                                 </div>
                               </td>
+                              <td className="py-4 px-4">{a.account_date ? new Date(`${a.account_date}T00:00:00`).toLocaleDateString('en-IN') : '—'}</td>
+                              <td className="py-4 px-4">{a.mobile_no || '—'}</td>
+                              <td className="py-4 px-4">{a.scheme || '—'}</td>
+                              <td className="py-4 px-4">{[a.rm, a.dealer].filter(Boolean).join(' / ') || '—'}</td>
+                              <td className="py-4 px-4">{a.branch || '—'}</td>
+                              <td className="py-4 px-4">{a.trading_started ? 'Yes' : 'No'}</td>
                               <td className="py-4 px-6 text-sm text-[var(--text-primary)]">{a.location}</td>
                               <td className="py-4 px-6 text-sm font-semibold text-[var(--text-primary)] tabular-nums">
                                 {formatMoney(a.aum)}
@@ -522,10 +635,16 @@ export const PrivilegeDashboardPage: React.FC = () => {
             {tab === 'Accounts' && (
               <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl shadow-sm overflow-hidden">
                 <div className="overflow-x-auto w-full">
-                  <table className="w-full text-left text-sm text-[var(--text-secondary)] min-w-[750px]">
+                  <table className="w-full text-left text-sm text-[var(--text-secondary)] min-w-[1450px]">
                     <thead className="bg-[var(--table-header-bg)] text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider border-b border-[var(--border)]">
                       <tr>
                         <th className="py-3.5 px-6 min-w-[190px]">Client</th>
+                        <th className="py-3.5 px-4">Date</th>
+                        <th className="py-3.5 px-4">Mobile No</th>
+                        <th className="py-3.5 px-4">Scheme</th>
+                        <th className="py-3.5 px-4">RM / Dealer</th>
+                        <th className="py-3.5 px-4">Branch</th>
+                        <th className="py-3.5 px-4">Trading</th>
                         <th className="py-3.5 px-6 min-w-[120px]">Location</th>
                         <th className="py-3.5 px-6 min-w-[120px]">AUM</th>
                         <th className="py-3.5 px-6 min-w-[150px]">Funds Utilised</th>
@@ -567,6 +686,12 @@ export const PrivilegeDashboardPage: React.FC = () => {
                                 </div>
                               </div>
                             </td>
+                            <td className="py-4 px-4">{a.account_date ? new Date(`${a.account_date}T00:00:00`).toLocaleDateString('en-IN') : '—'}</td>
+                            <td className="py-4 px-4">{a.mobile_no || '—'}</td>
+                            <td className="py-4 px-4">{a.scheme || '—'}</td>
+                            <td className="py-4 px-4">{[a.rm, a.dealer].filter(Boolean).join(' / ') || '—'}</td>
+                            <td className="py-4 px-4">{a.branch || '—'}</td>
+                            <td className="py-4 px-4">{a.trading_started ? 'Yes' : 'No'}</td>
                             <td className="py-4 px-6 text-sm text-[var(--text-primary)]">{a.location}</td>
                             <td className="py-4 px-6 text-sm font-semibold text-[var(--text-primary)] tabular-nums">
                               {formatMoney(a.aum)}
@@ -668,13 +793,18 @@ export const PrivilegeDashboardPage: React.FC = () => {
                           </div>
                         </div>
 
-                        <a
-                          href={privilegeService.getDownloadUrl(f.id)}
-                          download
-                          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-xl border border-[var(--border)] bg-[var(--bg-card)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition flex-shrink-0"
-                        >
-                          <ArrowDownToLine className="w-3.5 h-3.5" /> Download
-                        </a>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <a href={privilegeService.getViewUrl(f.id)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-xl border border-[var(--border)] bg-[var(--bg-card)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition">
+                            <Eye className="w-3.5 h-3.5" /> View
+                          </a>
+                          <a
+                            href={privilegeService.getDownloadUrl(f.id)}
+                            download
+                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-xl border border-[var(--border)] bg-[var(--bg-card)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition"
+                          >
+                            <ArrowDownToLine className="w-3.5 h-3.5" /> Download
+                          </a>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -693,14 +823,14 @@ export const PrivilegeDashboardPage: React.FC = () => {
         )}
 
         {/* ── Modal: View Account Details (Read-Only) ── */}
-        {modalAccount && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/60 backdrop-blur-sm animate-fadeIn" onClick={() => setModalAccount(null)}>
+        {modalAccount && createPortal(
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-6 bg-black/60 backdrop-blur-sm animate-fadeIn overflow-hidden" onClick={() => setModalAccount(null)} role="dialog" aria-modal="true" aria-label="Privilege account details">
             <div
-              className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden"
+              className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl shadow-2xl max-w-2xl w-full max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-3rem)] flex flex-col overflow-hidden"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Modal Header */}
-              <div className="px-5 sm:px-6 py-4 sm:py-5 border-b border-[var(--border)] flex items-center justify-between">
+              <div className="px-5 sm:px-6 py-4 sm:py-5 border-b border-[var(--border)] flex items-center justify-between shrink-0">
                 <div>
                   <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--accent)]">
                     Privilege Account · Details View
@@ -718,7 +848,7 @@ export const PrivilegeDashboardPage: React.FC = () => {
               </div>
 
               {/* Modal Body */}
-              <div className="p-5 sm:p-6 overflow-y-auto space-y-4">
+              <div className="p-5 sm:p-6 overflow-y-auto overscroll-contain space-y-4 min-h-0 flex-1">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
                   {FORM_FIELDS.map(([key, label]) => (
                     <div key={key} className={key === 'stocks' ? 'sm:col-span-2' : ''}>
@@ -729,10 +859,14 @@ export const PrivilegeDashboardPage: React.FC = () => {
                         readOnly
                         value={
                           ['aum', 'utilised'].includes(key)
-                            ? formatMoney(modalAccount[key])
+                            ? formatMoney(Number(modalAccount[key]))
                             : key === 'returns'
                             ? `${modalAccount.returns > 0 ? '+' : ''}${modalAccount.returns}%`
-                            : modalAccount[key] ?? ''
+                            : key === 'trading_started'
+                            ? (modalAccount.trading_started ? 'Yes' : 'No')
+                            : key === 'account_date' && modalAccount.account_date
+                            ? new Date(`${modalAccount.account_date}T00:00:00`).toLocaleDateString('en-IN')
+                            : String(modalAccount[key] ?? '')
                         }
                         type="text"
                         className="w-full px-3.5 py-2.5 text-sm bg-[var(--bg-base)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] outline-none cursor-default font-medium select-all"
@@ -743,7 +877,7 @@ export const PrivilegeDashboardPage: React.FC = () => {
               </div>
 
               {/* Modal Footer */}
-              <div className="px-5 sm:px-6 py-4 border-t border-[var(--border)] bg-[var(--bg-base)]/50 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="px-5 sm:px-6 py-4 border-t border-[var(--border)] bg-[var(--bg-base)]/50 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
                 <span className="text-xs text-[var(--text-muted)]">Amounts are recorded in INR (₹)</span>
                 <button
                   onClick={() => setModalAccount(null)}
@@ -753,7 +887,8 @@ export const PrivilegeDashboardPage: React.FC = () => {
                 </button>
               </div>
             </div>
-          </div>
+          </div>,
+          document.body
         )}
       </div>
     </DashboardLayout>

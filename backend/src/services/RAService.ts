@@ -1,6 +1,5 @@
 import fs from 'fs';
 import path from 'path';
-import crypto from 'crypto';
 import { supabaseAdmin } from '../config/supabase.js';
 import type {
   RAClient,
@@ -221,22 +220,18 @@ export class RAService {
       }
 
       const { data, error } = await query;
-      if (!error && Array.isArray(data) && data.length > 0) {
+      if (error) throw new Error(`Could not load packages: ${error.message}`);
+      if (Array.isArray(data)) {
         return data.map((p: any) => ({
           ...p,
           creator_name: p.profiles?.full_name || undefined
         }));
       }
+      throw new Error('Package query returned an invalid response.');
     } catch (err: any) {
-      console.warn('ra_packages read notice, using local catalog store:', err.message);
+      console.error('ra_packages database read failed:', err.message);
+      throw new Error('Packages could not be loaded from the database. Please refresh and try again.');
     }
-
-    // Resilient fallback to packages catalog
-    let list = this.readFallbackPackages();
-    if (activeOnly) {
-      list = list.filter((p) => p.is_active);
-    }
-    return list.sort((a, b) => Number(a.price || 0) - Number(b.price || 0));
   }
 
   async createPackage(data: Partial<RAPackage>, userId: string): Promise<RAPackage> {
@@ -269,7 +264,8 @@ export class RAService {
         .select()
         .single();
 
-      if (!error && inserted) {
+      if (error) throw new Error(error.message);
+      if (inserted) {
         const currentList = this.readFallbackPackages();
         const existingIdx = currentList.findIndex((p) => p.name.toLowerCase() === trimmedName.toLowerCase());
         if (existingIdx >= 0) {
@@ -280,33 +276,11 @@ export class RAService {
         this.writeFallbackPackages(currentList);
         return inserted;
       }
+      throw new Error('The database did not return the created package.');
     } catch (err: any) {
-      console.warn('Notice: saving package in persistent local store:', err.message);
+      console.error('Package database insert failed:', err.message);
+      throw new Error(`Package could not be created: ${err.message}`);
     }
-
-    // Resilient fallback insertion
-    const currentList = this.readFallbackPackages();
-    const existing = currentList.find((p) => p.name.toLowerCase() === trimmedName.toLowerCase());
-    if (existing) {
-      throw new Error("Package with name '" + trimmedName + "' already exists.");
-    }
-
-    const newPkg: RAPackage = {
-      id: crypto.randomUUID(),
-      name: payload.name,
-      description: payload.description || undefined,
-      segment: payload.segment,
-      price: payload.price,
-      duration_days: payload.duration_days,
-      is_active: payload.is_active,
-      created_by: userId,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    };
-
-    currentList.push(newPkg);
-    this.writeFallbackPackages(currentList);
-    return newPkg;
   }
 
   async updatePackage(id: string, data: Partial<RAPackage>, userId: string): Promise<RAPackage> {
@@ -334,7 +308,8 @@ export class RAService {
         .select()
         .single();
 
-      if (!error && updated) {
+      if (error) throw new Error(error.message);
+      if (updated) {
         const currentList = this.readFallbackPackages();
         const idx = currentList.findIndex((p) => p.id === id || p.name === updated.name);
         if (idx >= 0) {
@@ -343,25 +318,11 @@ export class RAService {
         }
         return updated;
       }
+      throw new Error('Package was not found or the database did not return the update.');
     } catch (err: any) {
-      console.warn('Notice: updating package in persistent local store:', err.message);
+      console.error('Package database update failed:', err.message);
+      throw new Error(`Package could not be updated: ${err.message}`);
     }
-
-    const currentList = this.readFallbackPackages();
-    const idx = currentList.findIndex((p) => p.id === id || (payload.name && p.name.toLowerCase() === payload.name.toLowerCase()));
-    if (idx < 0 || !currentList[idx]) {
-      throw new Error("Package with ID " + id + " not found.");
-    }
-
-    const existingPkg = currentList[idx]!;
-    const updatedPkg: RAPackage = {
-      ...existingPkg,
-      ...payload,
-      updated_at: new Date().toISOString()
-    };
-    currentList[idx] = updatedPkg;
-    this.writeFallbackPackages(currentList);
-    return updatedPkg;
   }
 
   async deletePackage(id: string, userId: string): Promise<boolean> {
@@ -372,23 +333,23 @@ export class RAService {
     if (!access.authorized) throw new Error('Unauthorized to delete packages.');
 
     try {
-      const { error } = await client
+      const { data: deleted, error } = await client
         .from('ra_packages')
         .delete()
-        .eq('id', id);
+        .eq('id', id)
+        .select('id');
 
-      if (!error) {
+      if (error) throw new Error(error.message);
+      if (deleted && deleted.length > 0) {
         const currentList = this.readFallbackPackages().filter((p) => p.id !== id);
         this.writeFallbackPackages(currentList);
         return true;
       }
+      throw new Error('Package was not found or has already been deleted.');
     } catch (err: any) {
-      console.warn('Notice: deleting package from persistent local store:', err.message);
+      console.error('Package database deletion failed:', err.message);
+      throw new Error(`Package could not be deleted: ${err.message}`);
     }
-
-    const currentList = this.readFallbackPackages().filter((p) => p.id !== id);
-    this.writeFallbackPackages(currentList);
-    return true;
   }
 
   // ── Clients Management ──────────────────────────────
