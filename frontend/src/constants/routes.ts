@@ -42,6 +42,8 @@ export const ROUTES = {
   SMM_CAMPAIGNS: '/smm/campaigns',
   PRIVILEGE_DASHBOARD: '/privilege-dashboard',
   PRIVILEGE_DATA_ENTRY: '/privilege-entry',
+  SW_GLOBAL_DASHBOARD: '/sw-global-dashboard',
+  SW_GLOBAL_DATA_ENTRY: '/sw-global-entry',
   ROOT: '/',
 } as const;
 

@@ -1,3 +1,6 @@
+import SWGlobalDashboardPage from './pages/SWGlobal/SWGlobalDashboardPage';
+import { authService } from './services/auth.service';
+import SWGlobalDataEntryPage from './pages/SWGlobal/SWGlobalDataEntryPage';
 import PrivilegeDashboardPage from './pages/Privilege/PrivilegeDashboardPage';
 import PrivilegeDataEntryPage from './pages/Privilege/PrivilegeDataEntryPage';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
@@ -390,6 +393,28 @@ function App() {
           element={
             <ProtectedRoute>
               <PrivilegeDataEntryPage />
+            </ProtectedRoute>
+          }
+        />
+
+        
+        {/* SW Global Department Routes */}
+        <Route
+          path={ROUTES.SW_GLOBAL_DASHBOARD}
+          element={
+            <ProtectedRoute>
+              <SWGlobalDashboardPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path={ROUTES.SW_GLOBAL_DATA_ENTRY}
+          element={
+            <ProtectedRoute>
+              {['admin', 'ceo'].includes(authService.getCurrentUser()?.role || '')
+                ? <Navigate to={ROUTES.SW_GLOBAL_DASHBOARD} replace />
+                : <SWGlobalDataEntryPage />}
             </ProtectedRoute>
           }
         />

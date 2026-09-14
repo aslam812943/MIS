@@ -108,6 +108,14 @@ const IconStar = () => (
   </svg>
 );
 
+const IconGlobe = () => (
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10"/>
+    <line x1="2" y1="12" x2="22" y2="12"/>
+    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+  </svg>
+);
+
 const IconReport = () => (
   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
@@ -224,10 +232,14 @@ export const Sidebar: React.FC = () => {
   const showSettlementsDashboard = isAdmin || isLeadership || (isSettlementsUser && (isHOD || isEmployee));
 
   
+  
+  const isSWGlobalUser = user?.department_name?.toUpperCase() === 'SW GLOBAL' || user?.department_name?.toUpperCase() === 'SW-GLOBAL' || user?.department_name?.toUpperCase() === 'GLOBAL';
+  const showSWGlobalDashboard = isAdmin || isLeadership || (isSWGlobalUser && (isHOD || isEmployee));
+
   const isPrivilegeUser = user?.department_name?.toUpperCase() === 'PRIVILEGE ACCOUNT' || user?.department_name?.toUpperCase() === 'PRIVILEGE';
   const showPrivilegeDashboard = isAdmin || isLeadership || (isPrivilegeUser && (isHOD || isEmployee));
 
-  const hasDedicatedDeptEntry = isIEPFUser || isSettlementsUser || isKYCUser || isDPUser || isITUser || isFinanceUser || isSalesUser || isCreatorDept || isCreator || isRAUser || isPrivilegeUser;
+  const hasDedicatedDeptEntry = isIEPFUser || isSettlementsUser || isKYCUser || isDPUser || isITUser || isFinanceUser || isSalesUser || isCreatorDept || isCreator || isRAUser || isPrivilegeUser || isSWGlobalUser;
 
   const closeOnMobile = () => setSidebarOpen(false);
 
@@ -272,6 +284,8 @@ export const Sidebar: React.FC = () => {
               ? ROUTES.RA_DASHBOARD
               : isPrivilegeUser
               ? ROUTES.PRIVILEGE_DASHBOARD
+              : isSWGlobalUser
+              ? ROUTES.SW_GLOBAL_DASHBOARD
               : ROUTES.DASHBOARD
           }
           icon={<IconDashboard />}
@@ -290,7 +304,7 @@ export const Sidebar: React.FC = () => {
         )}
 
         {/* Verification Hub */}
-        {(!isAdmin && !isLeadership && isHOD && !isPrivilegeUser) && (
+        {(!isAdmin && !isLeadership && isHOD && !isPrivilegeUser && !isSWGlobalUser) && (
           <NavItem
             to={ROUTES.VERIFY_ENTRIES}
             icon={<IconVerify />}
@@ -574,6 +588,38 @@ export const Sidebar: React.FC = () => {
         )}
 
         
+        
+        {/* SW Global Department Navigation */}
+        {isSWGlobalUser && (
+          <>
+            <span className="mis-sidebar-section-label">SW Global</span>
+            <NavItem
+              to={ROUTES.SW_GLOBAL_DASHBOARD}
+              icon={<IconGlobe />}
+              label="SW Global Dashboard"
+              onClick={closeOnMobile}
+            />
+            {!['admin', 'ceo'].includes(user?.role || '') && <NavItem
+              to={ROUTES.SW_GLOBAL_DATA_ENTRY}
+              icon={<IconDataEntry />}
+              label={isHOD ? "Client Accounts" : "SW Global Entry"}
+              onClick={closeOnMobile}
+            />}
+          </>
+        )}
+
+        {showSWGlobalDashboard && !isSWGlobalUser && (
+          <>
+            <span className="mis-sidebar-section-label">SW Global</span>
+            <NavItem
+              to={ROUTES.SW_GLOBAL_DASHBOARD}
+              icon={<IconGlobe />}
+              label="SW Global Dashboard"
+              onClick={closeOnMobile}
+            />
+          </>
+        )}
+
         {/* Privilege Account Department Navigation */}
         {isPrivilegeUser && (
           <>

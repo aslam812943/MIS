@@ -15,7 +15,9 @@ app.listen(PORT, async () => {
   // Supabase Initialization
   try {
     const { error } = await client.from('profiles').select('id').limit(1);
-    if (!error || error.code === 'PGRST116') {
+    if (error) {
+      console.error('Supabase connection failed:', error.message);
+    } else {
       console.log('✅ Supabase Connection: Active');
       
       const { data: buckets } = await client.storage.listBuckets();

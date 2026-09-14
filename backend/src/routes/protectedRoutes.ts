@@ -1,3 +1,5 @@
+import { swGlobalController } from '../controllers/SWGlobalController.js';
+import { swGlobalReadOnly } from '../middlewares/swGlobalReadOnly.js';
 import { privilegeController } from '../controllers/PrivilegeController.js';
 import { raController } from '../controllers/RAController.js';
 import { Router } from 'express';
@@ -45,6 +47,7 @@ import { TaskController } from '../controllers/TaskController.js';
 import multer from 'multer';
 
 const privilegeUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+const swGlobalUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 const router = Router();
 
@@ -387,5 +390,33 @@ router.get('/privilege/uploads', requireAuth, (req, res) => privilegeController.
 router.post('/privilege/uploads', requireAuth, privilegeUpload.single('file'), (req, res) => privilegeController.uploadFile(req, res));
 router.get('/privilege/uploads/:id/download', requireAuth, (req, res) => privilegeController.downloadFile(req, res));
 router.delete('/privilege/uploads/:id', requireAuth, (req, res) => privilegeController.deleteUpload(req, res));
+
+
+/**
+ * SW Global Department endpoints
+ */
+router.get('/sw-global/dashboard', requireAuth, (req, res) => swGlobalController.getDashboardStats(req, res));
+router.use('/sw-global', requireAuth, swGlobalReadOnly);
+router.get('/sw-global/report', requireAuth, (req, res) => swGlobalController.getAccountReport(req, res));
+router.get('/sw-global/accounts', requireAuth, (req, res) => swGlobalController.getAccounts(req, res));
+router.post('/sw-global/accounts', requireAuth, (req, res) => swGlobalController.saveAccount(req, res));
+router.post('/sw-global/accounts/bulk', requireAuth, (req, res) => swGlobalController.bulkImportAccounts(req, res));
+router.delete('/sw-global/accounts/:id', requireAuth, (req, res) => swGlobalController.deleteAccount(req, res));
+
+router.get('/sw-global/events', requireAuth, (req, res) => swGlobalController.getEvents(req, res));
+router.post('/sw-global/events', requireAuth, (req, res) => swGlobalController.saveEvent(req, res));
+router.delete('/sw-global/events/:id', requireAuth, (req, res) => swGlobalController.deleteEvent(req, res));
+
+router.get('/sw-global/leads', requireAuth, (req, res) => swGlobalController.getLeads(req, res));
+router.post('/sw-global/leads', requireAuth, (req, res) => swGlobalController.saveLead(req, res));
+router.post('/sw-global/leads/convert', requireAuth, (req, res) => swGlobalController.convertLead(req, res));
+router.post('/sw-global/leads/bulk', requireAuth, (req, res) => swGlobalController.bulkImportLeads(req, res));
+router.delete('/sw-global/leads/:id', requireAuth, (req, res) => swGlobalController.deleteLead(req, res));
+
+router.get('/sw-global/uploads', requireAuth, (req, res) => swGlobalController.getUploads(req, res));
+router.post('/sw-global/uploads', requireAuth, swGlobalUpload.single('file'), (req, res) => swGlobalController.uploadFile(req, res));
+router.get('/sw-global/uploads/:id/download', requireAuth, (req, res) => swGlobalController.downloadFile(req, res));
+router.delete('/sw-global/uploads/:id', requireAuth, (req, res) => swGlobalController.deleteUpload(req, res));
+
 
 export default router;
