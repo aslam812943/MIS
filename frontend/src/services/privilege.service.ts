@@ -2,6 +2,11 @@ import api from './api';
 import type { PrivilegeAccount, PrivilegeUpload, PrivilegeDashboardStats } from '../types/privilege.types';
 
 export const privilegeService = {
+  getFormOptions: async (): Promise<{ branches: Array<{ id: string; name: string }>; employees: Array<{ id: string; name: string }> }> => {
+    const res = await api.get('/admin/privilege/form-options');
+    return res.data;
+  },
+
   getDashboardStats: async (branchId?: string): Promise<PrivilegeDashboardStats> => {
     const res = await api.get('/admin/privilege/dashboard', {
       params: branchId ? { branchId } : {}

@@ -5,13 +5,26 @@ import { logAudit } from '../utils/auditLogger.js';
 import fs from 'fs';
 
 export class PrivilegeController {
+  async getFormOptions(req: Request, res: Response): Promise<void> {
+    try {
+      res.status(HttpStatus.OK).json(await privilegeService.getFormOptions());
+    } catch (error: any) {
+      console.error('Error fetching privilege form options:', error);
+      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ error: error.message || 'Unable to load form suggestions.' });
+    }
+  }
+
   /**
    * GET /api/admin/privilege/dashboard
    */
   async getDashboardStats(req: Request, res: Response): Promise<void> {
     try {
       const userId = (req as any).user?.id;
-      const branchId = req.query.branchId ? String(req.query.branchId) : undefined;
+      const user = (req as any).user;
+      const canViewAllBranches = ['hod', 'ceo', 'admin'].includes(user?.role);
+      const branchId = canViewAllBranches
+        ? (req.query.branchId ? String(req.query.branchId) : undefined)
+        : user?.branch_id;
       const stats = await privilegeService.getDashboardStats(userId, branchId);
       res.status(HttpStatus.OK).json(stats);
     } catch (error: any) {
@@ -27,7 +40,11 @@ export class PrivilegeController {
     try {
       const userId = (req as any).user?.id;
       const search = req.query.search ? String(req.query.search) : undefined;
-      const branchId = req.query.branchId ? String(req.query.branchId) : undefined;
+      const user = (req as any).user;
+      const canViewAllBranches = ['hod', 'ceo', 'admin'].includes(user?.role);
+      const branchId = canViewAllBranches
+        ? (req.query.branchId ? String(req.query.branchId) : undefined)
+        : user?.branch_id;
       const accounts = await privilegeService.getAccounts(userId, search, branchId);
       res.status(HttpStatus.OK).json(accounts);
     } catch (error: any) {
@@ -41,10 +58,6 @@ export class PrivilegeController {
    */
   async saveAccount(req: Request, res: Response): Promise<void> {
     try {
-      if ((req as any).user?.role === 'hod') {
-        res.status(HttpStatus.FORBIDDEN).json({ error: 'HOD has view-only access. Accounts can only be created or modified by executives.' });
-        return;
-      }
       const userId = (req as any).user?.id;
       const branchId = (req as any).user?.branch_id;
       const account = await privilegeService.saveAccount(req.body, userId, branchId);
@@ -67,10 +80,6 @@ export class PrivilegeController {
    */
   async bulkImport(req: Request, res: Response): Promise<void> {
     try {
-      if ((req as any).user?.role === 'hod') {
-        res.status(HttpStatus.FORBIDDEN).json({ error: 'HOD has view-only access. Bulk import is restricted to executives.' });
-        return;
-      }
       const userId = (req as any).user?.id;
       const branchId = (req as any).user?.branch_id;
       const rows = Array.isArray(req.body) ? req.body : req.body.accounts;
@@ -108,10 +117,6 @@ export class PrivilegeController {
    */
   async uploadFile(req: Request, res: Response): Promise<void> {
     try {
-      if ((req as any).user?.role === 'hod') {
-        res.status(HttpStatus.FORBIDDEN).json({ error: 'HOD has view-only access. File uploads are restricted to executives.' });
-        return;
-      }
       const userId = (req as any).user?.id;
       const file = req.file;
       const kind = String(req.body.kind || 'Account documents');
@@ -167,10 +172,6 @@ export class PrivilegeController {
    */
   async deleteAccount(req: Request, res: Response): Promise<void> {
     try {
-      if ((req as any).user?.role === 'hod') {
-        res.status(HttpStatus.FORBIDDEN).json({ error: 'HOD has view-only access. Account deletion is restricted.' });
-        return;
-      }
       const code = String(req.params.code || '').trim();
       if (!code) {
         res.status(HttpStatus.BAD_REQUEST).json({ error: 'Account code is required.' });
@@ -194,10 +195,6 @@ export class PrivilegeController {
    */
   async deleteUpload(req: Request, res: Response): Promise<void> {
     try {
-      if ((req as any).user?.role === 'hod') {
-        res.status(HttpStatus.FORBIDDEN).json({ error: 'HOD has view-only access. Upload deletion is restricted.' });
-        return;
-      }
       const id = String(req.params.id || '').trim();
       if (!id) {
         res.status(HttpStatus.BAD_REQUEST).json({ error: 'Upload ID is required.' });
