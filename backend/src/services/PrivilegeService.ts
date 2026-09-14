@@ -77,6 +77,21 @@ export class PrivilegeService {
     }
   }
 
+  /** Safe lookup values used by the account form's searchable optional fields. */
+  async getFormOptions(): Promise<{ branches: Array<{ id: string; name: string }>; employees: Array<{ id: string; name: string }> }> {
+    if (!client) throw new Error('The database connection is unavailable.');
+    const [branchResult, employeeResult] = await Promise.all([
+      client.from('branches').select('id, name').order('name'),
+      client.from('profiles').select('id, full_name').eq('status', 'active').order('full_name')
+    ]);
+    if (branchResult.error) throw new Error('Unable to load branch suggestions.');
+    if (employeeResult.error) throw new Error('Unable to load employee suggestions.');
+    return {
+      branches: (branchResult.data || []).map((branch: any) => ({ id: branch.id, name: branch.name })),
+      employees: (employeeResult.data || []).filter((employee: any) => employee.full_name).map((employee: any) => ({ id: employee.id, name: employee.full_name }))
+    };
+  }
+
   /**
    * Returns dashboard overview statistics for HOD/Leadership.
    */

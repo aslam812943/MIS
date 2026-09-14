@@ -5,6 +5,7 @@ import type { PrivilegeAccount, PrivilegeUpload } from '../../types/privilege.ty
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import toast from 'react-hot-toast';
 import { Link } from 'react-router-dom';
+import { ROUTES } from '../../constants/routes';
 import {
   Search,
   Plus,
@@ -52,6 +53,7 @@ export const PrivilegeDataEntryPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
+  const [formOptions, setFormOptions] = useState<{ branches: Array<{ id: string; name: string }>; employees: Array<{ id: string; name: string }> }>({ branches: [], employees: [] });
 
   // Custom Delete Confirmation state (Replaces default browser window.confirm)
   const [confirmDelete, setConfirmDelete] = useState<{
@@ -61,9 +63,9 @@ export const PrivilegeDataEntryPage: React.FC = () => {
   } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Determine if user can edit (Employees & Admins can add/edit/delete; HOD is strictly view-only)
+  // Privilege HOD and operational users can manage account data.
   const isHOD = currentUser?.role === 'hod';
-  const canEdit = !isHOD;
+  const canEdit = true;
 
   const fetchData = async (showToast = false) => {
     try {
@@ -86,6 +88,9 @@ export const PrivilegeDataEntryPage: React.FC = () => {
 
   useEffect(() => {
     fetchData();
+    privilegeService.getFormOptions()
+      .then(setFormOptions)
+      .catch((error) => console.warn('Privilege form suggestions unavailable:', error));
   }, []);
 
   const filteredAccounts = useMemo(() => {
@@ -297,13 +302,13 @@ export const PrivilegeDataEntryPage: React.FC = () => {
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
-            <Link
-              to="/privilege/dashboard"
+            {!isHOD && <Link
+              to={ROUTES.PRIVILEGE_DASHBOARD}
               className="inline-flex items-center gap-2 px-3.5 py-2 text-xs sm:text-sm font-semibold rounded-xl border border-[var(--border)] bg-[var(--bg-card)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition shadow-sm"
             >
               <LayoutDashboard className="w-4 h-4 text-[var(--accent)]" />
               <span>Dashboard</span>
-            </Link>
+            </Link>}
 
             <button
               onClick={() => fetchData(true)}
@@ -816,15 +821,24 @@ export const PrivilegeDataEntryPage: React.FC = () => {
                       </div>
 
                       {([
-                        ['scheme', 'Scheme', 'e.g. Privilege'], ['introducer', 'Introducer', 'Introducer name'],
-                        ['rm', 'RM', 'Relationship manager'], ['dealer', 'Dealer', 'Dealer name'],
-                        ['branch', 'Branch', 'Branch name']
-                      ] as const).map(([key, label, placeholder]) => (
+                        ['scheme', 'Scheme', 'e.g. Privilege', undefined],
+                        ['introducer', 'Introducer', 'Search employee or type a name', 'privilege-employee-options'],
+                        ['rm', 'RM', 'Search employee or type a name', 'privilege-employee-options'],
+                        ['dealer', 'Dealer', 'Search employee or type a name', 'privilege-employee-options'],
+                        ['branch', 'Branch', 'Search branch or type a name', 'privilege-branch-options']
+                      ] as const).map(([key, label, placeholder, listId]) => (
                         <div key={key}>
                           <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">{label} <span className="font-normal text-[var(--text-muted)]">(optional)</span></label>
-                          <input value={modalAccount[key] || ''} onChange={(e) => setModalAccount({ ...modalAccount, [key]: e.target.value })} placeholder={placeholder} className="w-full px-3.5 py-2 text-sm bg-[var(--bg-base)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] transition" />
+                          <input list={listId} value={modalAccount[key] || ''} onChange={(e) => setModalAccount({ ...modalAccount, [key]: e.target.value })} placeholder={placeholder} autoComplete="off" className="w-full px-3.5 py-2 text-sm bg-[var(--bg-base)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] transition" />
                         </div>
                       ))}
+
+                      <datalist id="privilege-employee-options">
+                        {formOptions.employees.map((employee) => <option key={employee.id} value={employee.name} />)}
+                      </datalist>
+                      <datalist id="privilege-branch-options">
+                        {formOptions.branches.map((branch) => <option key={branch.id} value={branch.name} />)}
+                      </datalist>
 
                       <div>
                         <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Trading Started <span className="font-normal text-[var(--text-muted)]">(optional)</span></label>

@@ -6,6 +6,8 @@ import toast from 'react-hot-toast';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import { privilegeService } from '../../services/privilege.service';
 import { authService } from '../../services/auth.service';
+import { orgService } from '../../services/org.service';
+import type { Branch } from '../../services/org.service';
 import type { PrivilegeAccount, PrivilegeUpload, PrivilegeDashboardStats } from '../../types/privilege.types';
 
 import {
@@ -63,6 +65,7 @@ const FORM_FIELDS: [keyof PrivilegeAccount, string][] = [
 export const PrivilegeDashboardPage: React.FC = () => {
   const currentUser = authService.getCurrentUser();
   const isHOD = currentUser?.role === 'hod';
+  const canViewAllBranches = ['hod', 'ceo', 'admin'].includes(currentUser?.role || '');
   
 
   const [stats, setStats] = useState<PrivilegeDashboardStats | null>(null);
@@ -75,18 +78,22 @@ export const PrivilegeDashboardPage: React.FC = () => {
   const [period, setPeriod] = useState<'week' | 'month' | 'year' | 'custom' | 'all'>('month');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [selectedBranch, setSelectedBranch] = useState('all');
 
   const fetchData = async (showToast = false) => {
     try {
       if (showToast) setRefreshing(true);
       else setLoading(true);
 
-      const [dashStats, uploadsList] = await Promise.all([
+      const [dashStats, uploadsList, branchList] = await Promise.all([
         privilegeService.getDashboardStats(),
-        privilegeService.getUploads()
+        privilegeService.getUploads(),
+        canViewAllBranches ? orgService.getBranches() : Promise.resolve([])
       ]);
       setStats(dashStats);
       setFiles(uploadsList);
+      setBranches(branchList);
       if (showToast) toast.success('Privilege dashboard updated');
     } catch (err: any) {
       console.error('Failed to load privilege dashboard:', err);
@@ -116,10 +123,13 @@ export const PrivilegeDashboardPage: React.FC = () => {
     return { start: iso(start), end: iso(end), label: `Last ${period}` };
   }, [period, fromDate, toDate]);
 
-  const periodAccounts = useMemo(() => accounts.filter((a) => {
+  const dateFilteredAccounts = useMemo(() => accounts.filter((a) => {
     if (!a.account_date) return period === 'all';
     return (!periodRange.start || a.account_date >= periodRange.start) && (!periodRange.end || a.account_date <= periodRange.end);
   }), [accounts, period, periodRange]);
+  const periodAccounts = useMemo(() => dateFilteredAccounts.filter((a) =>
+    selectedBranch === 'all' || a.branch_id === selectedBranch
+  ), [dateFilteredAccounts, selectedBranch]);
   const filteredAccounts = periodAccounts.filter((a) =>
     [a.name, a.code, a.mobile_no, a.scheme, a.rm, a.dealer, a.branch, a.location, a.stocks].join(' ').toLowerCase().includes(query.toLowerCase())
   );
@@ -131,8 +141,15 @@ export const PrivilegeDashboardPage: React.FC = () => {
   const totalAccounts = periodAccounts.length;
   const avgUtilised = totalAccounts ? used / totalAccounts : 0;
   const topAccounts = [...periodAccounts].sort((a, b) => Number(b.utilised) - Number(a.utilised)).slice(0, 5);
+  const selectedBranchName = selectedBranch === 'all' ? 'All Branches' : branches.find((b) => b.id === selectedBranch)?.name || 'Selected Branch';
+  const branchSummaries = useMemo(() => branches.map((branch) => {
+    const branchAccounts = dateFilteredAccounts.filter((a) => a.branch_id === branch.id);
+    const branchAum = branchAccounts.reduce((sum, a) => sum + Number(a.aum || 0), 0);
+    const branchUsed = branchAccounts.reduce((sum, a) => sum + Number(a.utilised || 0), 0);
+    return { ...branch, accounts: branchAccounts.length, aum: branchAum, utilised: branchUsed, ratio: branchAum > 0 ? (branchUsed / branchAum) * 100 : 0 };
+  }), [branches, dateFilteredAccounts]);
 
-  const reportTitle = `Privilege Account Report - ${periodRange.label}`;
+  const reportTitle = `Privilege Account Report - ${selectedBranchName} - ${periodRange.label}`;
   const reportRows = filteredAccounts.map((a) => [
     String(a.sl_no || ''), a.code, a.name, a.account_date || '', a.mobile_no || '', a.scheme || '',
     a.introducer || '', a.rm || '', a.dealer || '', a.branch || '', a.trading_started ? 'Yes' : 'No',
@@ -290,8 +307,17 @@ export const PrivilegeDashboardPage: React.FC = () => {
                 <label className="text-xs text-[var(--text-secondary)]">To<input type="date" value={toDate} min={fromDate || undefined} onChange={(e) => setToDate(e.target.value)} className="block mt-1 px-3 py-2 rounded-xl bg-[var(--bg-base)] border border-[var(--border)] text-[var(--text-primary)]" /></label>
               </div>
             )}
+            {canViewAllBranches && (
+              <label className="text-xs text-[var(--text-secondary)] min-w-[190px]">
+                Branch Scope
+                <select value={selectedBranch} onChange={(e) => setSelectedBranch(e.target.value)} className="block w-full mt-1 px-3 py-2 rounded-xl bg-[var(--bg-base)] border border-[var(--border)] text-[var(--text-primary)] font-semibold">
+                  <option value="all">All Branches</option>
+                  {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+                </select>
+              </label>
+            )}
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs text-[var(--text-muted)] mr-1">{periodRange.label} · {filteredAccounts.length} records</span>
+              <span className="text-xs text-[var(--text-muted)] mr-1">{selectedBranchName} · {periodRange.label} · {filteredAccounts.length} records</span>
               <button type="button" onClick={downloadPdf} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-[var(--accent)] text-slate-950"><Download className="w-4 h-4" /> Download PDF</button>
               <button type="button" onClick={printReport} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border border-[var(--border)] text-[var(--text-primary)] bg-[var(--bg-base)]"><Printer className="w-4 h-4" /> Print Report</button>
             </div>
@@ -316,6 +342,32 @@ export const PrivilegeDashboardPage: React.FC = () => {
             {/* ── Tab: Overview ── */}
             {tab === 'Overview' && (
               <>
+                {canViewAllBranches && selectedBranch === 'all' && (
+                  <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl shadow-sm overflow-hidden">
+                    <div className="px-5 sm:px-6 py-4 border-b border-[var(--border)]">
+                      <h2 className="text-base font-bold text-[var(--text-primary)]">Branch-wise Analysis</h2>
+                      <p className="text-xs text-[var(--text-muted)] mt-0.5">Separate performance for each branch during {periodRange.label.toLowerCase()}.</p>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full min-w-[700px] text-sm">
+                        <thead className="bg-[var(--table-header-bg)] text-xs uppercase tracking-wider text-[var(--text-muted)]"><tr><th className="px-6 py-3 text-left">Branch</th><th className="px-6 py-3 text-right">Accounts</th><th className="px-6 py-3 text-right">AUM</th><th className="px-6 py-3 text-right">Funds Utilised</th><th className="px-6 py-3 text-right">Available</th><th className="px-6 py-3 text-right">Utilisation</th><th className="px-6 py-3 text-right">View</th></tr></thead>
+                        <tbody className="divide-y divide-[var(--border)]">
+                          {branchSummaries.map((branch) => (
+                            <tr key={branch.id} className="hover:bg-[var(--bg-hover)]">
+                              <td className="px-6 py-3 font-semibold text-[var(--text-primary)]">{branch.name}</td>
+                              <td className="px-6 py-3 text-right text-[var(--text-secondary)]">{branch.accounts}</td>
+                              <td className="px-6 py-3 text-right font-semibold text-[var(--text-primary)]">{formatMoney(branch.aum)}</td>
+                              <td className="px-6 py-3 text-right text-[var(--text-primary)]">{formatMoney(branch.utilised)}</td>
+                              <td className="px-6 py-3 text-right text-[var(--text-secondary)]">{formatMoney(Math.max(0, branch.aum - branch.utilised))}</td>
+                              <td className="px-6 py-3 text-right font-semibold text-[var(--accent)]">{branch.ratio.toFixed(1)}%</td>
+                              <td className="px-6 py-3 text-right"><button type="button" onClick={() => setSelectedBranch(branch.id)} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[var(--accent-bg)] text-[var(--accent)] hover:bg-[var(--accent)] hover:text-slate-950 transition">Open</button></td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
                 {/* 3 KPI Metric Cards */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
                   {/* Total Accounts */}

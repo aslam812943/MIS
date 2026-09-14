@@ -378,6 +378,7 @@ router.get('/ra/reports/periodic', requireAuth, (req, res) => raController.getPe
  * Privilege Account Department endpoints
  */
 router.get('/privilege/dashboard', requireAuth, (req, res) => privilegeController.getDashboardStats(req, res));
+router.get('/privilege/form-options', requireAuth, (req, res) => privilegeController.getFormOptions(req, res));
 router.get('/privilege/accounts', requireAuth, (req, res) => privilegeController.getAccounts(req, res));
 router.post('/privilege/accounts', requireAuth, (req, res) => privilegeController.saveAccount(req, res));
 router.post('/privilege/accounts/bulk', requireAuth, (req, res) => privilegeController.bulkImport(req, res));
