@@ -30,6 +30,15 @@ import {
 } from 'lucide-react';
 import './Privilege.css';
 
+const getRequestErrorMessage = (error: any, fallback: string): string => {
+  const serverMessage = error?.response?.data?.error || error?.response?.data?.message;
+  if (typeof serverMessage === 'string' && serverMessage.trim()) return serverMessage;
+  if (!error?.response) return 'Unable to connect to the server. Check your connection and try again.';
+  if (error.response.status === 403) return 'You do not have permission to perform this action.';
+  if (error.response.status >= 500) return 'The server could not complete the request. Please try again, or contact an administrator if it continues.';
+  return fallback;
+};
+
 export const PrivilegeDataEntryPage: React.FC = () => {
   const currentUser = authService.getCurrentUser();
   const [tab, setTab] = useState<'Accounts' | 'Uploads'>('Accounts');
@@ -68,7 +77,7 @@ export const PrivilegeDataEntryPage: React.FC = () => {
       if (showToast) toast.success('Privilege records refreshed');
     } catch (err: any) {
       console.error('Error fetching privilege data:', err);
-      toast.error(err.response?.data?.error || 'Failed to load privilege data');
+      toast.error(getRequestErrorMessage(err, 'Failed to load privilege data.'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -86,6 +95,11 @@ export const PrivilegeDataEntryPage: React.FC = () => {
       (a) =>
         a.name.toLowerCase().includes(q) ||
         a.code.toLowerCase().includes(q) ||
+        (a.mobile_no || '').toLowerCase().includes(q) ||
+        (a.scheme || '').toLowerCase().includes(q) ||
+        (a.rm || '').toLowerCase().includes(q) ||
+        (a.dealer || '').toLowerCase().includes(q) ||
+        (a.branch || '').toLowerCase().includes(q) ||
         a.location.toLowerCase().includes(q) ||
         a.stocks.toLowerCase().includes(q) ||
         a.occupation.toLowerCase().includes(q)
@@ -107,6 +121,24 @@ export const PrivilegeDataEntryPage: React.FC = () => {
       return;
     }
 
+    const requiredFields: Array<[keyof PrivilegeAccount, string]> = [
+      ['name', 'Client name'], ['account_date', 'Date'],
+      ['mobile_no', 'Mobile number'], ['aum', 'AUM'], ['utilised', 'Funds utilised']
+    ];
+    const missing = requiredFields.find(([key]) => modalAccount[key] === undefined || modalAccount[key] === null || String(modalAccount[key]).trim() === '');
+    if (missing) {
+      toast.error(`${missing[1]} is required.`);
+      return;
+    }
+    if (!/^\+?[0-9]{10,15}$/.test(String(modalAccount.mobile_no).replace(/[\s-]/g, ''))) {
+      toast.error('Mobile number must contain 10 to 15 digits.');
+      return;
+    }
+    if ((modalAccount.utilised || 0) > (modalAccount.aum || 0)) {
+      toast.error('Funds utilised cannot be greater than AUM.');
+      return;
+    }
+
     try {
       setIsBusy(true);
       const res = await privilegeService.saveAccount(modalAccount);
@@ -115,7 +147,7 @@ export const PrivilegeDataEntryPage: React.FC = () => {
       await fetchData();
     } catch (err: any) {
       console.error('Save error:', err);
-      toast.error(err.response?.data?.error || err.message || 'Failed to save account');
+      toast.error(getRequestErrorMessage(err, 'Failed to save account. Check the entered details and try again.'));
     } finally {
       setIsBusy(false);
     }
@@ -148,7 +180,7 @@ export const PrivilegeDataEntryPage: React.FC = () => {
       setConfirmDelete(null);
     } catch (err: any) {
       console.error('Delete error:', err);
-      toast.error(err.response?.data?.error || err.message || 'Failed to delete record');
+      toast.error(getRequestErrorMessage(err, 'Failed to delete the record. Please try again.'));
     } finally {
       setIsDeleting(false);
     }
@@ -173,7 +205,7 @@ export const PrivilegeDataEntryPage: React.FC = () => {
         }
 
         const headers = lines[0].split(',').map((h) => h.trim().toLowerCase());
-        const expected = ['code', 'name', 'location', 'occupation', 'contact', 'aum', 'utilised', 'returns', 'stocks'];
+        const expected = ['name', 'account_date', 'mobile_no', 'aum', 'utilised'];
         const missing = expected.filter((col) => !headers.includes(col));
         if (missing.length > 0) {
           throw new Error(`CSV missing mandatory columns: ${missing.join(', ')}`);
@@ -190,8 +222,16 @@ export const PrivilegeDataEntryPage: React.FC = () => {
           });
 
           rows.push({
-            code: rowObj.code,
             name: rowObj.name,
+            account_date: rowObj.account_date,
+            mobile_no: rowObj.mobile_no,
+            scheme: rowObj.scheme,
+            introducer: rowObj.introducer,
+            rm: rowObj.rm,
+            dealer: rowObj.dealer,
+            branch: rowObj.branch,
+            trading_started: ['yes', 'true', '1', 'started'].includes(String(rowObj.trading_started).toLowerCase()),
+            remarks: rowObj.remarks || '',
             location: rowObj.location,
             occupation: rowObj.occupation,
             contact: rowObj.contact,
@@ -214,7 +254,8 @@ export const PrivilegeDataEntryPage: React.FC = () => {
       await fetchData();
     } catch (err: any) {
       console.error('Upload error:', err);
-      toast.error(err.response?.data?.error || err.message || 'Upload failed');
+      const message = err instanceof Error && !('response' in err) ? err.message : getRequestErrorMessage(err, 'Upload failed. Check the file and try again.');
+      toast.error(message);
     } finally {
       setIsBusy(false);
     }
@@ -222,10 +263,8 @@ export const PrivilegeDataEntryPage: React.FC = () => {
 
   const downloadCSVTemplate = () => {
     const csvContent =
-      'code,name,location,occupation,contact,aum,utilised,returns,stocks\n' +
-      'PA1001,Arjun Mehta,Mumbai,Business owner,9876543210,8500000,6300000,12.8,"HDFCBANK, RELIANCE, INFY"\n' +
-      'PA1002,Priya Nair,Bengaluru,Technology,9876543211,6500000,4800000,9.4,"TCS, INFY"\n' +
-      'PA1003,Rohan Shah,Mumbai,Consultant,9876543212,12000000,9600000,15.2,"RELIANCE, ICICIBANK"';
+      'name,account_date,mobile_no,scheme,introducer,rm,dealer,branch,trading_started,remarks,location,occupation,contact,aum,utilised,returns,stocks\n' +
+      'Arjun Mehta,2026-09-14,9876543210,Privilege,Direct,Rahul,Neha,Mumbai,Yes,Priority client,Mumbai,Business owner,9876543210,8500000,6300000,12.8,"HDFCBANK, RELIANCE, INFY"';
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -365,15 +404,21 @@ export const PrivilegeDataEntryPage: React.FC = () => {
             {tab === 'Accounts' && (
               <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl shadow-sm overflow-hidden">
                 <div className="overflow-x-auto w-full">
-                  <table className="w-full text-left text-sm text-[var(--text-secondary)] min-w-[750px]">
+                  <table className="w-full text-left text-sm text-[var(--text-secondary)] min-w-[1600px]">
                     <thead className="bg-[var(--table-header-bg)] text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider border-b border-[var(--border)]">
                       <tr>
-                        <th className="py-3.5 px-6 min-w-[190px]">Client</th>
-                        <th className="py-3.5 px-6 min-w-[120px]">Location</th>
-                        <th className="py-3.5 px-6 min-w-[120px]">AUM</th>
-                        <th className="py-3.5 px-6 min-w-[150px]">Funds Utilised</th>
-                        <th className="py-3.5 px-6 min-w-[100px]">Return</th>
-                        <th className="py-3.5 px-6 min-w-[170px]">Stocks In Trade</th>
+                        <th className="py-3.5 px-4">Sl No</th>
+                        <th className="py-3.5 px-4">Client Code</th>
+                        <th className="py-3.5 px-4 min-w-[180px]">Client Name</th>
+                        <th className="py-3.5 px-4">Date</th>
+                        <th className="py-3.5 px-4">Mobile No</th>
+                        <th className="py-3.5 px-4">Scheme</th>
+                        <th className="py-3.5 px-4">Introducer</th>
+                        <th className="py-3.5 px-4">RM</th>
+                        <th className="py-3.5 px-4">Dealer</th>
+                        <th className="py-3.5 px-4">Branch</th>
+                        <th className="py-3.5 px-4">Trading Started</th>
+                        <th className="py-3.5 px-4 min-w-[180px]">Remarks</th>
                         <th className="py-3.5 px-6 text-right w-24">Action</th>
                       </tr>
                     </thead>
@@ -385,17 +430,15 @@ export const PrivilegeDataEntryPage: React.FC = () => {
                           .slice(0, 2)
                           .join('')
                           .toUpperCase();
-                        const utilRatio = a.aum > 0 ? (a.utilised / a.aum) * 100 : 0;
-                        const stockList = a.stocks.split(',').map((s) => s.trim()).filter(Boolean);
-                        const isNegative = a.returns < 0;
-
                         return (
                           <tr
                             key={a.code}
                             onClick={() => setModalAccount(a)}
                             className="hover:bg-[var(--bg-hover)] transition cursor-pointer"
                           >
-                            <td className="py-4 px-6">
+                            <td className="py-4 px-4 tabular-nums">{a.sl_no || '—'}</td>
+                            <td className="py-4 px-4 font-mono">{a.code}</td>
+                            <td className="py-4 px-4">
                               <div className="flex items-center gap-3">
                                 <div className="w-9 h-9 rounded-full bg-gradient-to-br from-teal-500/20 to-emerald-500/20 text-[var(--accent)] font-bold text-xs flex items-center justify-center border border-[var(--border-accent)] flex-shrink-0">
                                   {clientInitials}
@@ -404,51 +447,18 @@ export const PrivilegeDataEntryPage: React.FC = () => {
                                   <div className="font-semibold text-[var(--text-primary)] hover:text-[var(--accent)] transition">
                                     {a.name}
                                   </div>
-                                  <div className="text-xs text-[var(--text-muted)] font-mono mt-0.5">
-                                    {a.code}
-                                  </div>
                                 </div>
                               </div>
                             </td>
-                            <td className="py-4 px-6 text-sm text-[var(--text-primary)]">{a.location}</td>
-                            <td className="py-4 px-6 text-sm font-semibold text-[var(--text-primary)] tabular-nums">
-                              {formatMoney(a.aum)}
-                            </td>
-                            <td className="py-4 px-6 tabular-nums">
-                              <div className="font-semibold text-[var(--text-primary)]">
-                                {formatMoney(a.utilised)}
-                              </div>
-                              <div className="h-1.5 w-20 rounded-full bg-slate-200 dark:bg-slate-700/80 overflow-hidden mt-1">
-                                <div
-                                  className="h-full rounded-full bg-[var(--accent)]"
-                                  style={{ width: `${Math.min(100, utilRatio)}%` }}
-                                />
-                              </div>
-                            </td>
-                            <td className="py-4 px-6">
-                              <span
-                                className={`inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-semibold ${
-                                  isNegative
-                                    ? 'bg-rose-500/10 text-rose-500 border border-rose-500/20'
-                                    : 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
-                                }`}
-                              >
-                                {a.returns > 0 ? '+' : ''}
-                                {a.returns.toFixed(1)}%
-                              </span>
-                            </td>
-                            <td className="py-4 px-6">
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-[var(--bg-base)] text-[var(--text-secondary)] border border-[var(--border)] font-mono">
-                                  {stockList[0] || '—'}
-                                </span>
-                                {stockList.length > 1 && (
-                                  <span className="text-xs font-semibold text-[var(--text-muted)]">
-                                    +{stockList.length - 1}
-                                  </span>
-                                )}
-                              </div>
-                            </td>
+                            <td className="py-4 px-4">{a.account_date ? new Date(`${a.account_date}T00:00:00`).toLocaleDateString('en-IN') : '—'}</td>
+                            <td className="py-4 px-4">{a.mobile_no || '—'}</td>
+                            <td className="py-4 px-4">{a.scheme || '—'}</td>
+                            <td className="py-4 px-4">{a.introducer || '—'}</td>
+                            <td className="py-4 px-4">{a.rm || '—'}</td>
+                            <td className="py-4 px-4">{a.dealer || '—'}</td>
+                            <td className="py-4 px-4">{a.branch || '—'}</td>
+                            <td className="py-4 px-4"><span className={`px-2 py-1 rounded-md text-xs font-semibold ${a.trading_started ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500'}`}>{a.trading_started ? 'Yes' : 'No'}</span></td>
+                            <td className="py-4 px-4 max-w-[240px] truncate" title={a.remarks || ''}>{a.remarks || '—'}</td>
                             <td className="py-4 px-6 text-right">
                               <div
                                 className="flex items-center justify-end gap-1"
@@ -558,6 +568,14 @@ export const PrivilegeDataEntryPage: React.FC = () => {
 
                         <div className="flex items-center gap-2 flex-shrink-0">
                           <a
+                            href={privilegeService.getViewUrl(f.id)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-xl border border-[var(--border)] bg-[var(--bg-card)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition"
+                          >
+                            <Eye className="w-3.5 h-3.5" /> View
+                          </a>
+                          <a
                             href={privilegeService.getDownloadUrl(f.id)}
                             download
                             className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-xl border border-[var(--border)] bg-[var(--bg-card)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition"
@@ -643,6 +661,21 @@ export const PrivilegeDataEntryPage: React.FC = () => {
               {!canEdit ? (
                 /* HOD Read-Only View */
                 <div className="p-5 sm:p-6 space-y-5 overflow-y-auto">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {[
+                      ['Sl No', modalAccount.sl_no], ['Date', modalAccount.account_date],
+                      ['Mobile No', modalAccount.mobile_no], ['Scheme', modalAccount.scheme],
+                      ['Introducer', modalAccount.introducer], ['RM', modalAccount.rm],
+                      ['Dealer', modalAccount.dealer], ['Branch', modalAccount.branch],
+                      ['Trading Started', modalAccount.trading_started ? 'Yes' : 'No'],
+                      ['Remarks', modalAccount.remarks || '—']
+                    ].map(([label, value]) => (
+                      <div key={String(label)} className="p-3.5 rounded-xl bg-[var(--bg-base)] border border-[var(--border)]">
+                        <div className="text-xs text-[var(--text-muted)] mb-1">{label}</div>
+                        <div className="font-medium text-sm text-[var(--text-primary)]">{value ?? '—'}</div>
+                      </div>
+                    ))}
+                  </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="p-3.5 rounded-xl bg-[var(--bg-base)] border border-[var(--border)]">
                       <div className="text-xs text-[var(--text-muted)] flex items-center gap-1.5 mb-1">
@@ -743,15 +776,24 @@ export const PrivilegeDataEntryPage: React.FC = () => {
                   <div className="p-5 sm:px-6 py-5 space-y-4 overflow-y-auto flex-1">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
+                        <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Sl No <span className="font-normal text-[var(--text-muted)]">(automatic)</span></label>
+                        <input readOnly value={modalAccount.sl_no ?? 'Generated when saved'} className="w-full px-3.5 py-2 text-sm bg-[var(--bg-base)] border border-[var(--border)] rounded-xl text-[var(--text-muted)] cursor-not-allowed" />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Date <span className="text-rose-500">*</span></label>
+                        <input type="date" required value={modalAccount.account_date || ''} onChange={(e) => setModalAccount({ ...modalAccount, account_date: e.target.value })} className="w-full px-3.5 py-2 text-sm bg-[var(--bg-base)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] transition" />
+                      </div>
+
+                      <div>
                         <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">
-                          Client Code <span className="text-rose-500">*</span>
+                          Client Code <span className="font-normal text-[var(--text-muted)]">(automatic)</span>
                         </label>
                         <input
-                          required
+                          readOnly
                           value={modalAccount.code || ''}
-                          onChange={(e) => setModalAccount({ ...modalAccount, code: e.target.value.toUpperCase() })}
-                          placeholder="e.g. PA1007"
-                          className="w-full px-3.5 py-2 text-sm bg-[var(--bg-base)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] transition uppercase font-mono"
+                          placeholder="Generated when saved (e.g. PA1007)"
+                          className="w-full px-3.5 py-2 text-sm bg-[var(--bg-base)] border border-[var(--border)] rounded-xl text-[var(--text-muted)] cursor-not-allowed uppercase font-mono"
                         />
                       </div>
 
@@ -769,11 +811,33 @@ export const PrivilegeDataEntryPage: React.FC = () => {
                       </div>
 
                       <div>
+                        <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Mobile No <span className="text-rose-500">*</span></label>
+                        <input type="tel" required inputMode="tel" value={modalAccount.mobile_no || ''} onChange={(e) => setModalAccount({ ...modalAccount, mobile_no: e.target.value })} placeholder="10 to 15 digit mobile number" className="w-full px-3.5 py-2 text-sm bg-[var(--bg-base)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] transition" />
+                      </div>
+
+                      {([
+                        ['scheme', 'Scheme', 'e.g. Privilege'], ['introducer', 'Introducer', 'Introducer name'],
+                        ['rm', 'RM', 'Relationship manager'], ['dealer', 'Dealer', 'Dealer name'],
+                        ['branch', 'Branch', 'Branch name']
+                      ] as const).map(([key, label, placeholder]) => (
+                        <div key={key}>
+                          <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">{label} <span className="font-normal text-[var(--text-muted)]">(optional)</span></label>
+                          <input value={modalAccount[key] || ''} onChange={(e) => setModalAccount({ ...modalAccount, [key]: e.target.value })} placeholder={placeholder} className="w-full px-3.5 py-2 text-sm bg-[var(--bg-base)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] transition" />
+                        </div>
+                      ))}
+
+                      <div>
+                        <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Trading Started <span className="font-normal text-[var(--text-muted)]">(optional)</span></label>
+                        <select value={modalAccount.trading_started ? 'yes' : 'no'} onChange={(e) => setModalAccount({ ...modalAccount, trading_started: e.target.value === 'yes' })} className="w-full px-3.5 py-2 text-sm bg-[var(--bg-base)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] transition">
+                          <option value="no">No</option><option value="yes">Yes</option>
+                        </select>
+                      </div>
+
+                      <div>
                         <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">
-                          Location <span className="text-rose-500">*</span>
+                          Location <span className="font-normal text-[var(--text-muted)]">(optional)</span>
                         </label>
                         <input
-                          required
                           value={modalAccount.location || ''}
                           onChange={(e) => setModalAccount({ ...modalAccount, location: e.target.value })}
                           placeholder="City / Region"
@@ -783,10 +847,9 @@ export const PrivilegeDataEntryPage: React.FC = () => {
 
                       <div>
                         <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">
-                          Occupation <span className="text-rose-500">*</span>
+                          Occupation <span className="font-normal text-[var(--text-muted)]">(optional)</span>
                         </label>
                         <input
-                          required
                           value={modalAccount.occupation || ''}
                           onChange={(e) => setModalAccount({ ...modalAccount, occupation: e.target.value })}
                           placeholder="e.g. Business owner, Doctor"
@@ -796,10 +859,9 @@ export const PrivilegeDataEntryPage: React.FC = () => {
 
                       <div>
                         <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">
-                          Contact Info <span className="text-rose-500">*</span>
+                          Contact Info <span className="font-normal text-[var(--text-muted)]">(optional)</span>
                         </label>
                         <input
-                          required
                           value={modalAccount.contact || ''}
                           onChange={(e) => setModalAccount({ ...modalAccount, contact: e.target.value })}
                           placeholder="Phone number or note"
@@ -841,11 +903,10 @@ export const PrivilegeDataEntryPage: React.FC = () => {
 
                       <div>
                         <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">
-                          Return (%) <span className="text-rose-500">*</span>
+                          Return (%) <span className="font-normal text-[var(--text-muted)]">(optional)</span>
                         </label>
                         <input
                           type="number"
-                          required
                           step="0.1"
                           value={modalAccount.returns ?? ''}
                           onChange={(e) => setModalAccount({ ...modalAccount, returns: parseFloat(e.target.value) || 0 })}
@@ -856,11 +917,15 @@ export const PrivilegeDataEntryPage: React.FC = () => {
                     </div>
 
                     <div>
+                      <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Remarks</label>
+                      <textarea rows={3} maxLength={1000} value={modalAccount.remarks || ''} onChange={(e) => setModalAccount({ ...modalAccount, remarks: e.target.value })} placeholder="Optional remarks" className="w-full px-3.5 py-2 text-sm bg-[var(--bg-base)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] transition resize-y" />
+                    </div>
+
+                    <div>
                       <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">
-                        Stocks In Trade (comma separated) <span className="text-rose-500">*</span>
+                        Stocks In Trade (comma separated) <span className="font-normal text-[var(--text-muted)]">(optional)</span>
                       </label>
                       <input
-                        required
                         value={modalAccount.stocks || ''}
                         onChange={(e) => setModalAccount({ ...modalAccount, stocks: e.target.value.toUpperCase() })}
                         placeholder="e.g. HDFCBANK, RELIANCE, TCS"

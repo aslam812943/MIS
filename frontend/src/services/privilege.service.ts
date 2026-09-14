@@ -54,5 +54,10 @@ export const privilegeService = {
   getDownloadUrl: (id: string): string => {
     const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
     return `${baseUrl}/admin/privilege/uploads/${id}/download`;
+  },
+
+  getViewUrl: (id: string): string => {
+    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+    return `${baseUrl}/admin/privilege/uploads/${encodeURIComponent(id)}/download?inline=true`;
   }
 };

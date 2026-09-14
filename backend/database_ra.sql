@@ -30,15 +30,9 @@ ALTER TABLE ra_packages ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Service role full access ra_packages" ON ra_packages;
 CREATE POLICY "Service role full access ra_packages" ON ra_packages FOR ALL TO service_role USING (true) WITH CHECK (true);
 
--- Seed default initial packages if not present
-INSERT INTO ra_packages (name, description, segment, price, duration_days, is_active)
-VALUES
-    ('Diamond Equity Portfolio', 'Long term high conviction equity advisory with disciplined rebalancing', 'Equity', 50000.00, 90, TRUE),
-    ('Platinum Momentum Pro', 'High alpha momentum equity swing trading recommendations', 'Equity', 35000.00, 90, TRUE),
-    ('Options & Futures Alpha', 'Index and stock options strategies with strict risk-to-reward hedging', 'Futures & Options', 25000.00, 30, TRUE),
-    ('Gold Commodity Specialist', 'Bullion and crude oil swing trading advisory signals', 'Commodity', 20000.00, 30, TRUE),
-    ('HNI Wealth Advisory Multi-Cap', 'Exclusive bespoke multi-asset allocation for high net-worth investors', 'HNI Alpha', 100000.00, 365, TRUE)
-ON CONFLICT (name) DO NOTHING;
+-- Packages are created by users in the RA Package Catalog.
+-- Do not seed defaults here: rerunning a schema migration must never recreate
+-- packages that a user intentionally deleted.
 
 -- 3. RA CLIENTS / SUBSCRIPTIONS TABLE
 CREATE TABLE IF NOT EXISTS ra_clients (

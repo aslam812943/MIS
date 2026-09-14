@@ -113,15 +113,13 @@ async function seedPrivilege() {
 
   // 5. Seed sample privilege accounts
   const sampleAccounts = [
-    { code: 'PA1001', name: 'Arjun Mehta', location: 'Mumbai', occupation: 'Business owner', contact: '9876543210', aum: 8500000.00, utilised: 6300000.00, returns: 12.80, stocks: 'HDFCBANK, RELIANCE, INFY', branch_id: branchId },
-    { code: 'PA1002', name: 'Priya Nair', location: 'Bengaluru', occupation: 'Technology', contact: '9876543211', aum: 6500000.00, utilised: 4800000.00, returns: 9.40, stocks: 'TCS, INFY', branch_id: branchId },
-    { code: 'PA1003', name: 'Rohan Shah', location: 'Mumbai', occupation: 'Consultant', contact: '9876543212', aum: 12000000.00, utilised: 9600000.00, returns: 15.20, stocks: 'RELIANCE, ICICIBANK', branch_id: branchId },
-    { code: 'PA1004', name: 'Ananya Iyer', location: 'Chennai', occupation: 'Doctor', contact: '9876543213', aum: 4500000.00, utilised: 2700000.00, returns: 7.60, stocks: 'SUNPHARMA, ITC', branch_id: branchId },
-    { code: 'PA1005', name: 'Vikram Kapoor', location: 'Delhi', occupation: 'Business owner', contact: '9876543214', aum: 9500000.00, utilised: 7100000.00, returns: -2.10, stocks: 'LT, TATAMOTORS', branch_id: branchId },
-    { code: 'PA1006', name: 'Neha Desai', location: 'Pune', occupation: 'Architect', contact: '9876543215', aum: 5500000.00, utilised: 3800000.00, returns: 11.30, stocks: 'HDFCBANK, TCS', branch_id: branchId }
+    { sl_no: 1, code: 'PA1001', name: 'Aarav Sharma', account_date: '2026-09-02', mobile_no: '9876501001', scheme: 'Privilege Plus', introducer: 'Direct', rm: 'Rahul Menon', dealer: 'Neha Patil', branch: 'Mumbai Central', trading_started: true, remarks: 'Active priority client', location: 'Mumbai', occupation: 'Business owner', contact: '9876501001', aum: 8500000, utilised: 6200000, returns: 12.4, stocks: 'HDFCBANK, RELIANCE', branch_id: branchId },
+    { sl_no: 2, code: 'PA1002', name: 'Diya Nair', account_date: '2026-09-06', mobile_no: '9876501002', scheme: 'Privilege Elite', introducer: 'Anil Kumar', rm: 'Meera Shah', dealer: 'Karan Joshi', branch: 'Bengaluru', trading_started: true, remarks: 'Monthly review completed', location: 'Bengaluru', occupation: 'Technology consultant', contact: '9876501002', aum: 6500000, utilised: 4100000, returns: 9.8, stocks: 'TCS, INFY', branch_id: branchId },
+    { sl_no: 3, code: 'PA1003', name: 'Kabir Patel', account_date: '2026-09-11', mobile_no: '9876501003', scheme: 'Privilege Select', introducer: 'Direct', rm: 'Rahul Menon', dealer: 'Sneha Rao', branch: 'Ahmedabad', trading_started: false, remarks: 'Trading activation pending', location: 'Ahmedabad', occupation: 'Entrepreneur', contact: '9876501003', aum: 12000000, utilised: 7500000, returns: 14.2, stocks: 'ICICIBANK, LT', branch_id: branchId }
   ];
 
   try {
+    await client.from('privilege_accounts').delete().in('code', ['PA1001', 'PA1002', 'PA1003', 'PA1004', 'PA1005', 'PA1006']);
     const { error: seedError } = await client
       .from('privilege_accounts')
       .upsert(sampleAccounts, { onConflict: 'code' });

@@ -151,7 +151,8 @@ export class PrivilegeController {
       }
 
       res.setHeader('Content-Type', record.mime_type || 'application/octet-stream');
-      res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(record.name)}"`);
+      const disposition = req.query.inline === 'true' ? 'inline' : 'attachment';
+      res.setHeader('Content-Disposition', `${disposition}; filename*=UTF-8''${encodeURIComponent(record.name)}`);
       res.setHeader('X-Content-Type-Options', 'nosniff');
 
       const stream = fs.createReadStream(record.file_path);
