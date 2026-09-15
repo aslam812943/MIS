@@ -32,16 +32,43 @@ import { Link } from 'react-router-dom';
 import { ROUTES } from '../../constants/routes';
 import toast from 'react-hot-toast';
 import './SWGlobal.css';
+import { orgService, type Branch } from '../../services/org.service';
+import { authService } from '../../services/auth.service';
 
 type ActiveTab = 'accounts' | 'pending' | 'events' | 'leads' | 'uploads';
 
+const parseCsvRows = (text: string): Record<string, string>[] => {
+  const parsed: string[][] = [];
+  let row: string[] = [], value = '', quoted = false;
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    if (char === '"' && quoted && text[index + 1] === '"') { value += '"'; index += 1; }
+    else if (char === '"') quoted = !quoted;
+    else if (char === ',' && !quoted) { row.push(value.trim()); value = ''; }
+    else if ((char === '\n' || char === '\r') && !quoted) {
+      if (char === '\r' && text[index + 1] === '\n') index += 1;
+      row.push(value.trim());
+      if (row.some(cell => cell)) parsed.push(row);
+      row = []; value = '';
+    } else value += char;
+  }
+  row.push(value.trim());
+  if (row.some(cell => cell)) parsed.push(row);
+  if (parsed.length < 2) return [];
+  const headers = parsed[0].map(header => header.replace(/^\uFEFF/, '').trim().toLowerCase());
+  return parsed.slice(1).map(cells => Object.fromEntries(headers.map((header, index) => [header, cells[index] || ''])));
+};
+
 export const SWGlobalDataEntryPage: React.FC = () => {
+  const currentRole = String(authService.getCurrentUser()?.role || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+  const canChooseBranch = ['hod', 'ceo', 'managing_director', 'director', 'executive', 'admin'].includes(currentRole);
   const [tab, setTab] = useState<ActiveTab>('accounts');
 
   const [accounts, setAccounts] = useState<SWGlobalAccount[]>([]);
   const [events, setEvents] = useState<SWGlobalEvent[]>([]);
   const [leads, setLeads] = useState<SWGlobalLead[]>([]);
   const [uploads, setUploads] = useState<SWGlobalUpload[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -63,7 +90,44 @@ export const SWGlobalDataEntryPage: React.FC = () => {
 
   // File Upload State
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [csvPreview, setCsvPreview] = useState<Record<string, string>[] | null>(null);
   const [uploadKind, setUploadKind] = useState<string>('Accounts CSV');
+  const csvTemplates: Record<string, { href: string; headers: string }> = {
+    'Accounts CSV': {
+      href: '/templates/sw-global-accounts-sample.csv',
+      headers: 'name, account_no, location, occupation, contact, email, status, pending_reason, followup, branch_name'
+    },
+    'Leads CSV': {
+      href: '/templates/sw-global-leads-sample.csv',
+      headers: 'event_id, name, contact, location, stage, notes, followup'
+    },
+    'Events CSV': {
+      href: '/templates/sw-global-events-sample.csv',
+      headers: 'title, type, date, status, notes'
+    }
+  };
+  const selectedCsvTemplate = csvTemplates[uploadKind];
+
+  const previewSelectedCsv = async () => {
+    if (!selectedFile) return toast.error('Please choose a CSV file first.');
+    if (!selectedFile.name.toLowerCase().endsWith('.csv')) return toast.error('Please choose a CSV file for this import type.');
+    try {
+      const rows = parseCsvRows(await selectedFile.text());
+      if (!rows.length) throw new Error('CSV must contain a header row and at least one record.');
+      const requiredByKind: Record<string, string[]> = {
+        'Accounts CSV': ['name', 'account_no', 'location', 'occupation', 'contact', 'status'],
+        'Leads CSV': ['event_id', 'name', 'contact', 'location', 'stage'],
+        'Events CSV': ['title', 'type', 'date', 'status']
+      };
+      const missing = (requiredByKind[uploadKind] || []).filter(header => !(header in rows[0]));
+      if (missing.length) throw new Error(`Missing required headers: ${missing.join(', ')}`);
+      setCsvPreview(rows);
+      toast.success(`${rows.length} record${rows.length === 1 ? '' : 's'} ready to upload`);
+    } catch (error: any) {
+      setCsvPreview(null);
+      toast.error(error.message || 'Could not preview this CSV.');
+    }
+  };
 
   // Custom Delete Confirmation Modal
   const [confirmDelete, setConfirmDelete] = useState<{
@@ -97,11 +161,16 @@ export const SWGlobalDataEntryPage: React.FC = () => {
 
   useEffect(() => {
     fetchData();
-  }, []);
+    if (canChooseBranch) {
+      orgService.getBranches().then(setBranches).catch(() => toast.error('Could not load branches.'));
+    }
+  }, [canChooseBranch]);
 
   const formatDate = (d?: string | null) => {
     if (!d) return 'Not set';
-    return new Date(d + 'T00:00:00').toLocaleDateString('en-IN', {
+    const parsedDate = new Date(d.includes('T') ? d : `${d}T00:00:00`);
+    if (Number.isNaN(parsedDate.getTime())) return 'Not available';
+    return parsedDate.toLocaleDateString('en-IN', {
       day: 'numeric',
       month: 'short',
       year: 'numeric'
@@ -183,6 +252,7 @@ export const SWGlobalDataEntryPage: React.FC = () => {
       contact: String(formData.get('contact') || '').trim(),
       email: String(formData.get('email') || '').trim(),
       status: formData.get('status') as any,
+      branch_id: String(formData.get('branch_id') || '').trim() || null,
       pending_reason: String(formData.get('pending_reason') || '').trim(),
       followup: formData.get('followup') ? String(formData.get('followup')) : null
     };
@@ -321,9 +391,22 @@ export const SWGlobalDataEntryPage: React.FC = () => {
 
     setIsBusy(true);
     try {
+      let importedCount = 0;
+      if (uploadKind === 'Accounts CSV') {
+        if (!selectedFile.name.toLowerCase().endsWith('.csv')) throw new Error('Accounts bulk import requires a CSV file.');
+        const rows = parseCsvRows(await selectedFile.text());
+        const requiredHeaders = ['name', 'account_no', 'location', 'occupation', 'contact', 'status'];
+        const missing = requiredHeaders.filter(header => !rows.length || !(header in rows[0]));
+        if (missing.length) throw new Error(`Missing required headers: ${missing.join(', ')}`);
+        const result = await swGlobalService.bulkImportAccounts(rows as Partial<SWGlobalAccount>[]);
+        importedCount = result.count;
+      }
       await swGlobalService.uploadFile(selectedFile, uploadKind);
-      toast.success(`File "${selectedFile.name}" uploaded successfully`);
+      toast.success(importedCount
+        ? `${importedCount} accounts imported and file saved successfully`
+        : `File "${selectedFile.name}" uploaded successfully`);
       setSelectedFile(null);
+      setCsvPreview(null);
       await fetchData();
     } catch (err: any) {
       console.error('Error uploading file:', err);
@@ -503,7 +586,7 @@ export const SWGlobalDataEntryPage: React.FC = () => {
                     <thead>
                       <tr className="border-b border-[var(--border)] text-[var(--text-muted)] font-bold uppercase tracking-wider">
                         <th className="pb-2.5">Client Name</th>
-                        <th className="pb-2.5">Account No</th>
+                        <th className="min-w-32 pb-2.5">Account No</th>
                         <th className="pb-2.5">Location</th>
                         <th className="pb-2.5">Occupation</th>
                         <th className="pb-2.5">Contact</th>
@@ -523,7 +606,11 @@ export const SWGlobalDataEntryPage: React.FC = () => {
                               </div>
                             </div>
                           </td>
-                          <td className="py-3 font-mono font-bold text-[var(--text-primary)]">{a.account_no}</td>
+                          <td className="py-3 pr-4">
+                            <span className="inline-flex whitespace-nowrap rounded-lg border border-[var(--border)] bg-[var(--bg-base)] px-2.5 py-1 font-sans text-[11px] font-bold tracking-wide text-[var(--text-primary)] tabular-nums">
+                              {a.account_no}
+                            </span>
+                          </td>
                           <td className="py-3 text-[var(--text-secondary)]">{a.location}</td>
                           <td className="py-3 text-[var(--text-secondary)]">{a.occupation}</td>
                           <td className="py-3 text-[var(--text-secondary)]">{a.contact}</td>
@@ -590,7 +677,7 @@ export const SWGlobalDataEntryPage: React.FC = () => {
                     <thead>
                       <tr className="border-b border-[var(--border)] text-[var(--text-muted)] font-bold uppercase tracking-wider">
                         <th className="pb-2.5">Client</th>
-                        <th className="pb-2.5">Account No</th>
+                        <th className="min-w-32 pb-2.5">Account No</th>
                         <th className="pb-2.5">Location</th>
                         <th className="pb-2.5">Pending Reason</th>
                         <th className="pb-2.5">Next Follow-up</th>
@@ -609,7 +696,11 @@ export const SWGlobalDataEntryPage: React.FC = () => {
                               </div>
                             </div>
                           </td>
-                          <td className="py-3 font-mono font-bold text-[var(--text-primary)]">{a.account_no}</td>
+                          <td className="py-3 pr-4">
+                            <span className="inline-flex whitespace-nowrap rounded-lg border border-[var(--border)] bg-[var(--bg-base)] px-2.5 py-1 font-sans text-[11px] font-bold tracking-wide text-[var(--text-primary)] tabular-nums">
+                              {a.account_no}
+                            </span>
+                          </td>
                           <td className="py-3 text-[var(--text-secondary)]">{a.location}</td>
                           <td className="py-3 text-amber-500 font-semibold">{a.pending_reason || 'Pending verification'}</td>
                           <td className="py-3 text-[var(--text-secondary)]">{formatDate(a.followup)}</td>
@@ -918,7 +1009,7 @@ export const SWGlobalDataEntryPage: React.FC = () => {
                       <label className="block text-[11px] font-semibold text-[var(--text-muted)] mb-1">File Type</label>
                       <select
                         value={uploadKind}
-                        onChange={(e) => setUploadKind(e.target.value)}
+                        onChange={(e) => { setUploadKind(e.target.value); setSelectedFile(null); setCsvPreview(null); }}
                         className="w-full px-3 py-2 text-xs rounded-xl bg-[var(--bg-card)] border border-[var(--border)] text-[var(--text-primary)] outline-none"
                       >
                         <option value="Accounts CSV">Accounts CSV</option>
@@ -932,20 +1023,63 @@ export const SWGlobalDataEntryPage: React.FC = () => {
                       <label className="block text-[11px] font-semibold text-[var(--text-muted)] mb-1">Choose File</label>
                       <input
                         type="file"
-                        onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                        onChange={(e) => { setSelectedFile(e.target.files?.[0] || null); setCsvPreview(null); }}
                         accept=".csv,.xlsx,.xls,.pdf"
                         className="w-full px-3 py-1.5 text-xs rounded-xl bg-[var(--bg-card)] border border-[var(--border)] text-[var(--text-primary)] file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-[var(--accent)] file:text-slate-950 hover:file:bg-[var(--accent-hover)]"
                       />
                     </div>
                   </div>
 
+                  {selectedCsvTemplate && (
+                    <div className="flex flex-col gap-3 rounded-xl border border-[var(--accent)]/20 bg-[var(--accent)]/5 p-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-[var(--text-primary)]">CSV format and required headers</p>
+                        <p className="mt-1 break-words font-mono text-[10px] leading-5 text-[var(--text-muted)]">
+                          {selectedCsvTemplate.headers}
+                        </p>
+                      </div>
+                      <a
+                        href={selectedCsvTemplate.href}
+                        download
+                        className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-[var(--accent)]/30 bg-[var(--bg-card)] px-3.5 py-2 text-xs font-bold text-[var(--accent)] transition hover:bg-[var(--accent)] hover:text-slate-950"
+                      >
+                        <ArrowDownToLine className="h-4 w-4" /> Download Sample CSV
+                      </a>
+                    </div>
+                  )}
+
+                  {selectedCsvTemplate && selectedFile && !csvPreview && (
+                    <button
+                      type="button"
+                      onClick={previewSelectedCsv}
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[var(--accent)] px-4 py-2.5 text-xs font-bold text-[var(--accent)] transition hover:bg-[var(--accent)]/10"
+                    >
+                      <Eye className="h-4 w-4" /> Preview & Validate CSV
+                    </button>
+                  )}
+
+                  {csvPreview && (
+                    <div className="overflow-hidden rounded-xl border border-[var(--border)]">
+                      <div className="bg-[var(--accent)]/10 px-3 py-2 text-xs font-bold text-[var(--accent)]">
+                        Preview: {csvPreview.length} record{csvPreview.length === 1 ? '' : 's'} ready
+                      </div>
+                      <div className="max-h-52 overflow-auto">
+                        <table className="w-full text-left text-[11px]">
+                          <thead className="sticky top-0 bg-[var(--bg-card)]"><tr>{Object.keys(csvPreview[0] || {}).slice(0, 6).map(header => <th key={header} className="whitespace-nowrap p-2 font-bold uppercase">{header}</th>)}</tr></thead>
+                          <tbody>{csvPreview.slice(0, 5).map((row, index) => <tr key={index} className="border-t border-[var(--border)]">{Object.keys(csvPreview[0] || {}).slice(0, 6).map(header => <td key={header} className="whitespace-nowrap p-2 text-[var(--text-secondary)]">{row[header] || '—'}</td>)}</tr>)}</tbody>
+                        </table>
+                      </div>
+                      {csvPreview.length > 5 && <p className="px-3 py-2 text-[10px] text-[var(--text-muted)]">Showing first 5 of {csvPreview.length} records.</p>}
+                    </div>
+                  )}
+
                   <div className="flex justify-end pt-2">
                     <button
                       type="submit"
-                      disabled={isBusy || !selectedFile}
+                      disabled={isBusy || !selectedFile || (!!selectedCsvTemplate && !csvPreview)}
                       className="px-4 py-2 text-xs font-bold rounded-xl bg-[var(--accent)] text-slate-950 hover:bg-[var(--accent-hover)] disabled:opacity-50 transition"
                     >
-                      {isBusy ? 'Uploading...' : 'Upload File'}
+                      {isBusy ? 'Uploading...' : csvPreview ? `Upload ${csvPreview.length} Records` : 'Upload File'}
                     </button>
                   </div>
                 </form>
@@ -970,7 +1104,11 @@ export const SWGlobalDataEntryPage: React.FC = () => {
                             <span className="truncate max-w-xs">{u.name}</span>
                           </td>
                           <td className="py-3 text-[var(--text-secondary)]">{u.kind}</td>
-                          <td className="py-3 text-[var(--text-muted)]">{Math.round((u.file_size || 0) / 1024)} KB</td>
+                          <td className="py-3 text-[var(--text-muted)]">
+                            {(u.file_size || 0) < 1024
+                              ? `${u.file_size || 0} B`
+                              : `${((u.file_size || 0) / 1024).toFixed(1)} KB`}
+                          </td>
                           <td className="py-3 text-[var(--text-secondary)]">{formatDate(u.created_at)}</td>
                           <td className="py-3 text-right">
                             <div className="flex items-center justify-end gap-1.5">
@@ -1086,6 +1224,19 @@ export const SWGlobalDataEntryPage: React.FC = () => {
                       <option value="Closed">Closed</option>
                     </select>
                   </div>
+
+                  {canChooseBranch && <div className="col-span-2">
+                    <label className="block text-[var(--text-muted)] font-semibold mb-1">Branch *</label>
+                    <select
+                      name="branch_id"
+                      defaultValue={accountModal.branch_id || ''}
+                      required
+                      className="w-full px-3 py-2 rounded-xl bg-[var(--bg-base)] border border-[var(--border)] text-[var(--text-primary)] outline-none"
+                    >
+                      <option value="" disabled>Select branch</option>
+                      {branches.map(branch => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+                    </select>
+                  </div>}
 
                   <div>
                     <label className="block text-[var(--text-muted)] font-semibold mb-1">Location *</label>

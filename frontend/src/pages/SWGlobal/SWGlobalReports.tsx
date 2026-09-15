@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import { authService } from '../../services/auth.service';
 import { swGlobalService } from '../../services/swGlobal.service';
 import type { SWGlobalAccountReport } from '../../types/swGlobal.types';
+import type { Branch } from '../../services/org.service';
 
 type Period = 'week' | 'month' | 'year' | 'custom' | 'all';
 
@@ -42,9 +43,16 @@ const accountCells = (a: SWGlobalAccountReport['accounts'][number], index: numbe
   a.followup ? a.followup.slice(0, 10) : (a.created_at ? a.created_at.slice(0, 10) : '-')
 ];
 
-export default function SWGlobalReports() {
+interface SWGlobalReportsProps {
+  branches?: Branch[];
+  initialBranchId?: string;
+  onBranchChange?: (branchId: string) => void;
+}
+
+export default function SWGlobalReports({ branches = [], initialBranchId = '', onBranchChange }: SWGlobalReportsProps) {
   const user = authService.getCurrentUser();
-  const allBranches = ['hod', 'ceo', 'managing_director', 'director', 'executive', 'admin'].includes(user?.role || '');
+  const normalizedRole = String(user?.role || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+  const allBranches = ['hod', 'ceo', 'managing_director', 'director', 'executive', 'admin'].includes(normalizedRole);
   const [period, setPeriod] = useState<Period>('month');
   const [anchor] = useState(new Date().toISOString().slice(0, 10));
   const [from, setFrom] = useState(anchor);
@@ -53,6 +61,7 @@ export default function SWGlobalReports() {
   const [preview, setPreview] = useState(false);
   const [error, setError] = useState('');
   const [retry, setRetry] = useState(0);
+  const [branchId, setBranchId] = useState(initialBranchId);
   const [report, setReport] = useState<(SWGlobalAccountReport & { branchLabel: string }) | null>(null);
 
   useEffect(() => {
@@ -66,9 +75,10 @@ export default function SWGlobalReports() {
     setError('');
     if (period !== 'custom' || (start && end && start <= end)) {
       setBusy(true);
-      swGlobalService.getAccountReport(start, end).then(data => {
+      swGlobalService.getAccountReport(start, end, branchId || undefined).then(data => {
         if (cancelled) return;
-        setReport({ ...data, branchLabel: allBranches ? 'All branches' : 'My branch' });
+        const selectedBranch = branches.find(branch => branch.id === branchId);
+        setReport({ ...data, branchLabel: selectedBranch?.name || (allBranches ? 'All branches' : 'My entries') });
       }).catch((err: any) => {
         if (!cancelled) setError(err.response?.data?.error || 'Could not generate report.');
       }).finally(() => { if (!cancelled) setBusy(false); });
@@ -77,7 +87,9 @@ export default function SWGlobalReports() {
       setBusy(false);
     }
     return () => { cancelled = true; };
-  }, [period, anchor, from, to, allBranches, retry]);
+  }, [period, anchor, from, to, allBranches, retry, branchId, branches]);
+
+  useEffect(() => setBranchId(initialBranchId), [initialBranchId]);
 
   const branchRows = report ? Array.from(new Set(report.accounts.map(a => a.branch_id || 'unassigned'))).map(id => {
     const rows = report.accounts.filter(a => (a.branch_id || 'unassigned') === id);
@@ -610,6 +622,24 @@ export default function SWGlobalReports() {
               </button>
             ))}
           </div>
+          {allBranches && (
+            <label className="sw-report-branch">
+              <span>Branch</span>
+              <select
+                value={branchId}
+                onChange={e => {
+                  const nextBranchId = e.target.value;
+                  setBranchId(nextBranchId);
+                  onBranchChange?.(nextBranchId);
+                  setReport(null);
+                }}
+                aria-label="Report branch"
+              >
+                <option value="">All Branches Report</option>
+                {branches.map(branch => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+              </select>
+            </label>
+          )}
         </div>
 
         <div className="sw-report-actions">

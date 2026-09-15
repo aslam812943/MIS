@@ -1,0 +1,2 @@
+client_name,package,amount,payment_date,mobile_number,research_date,email_id,sw_code,pan,aadhaar_no,reference,kyc_fetch_date,kra_modify_date,kra_reference_number,kra_updation_status,kra_user,ckyc_number,remarks,subscription_start_date,subscription_end_date,branch_name
+Sample Client,Basic,1500,2026-09-15,9876543210,2026-09-15,sample@example.com,SW-1001,ABCDE1234F,123456789012,Website,2026-09-15,2026-09-15,KRA-1001,Completed,RA User,CKYC1001,Sample import row,2026-09-15,2026-10-15,kollam

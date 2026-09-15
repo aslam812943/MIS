@@ -152,6 +152,9 @@ export class PrivilegeService {
       if (branchId) {
         query = query.eq('branch_id', branchId);
       }
+      if (userId) {
+        query = query.eq('created_by', userId);
+      }
 
       if (search && search.trim()) {
         const s = search.trim().replace(/[,()]/g, '');
@@ -304,6 +307,14 @@ export class PrivilegeService {
     const validated: PrivilegeAccountRow[] = [];
     const codes = new Set<string>();
     const serialNumbers = new Set<number>();
+    if (client) {
+      const { data: existing, error } = await client.from('privilege_accounts').select('sl_no, code');
+      if (error) throw friendlyDatabaseError(error, 'check existing account identifiers');
+      for (const item of existing || []) {
+        if (item.code) codes.add(String(item.code));
+        if (item.sl_no != null) serialNumbers.add(Number(item.sl_no));
+      }
+    }
 
     for (let i = 0; i < rows.length; i++) {
       const r = rows[i];
@@ -327,22 +338,29 @@ export class PrivilegeService {
       }
       if (!code || !Number.isFinite(slNo)) {
         if (!client) throw new Error('The database connection is unavailable. Account identifiers could not be generated.');
-        const { data: identifiers, error: identifierError } = await client.rpc('next_privilege_account_identifiers');
-        if (identifierError) throw friendlyDatabaseError(identifierError, 'generate account identifiers');
-        const generated = Array.isArray(identifiers) ? identifiers[0] : identifiers;
-        slNo = Number(generated?.sl_no);
-        code = String(generated?.client_code || '');
+        let generatedUnique = false;
+        for (let attempt = 0; attempt < 100 && !generatedUnique; attempt += 1) {
+          const { data: identifiers, error: identifierError } = await client.rpc('next_privilege_account_identifiers');
+          if (identifierError) throw friendlyDatabaseError(identifierError, 'generate account identifiers');
+          const generated = Array.isArray(identifiers) ? identifiers[0] : identifiers;
+          const candidateSlNo = Number(generated?.sl_no);
+          const candidateCode = String(generated?.client_code || '');
+          if (!serialNumbers.has(candidateSlNo) && !codes.has(candidateCode)) {
+            slNo = candidateSlNo;
+            code = candidateCode;
+            generatedUnique = true;
+          }
+        }
+        if (!generatedUnique) throw new Error('Could not generate unique account identifiers. Please try again.');
       }
       if (!Number.isInteger(slNo) || slNo <= 0) throw new Error(`Row ${i + 1}: Sl No must be a positive whole number.`);
       if (!/^PA\d{4,}$/.test(code)) throw new Error(`Row ${i + 1}: Client code must use the fixed PA format.`);
-      if (serialNumbers.has(slNo)) throw new Error(`Row ${i + 1}: Duplicate Sl No "${slNo}" in upload.`);
+      if (serialNumbers.has(slNo)) throw new Error(`Row ${i + 1}: Sl No "${slNo}" already exists.`);
       serialNumbers.add(slNo);
       if (!/^\+?[0-9]{10,15}$/.test(mobileNo.replace(/[\s-]/g, ''))) throw new Error(`Row ${i + 1} (${code}): Enter a valid 10 to 15 digit mobile number.`);
       if (!/^\d{4}-\d{2}-\d{2}$/.test(accountDate) || Number.isNaN(Date.parse(accountDate))) throw new Error(`Row ${i + 1} (${code}): Enter a valid date in YYYY-MM-DD format.`);
 
-      if (codes.has(code)) {
-        throw new Error(`Duplicate client code "${code}" in upload.`);
-      }
+      if (codes.has(code)) throw new Error(`Client code "${code}" already exists.`);
       codes.add(code);
 
       const aum = Number(r.aum);
@@ -407,10 +425,12 @@ export class PrivilegeService {
     }
 
     try {
-      const { data, error } = await client
+      let query = client
         .from('privilege_uploads')
         .select('*')
         .order('created_at', { ascending: false });
+      if (userId) query = query.eq('created_by', userId);
+      const { data, error } = await query;
 
       if (error) {
         console.warn('Error fetching uploads:', error.message);
@@ -482,14 +502,15 @@ export class PrivilegeService {
   /**
    * Retrieves upload record for downloading.
    */
-  async getUploadRecord(id: string): Promise<PrivilegeUploadRow | null> {
+  async getUploadRecord(id: string, ownerId?: string): Promise<PrivilegeUploadRow | null> {
     if (!client) return null;
 
-    const { data, error } = await client
+    let query = client
       .from('privilege_uploads')
       .select('*')
-      .eq('id', id)
-      .single();
+      .eq('id', id);
+    if (ownerId) query = query.eq('created_by', ownerId);
+    const { data, error } = await query.single();
 
     if (error || !data) return null;
     return data;
@@ -498,7 +519,7 @@ export class PrivilegeService {
   /**
    * Deletes a privilege account by client code.
    */
-  async deleteAccount(code: string): Promise<boolean> {
+  async deleteAccount(code: string, ownerId?: string): Promise<boolean> {
     const trimmedCode = (code || '').trim();
     if (!trimmedCode) {
       throw new Error('Client code is required to delete account.');
@@ -508,10 +529,12 @@ export class PrivilegeService {
       throw new Error('Database client is not available.');
     }
 
-    const { error } = await client
+    let query = client
       .from('privilege_accounts')
       .delete()
       .eq('code', trimmedCode);
+    if (ownerId) query = query.eq('created_by', ownerId);
+    const { error } = await query;
 
     if (error) {
       throw new Error(`Failed to delete account: ${error.message}`);
@@ -523,7 +546,7 @@ export class PrivilegeService {
   /**
    * Deletes an uploaded file and its metadata record.
    */
-  async deleteUpload(id: string): Promise<boolean> {
+  async deleteUpload(id: string, ownerId?: string): Promise<boolean> {
     const trimmedId = (id || '').trim();
     if (!trimmedId) {
       throw new Error('Upload ID is required.');
@@ -534,11 +557,12 @@ export class PrivilegeService {
     }
 
     // Retrieve file record first to clean up physical file from disk
-    const { data: record } = await client
+    let recordQuery = client
       .from('privilege_uploads')
       .select('file_path')
-      .eq('id', trimmedId)
-      .single();
+      .eq('id', trimmedId);
+    if (ownerId) recordQuery = recordQuery.eq('created_by', ownerId);
+    const { data: record } = await recordQuery.single();
 
     if (record?.file_path && fs.existsSync(record.file_path)) {
       try {
@@ -548,10 +572,12 @@ export class PrivilegeService {
       }
     }
 
-    const { error } = await client
+    let deleteQuery = client
       .from('privilege_uploads')
       .delete()
       .eq('id', trimmedId);
+    if (ownerId) deleteQuery = deleteQuery.eq('created_by', ownerId);
+    const { error } = await deleteQuery;
 
     if (error) {
       throw new Error(`Failed to delete upload record: ${error.message}`);

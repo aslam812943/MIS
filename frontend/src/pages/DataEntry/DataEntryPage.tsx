@@ -25,6 +25,8 @@ const DataEntryPage: React.FC = () => {
   const isIT = deptName === 'IT';
   const isFinance = deptName === 'FINANCE';
   const isSales = deptName === 'SALES';
+  const isCreator = currentUser?.role === 'content_creator'
+    || ['CREATIVE', 'MARKETING', 'CONTENT CREATION', 'CONTENT CREATOR'].includes(deptName);
 
   useEffect(() => {
     const fetchModules = async () => {
@@ -54,6 +56,10 @@ const DataEntryPage: React.FC = () => {
   }, []);
 
   const selectedModule = modules.find(m => m.id === selectedModuleId);
+
+  if (isCreator) {
+    return <Navigate to={ROUTES.CREATOR_PLANNER} replace />;
+  }
 
   if (isPrivilege) {
     return <Navigate to={ROUTES.PRIVILEGE_DATA_ENTRY} replace />;

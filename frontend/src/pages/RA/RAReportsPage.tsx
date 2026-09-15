@@ -5,6 +5,8 @@ import { raService } from '../../services/ra.service';
 import { orgService } from '../../services/org.service';
 import { authService } from '../../services/auth.service';
 import type { RAPeriodicReport } from '../../types/ra.types';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 const formatMoney = (val: number | string | undefined | null) => {
   const num = Number(val) || 0;
@@ -13,10 +15,10 @@ const formatMoney = (val: number | string | undefined | null) => {
 
 export const RAReportsPage: React.FC = () => {
   const currentUser = authService.getCurrentUser();
-  const isAdmin = currentUser?.role === 'admin';
-  const isLeadership = ['ceo', 'managing_director', 'director', 'executive'].includes(currentUser?.role || '');
-  const isHOD = currentUser?.role === 'hod';
-  const hasMultiBranchAccess = isAdmin || isLeadership || isHOD;
+  const normalizedRole = String(currentUser?.role || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+  const isAdmin = normalizedRole === 'admin';
+  const isHOD = normalizedRole === 'hod';
+  const hasMultiBranchAccess = isAdmin || normalizedRole === 'ceo' || isHOD;
 
   // Report Period Selection
   const [periodType, setPeriodType] = useState<'weekly' | 'monthly' | 'custom'>('monthly');
@@ -35,6 +37,7 @@ export const RAReportsPage: React.FC = () => {
 
   const [report, setReport] = useState<RAPeriodicReport | null>(null);
   const [loading, setLoading] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const reportContentRef = useRef<HTMLDivElement | null>(null);
 
   // Load branches
@@ -118,6 +121,127 @@ export const RAReportsPage: React.FC = () => {
     window.print();
   };
 
+  const handleDownloadPdf = async () => {
+    if (!report || downloading) return;
+
+    setDownloading(true);
+    try {
+      const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+      const margin = 14;
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const scopeLabel = report.branchName || (hasMultiBranchAccess ? 'Consolidated (All Branches)' : 'My Entries');
+      const reportLabel = periodType === 'weekly' ? 'WEEKLY' : periodType === 'monthly' ? 'MONTHLY' : 'PERIODIC';
+      const money = (value: number) => `Rs. ${Number(value || 0).toLocaleString('en-IN')}`;
+      const tableTheme = {
+        headStyles: { fillColor: [30, 64, 175] as [number, number, number], textColor: 255, fontStyle: 'bold' as const },
+        styles: { fontSize: 8, cellPadding: 2.4, textColor: [30, 41, 59] as [number, number, number], lineColor: [203, 213, 225] as [number, number, number], lineWidth: 0.15 },
+        alternateRowStyles: { fillColor: [248, 250, 252] as [number, number, number] },
+        margin: { left: margin, right: margin }
+      };
+
+      pdf.setFillColor(15, 23, 42);
+      pdf.roundedRect(margin, 10, pageWidth - margin * 2, 25, 2, 2, 'F');
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(15);
+      pdf.text('FINANCIAL ADVISORY SERVICES', margin + 6, 19);
+      pdf.setFontSize(11);
+      pdf.text(`${reportLabel} RESEARCH ANALYST PERFORMANCE REPORT`, margin + 6, 27);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(8);
+      pdf.text(`Period: ${report.startDate} to ${report.endDate}`, pageWidth - margin - 6, 19, { align: 'right' });
+      pdf.text(`Scope: ${scopeLabel}`, pageWidth - margin - 6, 27, { align: 'right' });
+
+      pdf.setTextColor(30, 41, 59);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(10);
+      pdf.text('1. EXECUTIVE FINANCIAL & ONBOARDING SUMMARY', margin, 44);
+      autoTable(pdf, {
+        startY: 48,
+        head: [['New Clients', 'Collected Revenue', 'Active', 'Expiring (30d)', 'Expired', 'KRA Completed']],
+        body: [[
+          report.summary.totalClientsAcquired,
+          money(report.summary.totalRevenue),
+          report.summary.activeSubscriptions,
+          report.summary.expiringSubscriptions,
+          report.summary.expiredSubscriptions,
+          report.summary.kraCompletedCount
+        ]],
+        ...tableTheme
+      });
+
+      let y = (pdf as any).lastAutoTable.finalY + 10;
+      pdf.setFontSize(10);
+      pdf.text('2. PACKAGE PERFORMANCE & PRODUCT MIX', margin, y);
+      const packageRows = Object.entries(report.packageBreakdown || {}).map(([name, pkg]) => [
+        name, pkg.clients, pkg.active, pkg.expiring, pkg.expired, money(pkg.revenue), money(pkg.clients ? pkg.revenue / pkg.clients : 0)
+      ]);
+      autoTable(pdf, {
+        startY: y + 4,
+        head: [['Advisory Package', 'Subscribers', 'Active', 'Expiring', 'Expired', 'Revenue', 'Avg Fee / Client']],
+        body: packageRows.length ? packageRows : [['No package activity in this period', '', '', '', '', '', '']],
+        ...tableTheme
+      });
+
+      y = (pdf as any).lastAutoTable.finalY + 10;
+      pdf.text('3. CLIENT ONBOARDING REGISTER', margin, y);
+      autoTable(pdf, {
+        startY: y + 4,
+        head: [['#', 'Client Name', 'Mobile', 'Package', 'Start Date', 'End Date', 'Fee Paid', 'KRA User']],
+        body: report.clientRecords.length ? report.clientRecords.map((client, index) => [
+          index + 1, client.client_name, client.mobile_number || '-', client.package || '-',
+          client.subscription_start_date || '-', client.subscription_end_date || '-', money(client.amount), client.kra_user || '-'
+        ]) : [['', 'No new clients onboarded during this selected timeframe', '', '', '', '', '', '']],
+        ...tableTheme
+      });
+
+      y = (pdf as any).lastAutoTable.finalY + 10;
+      pdf.text('4. RENEWALS FORECAST', margin, y);
+      autoTable(pdf, {
+        startY: y + 4,
+        head: [['Client Name', 'Mobile', 'Package', 'Expiry Date', 'Days Left', 'Renewal Status', 'Last Fee Paid']],
+        body: report.renewalRecords.length ? report.renewalRecords.map(item => [
+          item.client_name, item.mobile_number || '-', item.package || '-', item.subscription_end_date || '-',
+          item.daysLeft, item.renewalStatus, money(item.amount)
+        ]) : [['No upcoming renewals in the selected forecast', '', '', '', '', '', '']],
+        ...tableTheme
+      });
+
+      if (report.recentTestimonials?.length) {
+        y = (pdf as any).lastAutoTable.finalY + 10;
+        pdf.text('5. CLIENT FEEDBACK HIGHLIGHTS', margin, y);
+        autoTable(pdf, {
+          startY: y + 4,
+          head: [['Client', 'Rating', 'Feedback']],
+          body: report.recentTestimonials.slice(0, 8).map(item => [item.client_name, `${item.rating}/5`, item.feedback_text]),
+          ...tableTheme
+        });
+      }
+
+      const pageCount = pdf.getNumberOfPages();
+      for (let page = 1; page <= pageCount; page += 1) {
+        pdf.setPage(page);
+        pdf.setDrawColor(203, 213, 225);
+        pdf.line(margin, pageHeight - 10, pageWidth - margin, pageHeight - 10);
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(7);
+        pdf.setTextColor(100, 116, 139);
+        pdf.text('Confidential - Management Information System - RA Department', margin, pageHeight - 6);
+        pdf.text(`Page ${page} of ${pageCount}`, pageWidth - margin, pageHeight - 6, { align: 'right' });
+      }
+
+      const scope = (report.branchName || (hasMultiBranchAccess ? 'all-branches' : 'my-entries')).replace(/[^a-z0-9]+/gi, '-').toLowerCase();
+      pdf.save(`ra-${periodType}-report-${scope}-${startDate}-to-${endDate}.pdf`);
+      toast.success('PDF downloaded successfully');
+    } catch (err) {
+      console.error('Error downloading RA PDF:', err);
+      toast.error('Could not download the PDF. Please try again.');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   return (
     <DashboardLayout>
       <div className="mis-page mis-animate-in max-w-7xl mx-auto space-y-6 pb-16">
@@ -181,14 +305,14 @@ export const RAReportsPage: React.FC = () => {
             </button>
 
             <button
-              onClick={handlePrint}
-              disabled={!report}
+              onClick={handleDownloadPdf}
+              disabled={!report || downloading}
               className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-bold rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 shadow transition disabled:opacity-50"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
               </svg>
-              Download PDF
+              {downloading ? 'Preparing PDF...' : 'Download PDF'}
             </button>
           </div>
         </div>
@@ -341,7 +465,7 @@ export const RAReportsPage: React.FC = () => {
 
                 <div className="sm:text-right font-mono text-xs text-[var(--text-secondary)] space-y-1">
                   <div><strong>Period:</strong> {new Date(report.startDate).toLocaleDateString('en-IN')} to {new Date(report.endDate).toLocaleDateString('en-IN')}</div>
-                  <div><strong>Scope:</strong> {report.branchName || 'Consolidated (All Branches)'}</div>
+                  <div><strong>Scope:</strong> {report.branchName || (hasMultiBranchAccess ? 'Consolidated (All Branches)' : 'My Entries')}</div>
                 </div>
               </div>
             </div>

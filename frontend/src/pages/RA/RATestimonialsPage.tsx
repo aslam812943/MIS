@@ -8,14 +8,15 @@ import type { RATestimonial, RAClient } from '../../types/ra.types';
 
 export const RATestimonialsPage: React.FC = () => {
   const currentUser = authService.getCurrentUser();
-  const isAdmin = currentUser?.role === 'admin';
-  const isLeadership = ['ceo', 'managing_director', 'director', 'executive'].includes(currentUser?.role || '');
-  const isHOD = currentUser?.role === 'hod';
+  const normalizedRole = String(currentUser?.role || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+  const isAdmin = normalizedRole === 'admin';
+  const isLeadership = normalizedRole === 'ceo';
+  const isHOD = normalizedRole === 'hod';
   const hasMultiBranchAccess = isAdmin || isLeadership || isHOD;
 
   // Admin, CEO, Leadership, and HOD are strictly view-only (no add or edit).
   // Only department operational employees are permitted to create/edit testimonials.
-  const canEdit = currentUser?.role === 'employee' && !isHOD && !isAdmin && !isLeadership;
+  const canEdit = !hasMultiBranchAccess;
 
   const [testimonials, setTestimonials] = useState<RATestimonial[]>([]);
   const [clients, setClients] = useState<RAClient[]>([]);

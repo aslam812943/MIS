@@ -201,8 +201,9 @@ export const Sidebar: React.FC = () => {
   const isHR = user?.role === 'hr' || user?.department_name?.toUpperCase() === 'HR';
   const isEmployee = user?.role === 'employee';
 
-  const isCreatorDept = user?.department_name?.toUpperCase() === 'CREATIVE' || user?.department_name?.toUpperCase() === 'MARKETING';
-  const isSMM = user?.role === 'social_media_manager' || (isCreatorDept && (isHOD || isAdmin));
+  const normalizedDepartment = user?.department_name?.trim().toUpperCase() || '';
+  const isCreatorDept = ['CREATIVE', 'MARKETING', 'CONTENT CREATION', 'CONTENT CREATOR'].includes(normalizedDepartment);
+  const isSMM = user?.role === 'social_media_manager';
   const isCreator = user?.role === 'content_creator' || isCreatorDept;
 
   const showHRDashboard = isAdmin || isHR;
@@ -282,6 +283,8 @@ export const Sidebar: React.FC = () => {
           to={
             isRAUser
               ? ROUTES.RA_DASHBOARD
+              : isCreator
+              ? ROUTES.CREATOR_DASHBOARD
               : isPrivilegeUser
               ? ROUTES.PRIVILEGE_DASHBOARD
               : isSWGlobalUser
@@ -304,7 +307,7 @@ export const Sidebar: React.FC = () => {
         )}
 
         {/* Verification Hub */}
-        {(!isAdmin && !isLeadership && isHOD && !isPrivilegeUser && !isSWGlobalUser) && (
+        {(!isAdmin && !isLeadership && isHOD && !isCreator && !isRAUser && !isPrivilegeUser && !isSWGlobalUser) && (
           <NavItem
             to={ROUTES.VERIFY_ENTRIES}
             icon={<IconVerify />}
@@ -350,6 +353,24 @@ export const Sidebar: React.FC = () => {
               to={ROUTES.CREATOR_PLANNER}
               icon={<IconDataEntry />}
               label="Content Planner"
+              onClick={closeOnMobile}
+            />
+            <NavItem
+              to={ROUTES.CREATOR_CALENDAR}
+              icon={<IconTask />}
+              label="Schedule Calendar"
+              onClick={closeOnMobile}
+            />
+            <NavItem
+              to={ROUTES.SMM_CAMPAIGNS}
+              icon={<IconReport />}
+              label="Campaigns & Briefs"
+              onClick={closeOnMobile}
+            />
+            <NavItem
+              to={ROUTES.CREATOR_ASSETS}
+              icon={<IconIEPFEntry />}
+              label="Asset Library"
               onClick={closeOnMobile}
             />
           </>

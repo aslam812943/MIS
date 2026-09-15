@@ -4,6 +4,10 @@ import { HttpStatus } from '../utils/httpStatus.js';
 import { logAudit } from '../utils/auditLogger.js';
 import fs from 'fs';
 
+const privilegeManagementRoles = new Set(['hod', 'ceo', 'admin']);
+const normalizeRole = (role: unknown) => String(role || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+const canViewAllPrivilegeRecords = (user: any) => privilegeManagementRoles.has(normalizeRole(user?.role));
+
 export class PrivilegeController {
   async getFormOptions(req: Request, res: Response): Promise<void> {
     try {
@@ -19,13 +23,13 @@ export class PrivilegeController {
    */
   async getDashboardStats(req: Request, res: Response): Promise<void> {
     try {
-      const userId = (req as any).user?.id;
       const user = (req as any).user;
-      const canViewAllBranches = ['hod', 'ceo', 'admin'].includes(user?.role);
+      const canViewAllBranches = canViewAllPrivilegeRecords(user);
+      const ownerId = canViewAllBranches ? undefined : user?.id;
       const branchId = canViewAllBranches
         ? (req.query.branchId ? String(req.query.branchId) : undefined)
         : user?.branch_id;
-      const stats = await privilegeService.getDashboardStats(userId, branchId);
+      const stats = await privilegeService.getDashboardStats(ownerId, branchId);
       res.status(HttpStatus.OK).json(stats);
     } catch (error: any) {
       console.error('Error fetching privilege dashboard stats:', error);
@@ -38,14 +42,14 @@ export class PrivilegeController {
    */
   async getAccounts(req: Request, res: Response): Promise<void> {
     try {
-      const userId = (req as any).user?.id;
       const search = req.query.search ? String(req.query.search) : undefined;
       const user = (req as any).user;
-      const canViewAllBranches = ['hod', 'ceo', 'admin'].includes(user?.role);
+      const canViewAllBranches = canViewAllPrivilegeRecords(user);
+      const ownerId = canViewAllBranches ? undefined : user?.id;
       const branchId = canViewAllBranches
         ? (req.query.branchId ? String(req.query.branchId) : undefined)
         : user?.branch_id;
-      const accounts = await privilegeService.getAccounts(userId, search, branchId);
+      const accounts = await privilegeService.getAccounts(ownerId, search, branchId);
       res.status(HttpStatus.OK).json(accounts);
     } catch (error: any) {
       console.error('Error fetching privilege accounts:', error);
@@ -103,8 +107,8 @@ export class PrivilegeController {
    */
   async getUploads(req: Request, res: Response): Promise<void> {
     try {
-      const userId = (req as any).user?.id;
-      const files = await privilegeService.getUploads(userId);
+      const user = (req as any).user;
+      const files = await privilegeService.getUploads(canViewAllPrivilegeRecords(user) ? undefined : user?.id);
       res.status(HttpStatus.OK).json(files);
     } catch (error: any) {
       console.error('Error fetching privilege uploads:', error);
@@ -148,7 +152,8 @@ export class PrivilegeController {
   async downloadFile(req: Request, res: Response): Promise<void> {
     try {
       const id = String(req.params.id || '');
-      const record = await privilegeService.getUploadRecord(id);
+      const user = (req as any).user;
+      const record = await privilegeService.getUploadRecord(id, canViewAllPrivilegeRecords(user) ? undefined : user?.id);
 
       if (!record || !record.file_path || !fs.existsSync(record.file_path)) {
         res.status(HttpStatus.NOT_FOUND).json({ error: 'File not found' });
@@ -178,7 +183,8 @@ export class PrivilegeController {
         return;
       }
 
-      await privilegeService.deleteAccount(code);
+      const user = (req as any).user;
+      await privilegeService.deleteAccount(code, canViewAllPrivilegeRecords(user) ? undefined : user?.id);
 
       // Audit Log
       logAudit(req, 'DELETE', 'privilege_accounts', code, { code }, null);
@@ -201,7 +207,8 @@ export class PrivilegeController {
         return;
       }
 
-      await privilegeService.deleteUpload(id);
+      const user = (req as any).user;
+      await privilegeService.deleteUpload(id, canViewAllPrivilegeRecords(user) ? undefined : user?.id);
 
       // Audit Log
       logAudit(req, 'DELETE', 'privilege_uploads', id, { id }, null);

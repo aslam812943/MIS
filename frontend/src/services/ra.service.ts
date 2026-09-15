@@ -60,6 +60,11 @@ export const raService = {
     return response.data.client || response.data;
   },
 
+  bulkCreateClients: async (rows: Record<string, unknown>[]): Promise<{ inserted: number; failed: Array<{ row: number; error: string }> }> => {
+    const response = await api.post('/admin/ra/clients/bulk', { rows });
+    return response.data;
+  },
+
   updateClient: async (id: string, data: Partial<RAClient>): Promise<RAClient> => {
     const response = await api.put(`/admin/ra/clients/${id}`, data);
     return response.data.client || response.data;

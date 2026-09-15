@@ -22,10 +22,10 @@ export const RADashboardPage: React.FC = () => {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
 
-  const isAdmin = currentUser?.role === 'admin';
-  const isLeadership = ['ceo', 'managing_director', 'director', 'executive'].includes(currentUser?.role || '');
-  const isHOD = currentUser?.role === 'hod';
-  const hasMultiBranchAccess = isAdmin || isLeadership || isHOD;
+  const normalizedRole = String(currentUser?.role || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+  const isAdmin = normalizedRole === 'admin';
+  const isHOD = normalizedRole === 'hod';
+  const hasMultiBranchAccess = isAdmin || normalizedRole === 'ceo' || isHOD;
 
   const [stats, setStats] = useState<RADashboardStats | null>(null);
   const [loading, setLoading] = useState(true);

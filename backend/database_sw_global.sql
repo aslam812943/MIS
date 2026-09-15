@@ -87,6 +87,10 @@ CREATE TABLE IF NOT EXISTS sw_global_accounts (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
+-- Safe migration for databases created before branch support was added.
+ALTER TABLE sw_global_accounts
+    ADD COLUMN IF NOT EXISTS branch_id UUID REFERENCES branches(id) ON DELETE SET NULL;
+
 CREATE INDEX IF NOT EXISTS idx_sw_global_accounts_client ON sw_global_accounts(client_code);
 CREATE INDEX IF NOT EXISTS idx_sw_global_accounts_status ON sw_global_accounts(status);
 CREATE INDEX IF NOT EXISTS idx_sw_global_accounts_branch_id ON sw_global_accounts(branch_id);
@@ -114,7 +118,8 @@ ALTER TABLE sw_global_uploads ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Service role full access sw_global_uploads" ON sw_global_uploads;
 CREATE POLICY "Service role full access sw_global_uploads" ON sw_global_uploads FOR ALL TO service_role USING (true) WITH CHECK (true);
 
--- 7. Seed Initial Sample Data (if tables are empty)
+-- 7. Reset SW Global data and seed fresh test data using existing branches
+-- WARNING: Running this section removes all current SW Global records.
 DO $$
 DECLARE
     e1_id UUID := '11111111-1111-1111-1111-111111111101';
@@ -127,47 +132,63 @@ DECLARE
     l5_id UUID := '22222222-2222-2222-2222-222222222205';
     l6_id UUID := '22222222-2222-2222-2222-222222222206';
     l7_id UUID := '22222222-2222-2222-2222-222222222207';
+    branch_ids UUID[];
+    branch_count INTEGER;
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM sw_global_clients LIMIT 1) THEN
-        -- Seed Clients
-        INSERT INTO sw_global_clients (code, name, location, occupation, contact, email)
-        VALUES
-            ('SW1001', 'Arjun Mehta', 'Mumbai', 'Business owner', '9820011001', 'arjun.mehta@example.com'),
-            ('SW1002', 'Priya Nair', 'Bengaluru', 'Consultant', '9845011002', 'priya.nair@example.com'),
-            ('SW1003', 'Rohan Shah', 'Mumbai', 'Entrepreneur', '9821011003', 'rohan.shah@example.com'),
-            ('SW1004', 'Ananya Iyer', 'Chennai', 'Doctor', '9840011004', 'ananya.iyer@example.com'),
-            ('SW1005', 'Neha Desai', 'Pune', 'Architect', '9822011005', 'neha.desai@example.com')
-        ON CONFLICT (code) DO NOTHING;
+    SELECT array_agg(id ORDER BY name, id)
+    INTO branch_ids
+    FROM branches;
 
-        -- Seed Events
-        INSERT INTO sw_global_events (id, title, type, date, status, notes)
-        VALUES
-            (e1_id, 'Global investing essentials', 'Webinar', '2026-09-08', 'Conducted', 'Introduction to the SW Global account.'),
-            (e2_id, 'Beyond borders: portfolio perspectives', 'Seminar', '2026-09-05', 'Conducted', 'High net worth global asset allocation seminar.'),
-            (e3_id, 'SW Global client connect', 'Client meet', '2026-09-24', 'Planned', 'Quarterly global markets overview.')
-        ON CONFLICT (id) DO NOTHING;
-
-        -- Seed Leads
-        INSERT INTO sw_global_leads (id, event_id, name, contact, location, stage, notes, followup)
-        VALUES
-            (l1_id, e1_id, 'Arjun Mehta', '9820011001', 'Mumbai', 'Converted', '', NULL),
-            (l2_id, e1_id, 'Dev Patel', '9824011006', 'Ahmedabad', 'Qualified', 'Requested account details.', '2026-09-15'),
-            (l3_id, e1_id, 'Isha Rao', '9849011007', 'Hyderabad', 'Contacted', '', '2026-09-16'),
-            (l4_id, e2_id, 'Rohan Shah', '9821011003', 'Mumbai', 'Converted', '', NULL),
-            (l5_id, e2_id, 'Aditi Menon', '9847011008', 'Kochi', 'New', '', NULL),
-            (l6_id, e2_id, 'Karan Sethi', '9811011009', 'Delhi', 'Not interested', '', NULL),
-            (l7_id, e3_id, 'Riya Kapoor', '9810011010', 'Delhi', 'New', 'Registered interest.', NULL)
-        ON CONFLICT (id) DO NOTHING;
-
-        -- Seed Accounts
-        INSERT INTO sw_global_accounts (account_no, client_code, status, pending_reason, followup, lead_id)
-        VALUES
-            ('SW-001', 'SW1001', 'Active', '', NULL, l1_id),
-            ('SW-002', 'SW1002', 'Pending', 'KYC documents awaited', '2026-09-15', NULL),
-            ('SW-003', 'SW1003', 'Active', '', NULL, l4_id),
-            ('SW-004', 'SW1004', 'Pending', 'Bank verification', '2026-09-14', NULL),
-            ('SW-005', 'SW1005', 'Pending', 'Client signature awaited', '2026-09-16', NULL),
-            ('SW-006', 'SW1001', 'Active', '', NULL, NULL)
-        ON CONFLICT (account_no) DO NOTHING;
+    branch_count := COALESCE(array_length(branch_ids, 1), 0);
+    IF branch_count = 0 THEN
+        RAISE EXCEPTION 'Cannot seed SW Global test data: no existing branches were found.';
     END IF;
+
+    -- Delete child records first to preserve foreign-key integrity.
+    DELETE FROM sw_global_uploads;
+    DELETE FROM sw_global_accounts;
+    DELETE FROM sw_global_leads;
+    DELETE FROM sw_global_events;
+    DELETE FROM sw_global_clients;
+
+    INSERT INTO sw_global_clients (code, name, location, occupation, contact, email)
+    VALUES
+        ('SW2001', 'Aarav Sharma', 'Mumbai', 'Business owner', '9900012001', 'aarav.sharma@test.example'),
+        ('SW2002', 'Meera Kulkarni', 'Pune', 'Consultant', '9900012002', 'meera.kulkarni@test.example'),
+        ('SW2003', 'Vikram Reddy', 'Hyderabad', 'Entrepreneur', '9900012003', 'vikram.reddy@test.example'),
+        ('SW2004', 'Kavya Iyer', 'Chennai', 'Doctor', '9900012004', 'kavya.iyer@test.example'),
+        ('SW2005', 'Kabir Singh', 'Delhi', 'Architect', '9900012005', 'kabir.singh@test.example'),
+        ('SW2006', 'Nisha Patel', 'Ahmedabad', 'Chartered accountant', '9900012006', 'nisha.patel@test.example'),
+        ('SW2007', 'Aditya Nair', 'Bengaluru', 'Technology executive', '9900012007', 'aditya.nair@test.example'),
+        ('SW2008', 'Sara Khan', 'Kolkata', 'Investor', '9900012008', 'sara.khan@test.example');
+
+    INSERT INTO sw_global_events (id, title, type, date, status, notes)
+    VALUES
+        (e1_id, 'International investing fundamentals', 'Webinar', CURRENT_DATE - 14, 'Conducted', 'Test webinar for global account prospects.'),
+        (e2_id, 'Global portfolio opportunities', 'Seminar', CURRENT_DATE - 7, 'Conducted', 'Test seminar for existing and prospective clients.'),
+        (e3_id, 'SW Global investor connect', 'Client meet', CURRENT_DATE + 10, 'Planned', 'Upcoming test client engagement event.');
+
+    INSERT INTO sw_global_leads (id, event_id, name, contact, location, stage, notes, followup)
+    VALUES
+        (l1_id, e1_id, 'Aarav Sharma', '9900012001', 'Mumbai', 'Converted', 'Converted test lead.', NULL),
+        (l2_id, e1_id, 'Ritu Jain', '9900012010', 'Jaipur', 'Qualified', 'Requested account details.', CURRENT_DATE + 2),
+        (l3_id, e1_id, 'Manav Joshi', '9900012011', 'Surat', 'Contacted', 'Initial call completed.', CURRENT_DATE + 3),
+        (l4_id, e2_id, 'Vikram Reddy', '9900012003', 'Hyderabad', 'Converted', 'Converted after seminar.', NULL),
+        (l5_id, e2_id, 'Tanvi Menon', '9900012012', 'Kochi', 'New', 'New test enquiry.', NULL),
+        (l6_id, e2_id, 'Rahul Sethi', '9900012013', 'Delhi', 'Not interested', 'Declined for now.', NULL),
+        (l7_id, e3_id, 'Simran Kapoor', '9900012014', 'Delhi', 'New', 'Registered for upcoming event.', NULL);
+
+    -- Existing branches are assigned in name order and reused cyclically when
+    -- there are fewer branches than test accounts.
+    INSERT INTO sw_global_accounts
+        (account_no, client_code, status, pending_reason, followup, lead_id, branch_id, created_at, updated_at)
+    VALUES
+        ('SWT-001', 'SW2001', 'Active',  '', NULL, l1_id, branch_ids[1 + (0 % branch_count)], CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+        ('SWT-002', 'SW2002', 'Pending', 'KYC documents awaited', CURRENT_DATE + 2, NULL, branch_ids[1 + (1 % branch_count)], CURRENT_TIMESTAMP - INTERVAL '2 days', CURRENT_TIMESTAMP),
+        ('SWT-003', 'SW2003', 'Active',  '', NULL, l4_id, branch_ids[1 + (2 % branch_count)], CURRENT_TIMESTAMP - INTERVAL '10 days', CURRENT_TIMESTAMP),
+        ('SWT-004', 'SW2004', 'Pending', 'Bank verification pending', CURRENT_DATE + 1, NULL, branch_ids[1 + (3 % branch_count)], CURRENT_TIMESTAMP - INTERVAL '20 days', CURRENT_TIMESTAMP),
+        ('SWT-005', 'SW2005', 'Closed',  '', NULL, NULL, branch_ids[1 + (4 % branch_count)], CURRENT_TIMESTAMP - INTERVAL '45 days', CURRENT_TIMESTAMP),
+        ('SWT-006', 'SW2006', 'Active',  '', NULL, NULL, branch_ids[1 + (5 % branch_count)], CURRENT_TIMESTAMP - INTERVAL '100 days', CURRENT_TIMESTAMP),
+        ('SWT-007', 'SW2007', 'Pending', 'Client signature awaited', CURRENT_DATE + 4, NULL, branch_ids[1 + (6 % branch_count)], CURRENT_TIMESTAMP - INTERVAL '250 days', CURRENT_TIMESTAMP),
+        ('SWT-008', 'SW2008', 'Active',  '', NULL, NULL, branch_ids[1 + (7 % branch_count)], CURRENT_TIMESTAMP - INTERVAL '400 days', CURRENT_TIMESTAMP);
 END $$;

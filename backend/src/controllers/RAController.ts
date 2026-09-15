@@ -152,6 +152,22 @@ export class RAController {
     }
   }
 
+  async bulkCreateClients(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = (req as any).user?.id;
+      if (!userId) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+      }
+      const rows = Array.isArray(req.body?.rows) ? req.body.rows : [];
+      const result = await raService.bulkCreateClients(rows, userId);
+      res.status(201).json(result);
+    } catch (error: any) {
+      console.error('Error bulk importing RA clients:', error);
+      res.status(400).json({ error: error.message || 'Failed to import clients' });
+    }
+  }
+
   async updateClient(req: Request, res: Response): Promise<void> {
     try {
       const userId = (req as any).user?.id;
