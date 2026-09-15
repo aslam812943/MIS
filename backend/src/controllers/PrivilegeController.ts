@@ -84,8 +84,11 @@ export class PrivilegeController {
    */
   async bulkImport(req: Request, res: Response): Promise<void> {
     try {
-      const userId = (req as any).user?.id;
-      const branchId = (req as any).user?.branch_id;
+      const user = (req as any).user;
+      const userId = user?.id;
+      // Management imports may assign each row from its CSV branch column.
+      // Other users remain locked to their assigned branch.
+      const branchId = canViewAllPrivilegeRecords(user) ? undefined : user?.branch_id;
       const rows = Array.isArray(req.body) ? req.body : req.body.accounts;
       const result = await privilegeService.bulkImportAccounts(rows, userId, branchId);
 
@@ -193,6 +196,34 @@ export class PrivilegeController {
     } catch (error: any) {
       console.error('Error deleting privilege account:', error);
       res.status(HttpStatus.BAD_REQUEST).json({ error: error.message || 'Failed to delete account' });
+    }
+  }
+
+  async bulkDeleteAccounts(req: Request, res: Response): Promise<void> {
+    try {
+      const user = (req as any).user;
+      const codes = Array.isArray(req.body?.codes) ? req.body.codes : [];
+      const count = await privilegeService.bulkDeleteAccounts(codes, canViewAllPrivilegeRecords(user) ? undefined : user?.id);
+      logAudit(req, 'DELETE', 'privilege_accounts', 'bulk-delete', { codes }, { count });
+      res.status(HttpStatus.OK).json({ message: `${count} accounts deleted successfully`, count });
+    } catch (error: any) {
+      res.status(HttpStatus.BAD_REQUEST).json({ error: error.message || 'Failed to delete selected accounts' });
+    }
+  }
+
+  async bulkUpdateAccounts(req: Request, res: Response): Promise<void> {
+    try {
+      const user = (req as any).user;
+      const codes = Array.isArray(req.body?.codes) ? req.body.codes : [];
+      if (typeof req.body?.trading_started !== 'boolean') {
+        res.status(HttpStatus.BAD_REQUEST).json({ error: 'Choose a valid trading status.' });
+        return;
+      }
+      const count = await privilegeService.bulkUpdateTradingStatus(codes, req.body.trading_started, canViewAllPrivilegeRecords(user) ? undefined : user?.id);
+      logAudit(req, 'UPDATE', 'privilege_accounts', 'bulk-update', null, { codes, trading_started: req.body.trading_started, count });
+      res.status(HttpStatus.OK).json({ message: `${count} accounts updated successfully`, count });
+    } catch (error: any) {
+      res.status(HttpStatus.BAD_REQUEST).json({ error: error.message || 'Failed to update selected accounts' });
     }
   }
 

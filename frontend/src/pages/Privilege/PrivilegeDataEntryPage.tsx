@@ -28,6 +28,7 @@ import {
   Phone,
   MapPin,
   Upload
+  , Loader2
 } from 'lucide-react';
 import './Privilege.css';
 
@@ -58,7 +59,15 @@ const parseCsvPreview = (text: string) => {
   row.push(value.trim());
   if (row.some(cell => cell)) parsed.push(row);
   if (parsed.length < 2) throw new Error('CSV must contain a header row and at least one record.');
-  const headers = parsed[0].map(header => header.replace(/^\uFEFF/, '').trim().toLowerCase());
+  // CSV headings are intentionally case-insensitive and accept spaces/hyphens.
+  // For example, "Mobile No", "MOBILE_NO" and "mobile-no" all map to mobile_no.
+  const headers = parsed[0].map(header => header
+    .replace(/^\uFEFF/, '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_'));
+  const duplicateHeader = headers.find((header, index) => headers.indexOf(header) !== index);
+  if (duplicateHeader) throw new Error(`CSV contains the duplicate column "${duplicateHeader}".`);
   const rows = parsed.slice(1).map(cells => Object.fromEntries(headers.map((header, index) => [header, cells[index] || ''])));
   return { headers, rows };
 };
@@ -74,18 +83,23 @@ export const PrivilegeDataEntryPage: React.FC = () => {
   const [uploadKind, setUploadKind] = useState<string>('Accounts CSV');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [csvPreview, setCsvPreview] = useState<{ headers: string[]; rows: Record<string, string>[] } | null>(null);
+  const [csvVerified, setCsvVerified] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
+  const [selectedCodes, setSelectedCodes] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [importResult, setImportResult] = useState<{ saved: number; requested: number } | null>(null);
   const [formOptions, setFormOptions] = useState<{ branches: Array<{ id: string; name: string }>; employees: Array<{ id: string; name: string }> }>({ branches: [], employees: [] });
 
   // Custom Delete Confirmation state (Replaces default browser window.confirm)
   const [confirmDelete, setConfirmDelete] = useState<{
-    type: 'account' | 'upload';
+    type: 'account' | 'account-bulk' | 'upload';
     id: string;
     name: string;
   } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteConfirmed, setDeleteConfirmed] = useState(false);
 
   // Privilege HOD and operational users can manage account data.
   const isHOD = currentUser?.role === 'hod';
@@ -117,6 +131,10 @@ export const PrivilegeDataEntryPage: React.FC = () => {
       .catch((error) => console.warn('Privilege form suggestions unavailable:', error));
   }, []);
 
+  useEffect(() => {
+    if (confirmDelete) setDeleteConfirmed(false);
+  }, [confirmDelete]);
+
   const filteredAccounts = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return accounts;
@@ -134,6 +152,34 @@ export const PrivilegeDataEntryPage: React.FC = () => {
         a.occupation.toLowerCase().includes(q)
     );
   }, [accounts, query]);
+
+  const visibleCodes = filteredAccounts.map(account => account.code);
+  const allVisibleSelected = visibleCodes.length > 0 && visibleCodes.every(code => selectedCodes.has(code));
+  const toggleSelectAll = () => setSelectedCodes(previous => {
+    const next = new Set(previous);
+    if (allVisibleSelected) visibleCodes.forEach(code => next.delete(code));
+    else visibleCodes.forEach(code => next.add(code));
+    return next;
+  });
+  const toggleSelected = (code: string) => setSelectedCodes(previous => {
+    const next = new Set(previous);
+    if (next.has(code)) next.delete(code); else next.add(code);
+    return next;
+  });
+
+  const updateSelectedTradingStatus = async (tradingStarted: boolean) => {
+    const codes = [...selectedCodes];
+    if (!codes.length) return;
+    try {
+      setBulkBusy(true);
+      const result = await privilegeService.bulkUpdateTradingStatus(codes, tradingStarted);
+      toast.success(`${result.count} selected account${result.count === 1 ? '' : 's'} updated`);
+      setSelectedCodes(new Set());
+      await fetchData();
+    } catch (error: any) {
+      toast.error(getRequestErrorMessage(error, 'Could not update the selected accounts.'));
+    } finally { setBulkBusy(false); }
+  };
 
   const formatMoney = (n: number) => {
     if (n >= 10000000) return `₹${(n / 10000000).toFixed(2)} Cr`;
@@ -194,7 +240,12 @@ export const PrivilegeDataEntryPage: React.FC = () => {
 
     try {
       setIsDeleting(true);
-      if (confirmDelete.type === 'account') {
+      if (confirmDelete.type === 'account-bulk') {
+        const result = await privilegeService.bulkDeleteAccounts([...selectedCodes]);
+        setAccounts((prev) => prev.filter((a) => !selectedCodes.has(a.code)));
+        setSelectedCodes(new Set());
+        toast.success(`${result.count} selected account${result.count === 1 ? '' : 's'} deleted`);
+      } else if (confirmDelete.type === 'account') {
         await privilegeService.deleteAccount(confirmDelete.id);
         setAccounts((prev) => prev.filter((a) => a.code !== confirmDelete.id));
         toast.success(`Account "${confirmDelete.name}" deleted successfully`);
@@ -228,6 +279,7 @@ export const PrivilegeDataEntryPage: React.FC = () => {
 
       if (uploadKind === 'Accounts CSV') {
         if (!csvPreview) throw new Error('Preview and validate the CSV before uploading.');
+        if (!csvVerified) throw new Error('Review all CSV data and confirm it before uploading.');
         const { headers } = csvPreview;
         const expected = ['name', 'account_date', 'mobile_no', 'aum', 'utilised'];
         const missing = expected.filter((col) => !headers.includes(col));
@@ -258,8 +310,10 @@ export const PrivilegeDataEntryPage: React.FC = () => {
           });
         }
 
+        const requested = rows.length;
         const res = await privilegeService.bulkImportAccounts(rows);
-        toast.success(res.message || `Imported ${res.saved} accounts successfully`);
+        setImportResult({ saved: res.saved, requested });
+        toast.success(`${res.saved} of ${requested} accounts stored successfully`);
       } else {
         const res = await privilegeService.uploadFile(selectedFile, uploadKind);
         toast.success(res.message || 'File uploaded successfully');
@@ -268,6 +322,7 @@ export const PrivilegeDataEntryPage: React.FC = () => {
       setIsUploadOpen(false);
       setSelectedFile(null);
       setCsvPreview(null);
+      setCsvVerified(false);
       await fetchData();
     } catch (err: any) {
       console.error('Upload error:', err);
@@ -286,6 +341,7 @@ export const PrivilegeDataEntryPage: React.FC = () => {
       const missing = required.filter(header => !parsed.headers.includes(header));
       if (missing.length) throw new Error(`CSV missing mandatory columns: ${missing.join(', ')}`);
       setCsvPreview(parsed);
+      setCsvVerified(false);
       toast.success(`${parsed.rows.length} record${parsed.rows.length === 1 ? '' : 's'} ready to upload`);
     } catch (error: any) {
       setCsvPreview(null);
@@ -354,6 +410,8 @@ export const PrivilegeDataEntryPage: React.FC = () => {
                   onClick={() => {
                     setIsUploadOpen(true);
                     setSelectedFile(null);
+                    setCsvPreview(null);
+                    setCsvVerified(false);
                   }}
                   className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs sm:text-sm font-medium rounded-xl border border-[var(--border)] bg-[var(--bg-card)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition shadow-sm"
                 >
@@ -436,10 +494,22 @@ export const PrivilegeDataEntryPage: React.FC = () => {
             {/* ── Tab: Accounts ── */}
             {tab === 'Accounts' && (
               <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl shadow-sm overflow-hidden">
+                {(selectedCodes.size > 0 || importResult) && (
+                  <div className="px-4 py-3 border-b border-[var(--border)] flex flex-wrap items-center gap-2 bg-[var(--accent-bg)]/40">
+                    {importResult && <span className="text-xs font-semibold text-emerald-500 mr-auto">Stored {importResult.saved} of {importResult.requested} CSV records</span>}
+                    {selectedCodes.size > 0 && <span className="text-xs font-bold text-[var(--accent)] mr-2">{selectedCodes.size} selected</span>}
+                    {selectedCodes.size > 0 && <>
+                      <button disabled={bulkBusy} onClick={() => updateSelectedTradingStatus(true)} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500/10 text-emerald-500 disabled:opacity-50">Trading: Yes</button>
+                      <button disabled={bulkBusy} onClick={() => updateSelectedTradingStatus(false)} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500/10 text-amber-500 disabled:opacity-50">Trading: No</button>
+                      <button disabled={bulkBusy} onClick={() => { setDeleteConfirmed(false); setConfirmDelete({ type: 'account-bulk', id: 'bulk', name: `${selectedCodes.size} selected accounts` }); }} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-500/10 text-rose-500 disabled:opacity-50">Delete selected</button>
+                    </>}
+                  </div>
+                )}
                 <div className="overflow-x-auto w-full">
                   <table className="w-full text-left text-sm text-[var(--text-secondary)] min-w-[1600px]">
                     <thead className="bg-[var(--table-header-bg)] text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider border-b border-[var(--border)]">
                       <tr>
+                        <th className="py-3.5 px-4 w-12"><input type="checkbox" checked={allVisibleSelected} onChange={toggleSelectAll} aria-label="Select all visible accounts" /></th>
                         <th className="py-3.5 px-4">Sl No</th>
                         <th className="py-3.5 px-4">Client Code</th>
                         <th className="py-3.5 px-4 min-w-[180px]">Client Name</th>
@@ -469,6 +539,7 @@ export const PrivilegeDataEntryPage: React.FC = () => {
                             onClick={() => setModalAccount(a)}
                             className="hover:bg-[var(--bg-hover)] transition cursor-pointer"
                           >
+                            <td className="py-4 px-4" onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={selectedCodes.has(a.code)} onChange={() => toggleSelected(a.code)} aria-label={`Select ${a.name}`} /></td>
                             <td className="py-4 px-4 tabular-nums">{a.sl_no || '—'}</td>
                             <td className="py-4 px-4 font-mono">{a.code}</td>
                             <td className="py-4 px-4">
@@ -575,7 +646,7 @@ export const PrivilegeDataEntryPage: React.FC = () => {
                   </div>
                   {canEdit && (
                     <button
-                      onClick={() => { setIsUploadOpen(true); setSelectedFile(null); setCsvPreview(null); }}
+                      onClick={() => { setIsUploadOpen(true); setSelectedFile(null); setCsvPreview(null); setCsvVerified(false); }}
                       className="inline-flex items-center justify-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-xl bg-[var(--accent)] text-slate-950 hover:bg-[var(--accent-hover)] transition shadow-sm w-full sm:w-auto"
                     >
                       <Upload className="w-4 h-4" /> Upload new file
@@ -648,7 +719,7 @@ export const PrivilegeDataEntryPage: React.FC = () => {
                     </p>
                     {canEdit && (
                       <button
-                        onClick={() => { setIsUploadOpen(true); setSelectedFile(null); setCsvPreview(null); }}
+                        onClick={() => { setIsUploadOpen(true); setSelectedFile(null); setCsvPreview(null); setCsvVerified(false); }}
                         className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-xl bg-[var(--accent)] text-slate-950 hover:bg-[var(--accent-hover)] transition shadow-sm"
                       >
                         <FileUp className="w-4 h-4" /> Upload details
@@ -1030,7 +1101,7 @@ export const PrivilegeDataEntryPage: React.FC = () => {
             onClick={() => !isBusy && setIsUploadOpen(false)}
           >
             <div
-              className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] flex flex-col overflow-hidden"
+              className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl shadow-2xl max-w-6xl w-full max-h-[94vh] flex flex-col overflow-hidden"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Modal Header */}
@@ -1062,6 +1133,7 @@ export const PrivilegeDataEntryPage: React.FC = () => {
                       setUploadKind(e.target.value);
                       setSelectedFile(null);
                       setCsvPreview(null);
+                      setCsvVerified(false);
                     }}
                     className="w-full px-3.5 py-2.5 text-sm bg-[var(--bg-base)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] transition"
                   >
@@ -1116,6 +1188,7 @@ export const PrivilegeDataEntryPage: React.FC = () => {
                       }
                       setSelectedFile(f || null);
                       setCsvPreview(null);
+                      setCsvVerified(false);
                     }}
                   />
                 </label>
@@ -1126,13 +1199,23 @@ export const PrivilegeDataEntryPage: React.FC = () => {
                   </button>
                 )}
                 {csvPreview && (
-                  <div className="rounded-xl border border-[var(--border)] overflow-hidden">
-                    <div className="px-3 py-2 bg-[var(--accent-bg)] text-xs font-bold text-[var(--accent)]">Preview: {csvPreview.rows.length} records ready</div>
-                    <div className="overflow-x-auto max-h-48">
-                      <table className="w-full text-xs"><thead><tr>{csvPreview.headers.slice(0, 5).map(h => <th key={h} className="p-2 text-left whitespace-nowrap">{h}</th>)}</tr></thead>
-                        <tbody>{csvPreview.rows.slice(0, 5).map((row, i) => <tr key={i} className="border-t border-[var(--border)]">{csvPreview.headers.slice(0, 5).map(h => <td key={h} className="p-2 whitespace-nowrap">{row[h] || '—'}</td>)}</tr>)}</tbody>
-                      </table>
+                  <div className="space-y-3">
+                    <div className="rounded-xl border border-[var(--border)] overflow-hidden">
+                      <div className="px-3 py-2 bg-[var(--accent-bg)] text-xs font-bold text-[var(--accent)] flex items-center justify-between gap-3">
+                        <span>Full preview: {csvPreview.rows.length} records × {csvPreview.headers.length} columns</span>
+                        <span>Scroll to verify everything</span>
+                      </div>
+                      <div className="overflow-auto max-h-[42vh]">
+                        <table className="w-full text-xs min-w-max">
+                          <thead className="sticky top-0 z-10 bg-[var(--table-header-bg)]"><tr><th className="p-2 text-left whitespace-nowrap">Row</th>{csvPreview.headers.map(h => <th key={h} className="p-2 text-left whitespace-nowrap">{h}</th>)}</tr></thead>
+                          <tbody>{csvPreview.rows.map((row, i) => <tr key={i} className="border-t border-[var(--border)]"><td className="p-2 font-semibold text-[var(--text-muted)]">{i + 1}</td>{csvPreview.headers.map(h => <td key={h} className="p-2 whitespace-nowrap max-w-64 overflow-hidden text-ellipsis" title={row[h] || ''}>{row[h] || '—'}</td>)}</tr>)}</tbody>
+                        </table>
+                      </div>
                     </div>
+                    <label className="flex items-start gap-3 p-3 rounded-xl border border-[var(--border)] bg-[var(--bg-base)] cursor-pointer">
+                      <input type="checkbox" checked={csvVerified} onChange={(e) => setCsvVerified(e.target.checked)} className="mt-0.5" />
+                      <span className="text-xs font-semibold text-[var(--text-primary)]">I reviewed all {csvPreview.rows.length} records and confirm the data is correct and ready to save.</span>
+                    </label>
                   </div>
                 )}
               </div>
@@ -1150,11 +1233,11 @@ export const PrivilegeDataEntryPage: React.FC = () => {
                     Cancel
                   </button>
                   <button
-                    disabled={!selectedFile || isBusy || (uploadKind === 'Accounts CSV' && !csvPreview)}
+                    disabled={!selectedFile || isBusy || (uploadKind === 'Accounts CSV' && (!csvPreview || !csvVerified))}
                     onClick={handleUpload}
                     className="inline-flex items-center justify-center gap-2 px-5 py-2 text-sm font-semibold rounded-xl bg-[var(--accent)] text-slate-950 hover:bg-[var(--accent-hover)] transition shadow-sm disabled:opacity-50 flex-1 sm:flex-initial"
                   >
-                    {isBusy ? 'Uploading…' : 'Upload'}
+                    {isBusy ? <><Loader2 className="w-4 h-4 animate-spin" /> {uploadKind === 'Accounts CSV' ? `Storing ${csvPreview?.rows.length || 0} accounts…` : 'Uploading…'}</> : 'Upload'}
                   </button>
                 </div>
               </div>
@@ -1179,7 +1262,7 @@ export const PrivilegeDataEntryPage: React.FC = () => {
 
               {/* Title & Description */}
               <h3 className="text-lg font-bold text-[var(--text-primary)]">
-                {confirmDelete.type === 'account' ? 'Delete Client Account' : 'Delete Uploaded File'}
+                {confirmDelete.type === 'account-bulk' ? 'Delete Selected Accounts' : confirmDelete.type === 'account' ? 'Delete Client Account' : 'Delete Uploaded File'}
               </h3>
 
               <p className="text-sm text-[var(--text-secondary)] mt-2 leading-relaxed">
@@ -1191,22 +1274,27 @@ export const PrivilegeDataEntryPage: React.FC = () => {
               </p>
 
               <div className="mt-3 p-3 rounded-xl bg-rose-500/5 border border-rose-500/15 text-xs text-rose-600 dark:text-rose-400">
-                This action cannot be undone and will permanently remove this record from the MIS portal.
+                This action cannot be undone and will permanently remove {confirmDelete.type === 'account-bulk' ? `all ${selectedCodes.size} selected accounts` : 'this record'} from the MIS portal.
               </div>
+
+              <label className="mt-4 flex items-start gap-3 p-3 rounded-xl border border-[var(--border)] bg-[var(--bg-base)] text-left cursor-pointer">
+                <input type="checkbox" checked={deleteConfirmed} onChange={(e) => setDeleteConfirmed(e.target.checked)} className="mt-0.5" />
+                <span className="text-xs font-semibold text-[var(--text-primary)]">I understand this deletion is permanent and confirm that I want to continue.</span>
+              </label>
 
               {/* Action Buttons */}
               <div className="mt-6 flex items-center gap-3">
                 <button
                   type="button"
                   disabled={isDeleting}
-                  onClick={() => setConfirmDelete(null)}
+                  onClick={() => { setConfirmDelete(null); setDeleteConfirmed(false); }}
                   className="flex-1 px-4 py-2.5 text-sm font-medium rounded-xl border border-[var(--border)] bg-[var(--bg-card)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
-                  disabled={isDeleting}
+                  disabled={isDeleting || !deleteConfirmed}
                   onClick={executeDelete}
                   className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-xl bg-rose-600 hover:bg-rose-700 text-white transition shadow-sm disabled:opacity-50"
                 >

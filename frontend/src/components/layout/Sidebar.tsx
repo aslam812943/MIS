@@ -657,6 +657,12 @@ export const Sidebar: React.FC = () => {
               label={isHOD ? "Client Accounts" : "Privilege Accounts"}
               onClick={closeOnMobile}
             />
+            <NavItem
+              to={ROUTES.PRIVILEGE_REPORTS}
+              icon={<IconReport />}
+              label="Privilege Reports"
+              onClick={closeOnMobile}
+            />
           </>
         )}
 
@@ -667,6 +673,12 @@ export const Sidebar: React.FC = () => {
               to={ROUTES.PRIVILEGE_DASHBOARD}
               icon={<IconDashboard />}
               label="Privilege Dashboard"
+              onClick={closeOnMobile}
+            />
+            <NavItem
+              to={ROUTES.PRIVILEGE_REPORTS}
+              icon={<IconReport />}
+              label="Privilege Reports"
               onClick={closeOnMobile}
             />
           </>
