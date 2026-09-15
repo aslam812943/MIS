@@ -133,7 +133,16 @@ const DashboardPage: React.FC = () => {
   const dept = user?.department_name?.toUpperCase() || '';
   const isPrivilegeUser = dept === 'PRIVILEGE ACCOUNT' || dept === 'PRIVILEGE';
   const isSWGlobalUser = dept === 'SW GLOBAL' || dept === 'SW-GLOBAL' || dept === 'GLOBAL';
+  const isRAUser = ['RA', 'RESEARCH ANALYST', 'RESEARCH & ANALYSIS', 'RESEARCH'].includes(dept);
   const isHOD = role === 'hod';
+
+  if (isCreator) {
+    return <Navigate to={ROUTES.CREATOR_DASHBOARD} replace />;
+  }
+
+  if (isHOD && isRAUser) {
+    return <Navigate to={ROUTES.RA_DASHBOARD} replace />;
+  }
 
   // 1. Privilege HOD redirection
   if (isHOD && isPrivilegeUser) {

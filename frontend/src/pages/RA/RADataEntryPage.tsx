@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -14,6 +14,31 @@ import type {
 } from '../../types/ra.types';
 
 const KRA_STATUSES: KRAUpdationStatus[] = ['Pending', 'In Progress', 'Completed', 'Updated'];
+const REQUIRED_CSV_HEADERS = ['client_name', 'package'];
+
+const parseCsv = (text: string): Record<string, string>[] => {
+  const rows: string[][] = [];
+  let row: string[] = [], value = '', quoted = false;
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    if (char === '"' && quoted && text[index + 1] === '"') { value += '"'; index += 1; }
+    else if (char === '"') quoted = !quoted;
+    else if (char === ',' && !quoted) { row.push(value.trim()); value = ''; }
+    else if ((char === '\n' || char === '\r') && !quoted) {
+      if (char === '\r' && text[index + 1] === '\n') index += 1;
+      row.push(value.trim());
+      if (row.some(cell => cell !== '')) rows.push(row);
+      row = []; value = '';
+    } else value += char;
+  }
+  row.push(value.trim());
+  if (row.some(cell => cell !== '')) rows.push(row);
+  if (rows.length < 2) return [];
+  const headers = rows[0].map(header => header.replace(/^\uFEFF/, '').trim().toLowerCase());
+  const missing = REQUIRED_CSV_HEADERS.filter(header => !headers.includes(header));
+  if (missing.length) throw new Error(`Missing required CSV headers: ${missing.join(', ')}`);
+  return rows.slice(1).map(cells => Object.fromEntries(headers.map((header, index) => [header, cells[index] || ''])));
+};
 
 interface RADataEntryPageProps {
   defaultTab?: 'clients' | 'packages' | 'renewals' | 'payments' | 'kyc';
@@ -44,9 +69,8 @@ export const RADataEntryPage: React.FC<RADataEntryPageProps> = ({ defaultTab }) 
   // Multi-branch state
   const [branches, setBranches] = useState<any[]>([]);
   const [selectedBranch, setSelectedBranch] = useState<string>('');
-  const hasMultiBranchAccess = ['admin', 'ceo', 'managing_director', 'director', 'executive', 'hod'].includes(
-    currentUser?.role || ''
-  );
+  const normalizedRole = String(currentUser?.role || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+  const hasMultiBranchAccess = ['admin', 'ceo', 'hod'].includes(normalizedRole);
 
   // Data states
   const [clients, setClients] = useState<RAClient[]>([]);
@@ -66,6 +90,8 @@ export const RADataEntryPage: React.FC<RADataEntryPageProps> = ({ defaultTab }) 
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<RAClient | null>(null);
   const [saving, setSaving] = useState(false);
+  const [bulkImporting, setBulkImporting] = useState(false);
+  const bulkFileRef = useRef<HTMLInputElement | null>(null);
 
   // Modal States - Package
   const [isPackageModalOpen, setIsPackageModalOpen] = useState(false);
@@ -327,6 +353,38 @@ export const RADataEntryPage: React.FC<RADataEntryPageProps> = ({ defaultTab }) 
     }
   };
 
+  const handleBulkUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith('.csv')) {
+      toast.error('Please select a CSV file.');
+      return;
+    }
+
+    try {
+      setBulkImporting(true);
+      const parsedRows = parseCsv(await file.text());
+      if (!parsedRows.length) throw new Error('The CSV does not contain any data rows.');
+      const rows = parsedRows.map(row => ({
+        ...row,
+        amount: Number(row.amount || 0),
+        branch_id: row.branch_id || selectedBranch || undefined
+      }));
+      const result = await raService.bulkCreateClients(rows);
+      if (result.failed.length) {
+        toast.error(`${result.inserted} imported; ${result.failed.length} failed. First error: row ${result.failed[0].row} — ${result.failed[0].error}`);
+      } else {
+        toast.success(`${result.inserted} clients imported successfully.`);
+      }
+      await loadData();
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || err.message || 'Failed to import CSV.');
+    } finally {
+      setBulkImporting(false);
+    }
+  };
+
   // Delete Client
   const handleDeleteClient = async (client: RAClient) => {
     if (!window.confirm(`Are you sure you want to delete client record for "${client.client_name}"?`)) {
@@ -583,6 +641,7 @@ export const RADataEntryPage: React.FC<RADataEntryPageProps> = ({ defaultTab }) 
           </div>
 
           <div className="flex items-center flex-wrap gap-3">
+            <input ref={bulkFileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={handleBulkUpload} />
             {hasMultiBranchAccess && (
               <select
                 value={selectedBranch}
@@ -606,6 +665,22 @@ export const RADataEntryPage: React.FC<RADataEntryPageProps> = ({ defaultTab }) 
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
               </svg>
               + Create Package
+            </button>
+
+            <a
+              href="/templates/ra-clients-sample.csv"
+              download="ra-clients-sample.csv"
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--bg-base)] px-3.5 py-2 text-sm font-semibold text-[var(--text-primary)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
+            >
+              ↓ Sample CSV
+            </a>
+
+            <button
+              onClick={() => bulkFileRef.current?.click()}
+              disabled={bulkImporting}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--accent)]/30 bg-[var(--accent)]/10 px-3.5 py-2 text-sm font-semibold text-[var(--accent)] transition hover:bg-[var(--accent)] hover:text-slate-950 disabled:opacity-50"
+            >
+              {bulkImporting ? 'Importing...' : '↑ Bulk Upload CSV'}
             </button>
 
             <button

@@ -31,6 +31,7 @@ export interface SWGlobalAccount {
   followup?: string | null;
   lead_id?: string | null;
   branch_id?: string | null;
+  branch_name?: string;
   created_by?: string | null;
   created_at?: string;
   updated_at?: string;

@@ -64,8 +64,9 @@ const FORM_FIELDS: [keyof PrivilegeAccount, string][] = [
 
 export const PrivilegeDashboardPage: React.FC = () => {
   const currentUser = authService.getCurrentUser();
-  const isHOD = currentUser?.role === 'hod';
-  const canViewAllBranches = ['hod', 'ceo', 'admin'].includes(currentUser?.role || '');
+  const normalizedRole = String(currentUser?.role || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+  const isHOD = normalizedRole === 'hod';
+  const canViewAllBranches = ['hod', 'ceo', 'admin'].includes(normalizedRole);
   
 
   const [stats, setStats] = useState<PrivilegeDashboardStats | null>(null);
@@ -141,7 +142,9 @@ export const PrivilegeDashboardPage: React.FC = () => {
   const totalAccounts = periodAccounts.length;
   const avgUtilised = totalAccounts ? used / totalAccounts : 0;
   const topAccounts = [...periodAccounts].sort((a, b) => Number(b.utilised) - Number(a.utilised)).slice(0, 5);
-  const selectedBranchName = selectedBranch === 'all' ? 'All Branches' : branches.find((b) => b.id === selectedBranch)?.name || 'Selected Branch';
+  const selectedBranchName = selectedBranch === 'all'
+    ? (canViewAllBranches ? 'All Branches' : 'My Entries')
+    : branches.find((b) => b.id === selectedBranch)?.name || 'Selected Branch';
   const branchSummaries = useMemo(() => branches.map((branch) => {
     const branchAccounts = dateFilteredAccounts.filter((a) => a.branch_id === branch.id);
     const branchAum = branchAccounts.reduce((sum, a) => sum + Number(a.aum || 0), 0);

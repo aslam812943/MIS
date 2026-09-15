@@ -1,7 +1,9 @@
 ﻿import React, { useEffect, useState } from 'react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
+import { createPortal } from 'react-dom';
 import { socialMediaService, type SocialMediaCampaign, type SocialMediaPost } from '../../services/socialMedia.service';
 import toast from 'react-hot-toast';
+import { FolderKanban, Plus, Send } from 'lucide-react';
 
 const PLATFORMS = ['Instagram', 'YouTube', 'TikTok', 'Facebook', 'LinkedIn', 'X'] as const;
 const CONTENT_TYPES = ['Reel', 'Short', 'Post', 'Story', 'Video'] as const;
@@ -97,11 +99,16 @@ const CampaignsManager: React.FC = () => {
     return posts.filter(p => p.campaign_id === campaignId);
   };
 
+  const openBriefForCampaign = (campaignId: string) => {
+    setNewBrief(prev => ({ ...prev, campaign_id: campaignId }));
+    setShowBriefModal(true);
+  };
+
   return (
     <DashboardLayout>
       <div className="mis-page mis-animate-in max-w-7xl mx-auto space-y-6">
         {/* Top Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="flex flex-col items-start justify-between gap-5 rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] p-5 shadow-sm sm:flex-row sm:items-center sm:p-6">
           <div>
             <h1 className="text-2xl sm:text-3xl font-extrabold" style={{ color: 'var(--text-primary)' }}>
               Campaigns & <span className="mis-page-title-accent">Briefs</span>
@@ -111,12 +118,12 @@ const CampaignsManager: React.FC = () => {
             </p>
           </div>
           
-          <div className="flex gap-2">
+          <div className="grid w-full grid-cols-1 gap-2 sm:flex sm:w-auto">
             <button
               onClick={() => setShowCampaignModal(true)}
-              className="px-4 py-2 text-sm font-semibold rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 transition"
+              className="w-full px-4 py-2 text-sm font-semibold rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 transition sm:w-auto"
             >
-              + Create Campaign
+              <span className="inline-flex items-center justify-center gap-2"><Plus size={16} /> Create Campaign</span>
             </button>
             <button
               onClick={() => {
@@ -124,12 +131,11 @@ const CampaignsManager: React.FC = () => {
                   toast.error('Please create a campaign first.');
                   return;
                 }
-                setNewBrief(prev => ({ ...prev, campaign_id: campaigns[0].id }));
-                setShowBriefModal(true);
+                openBriefForCampaign(campaigns[0].id);
               }}
-              className="mis-btn mis-btn-primary py-2 px-4 text-sm font-semibold rounded-lg shadow-md"
+              className="mis-btn mis-btn-primary w-full py-2 px-4 text-sm font-semibold rounded-lg shadow-md sm:w-auto"
             >
-              + Dispatch Brief
+              <span className="inline-flex items-center justify-center gap-2"><Send size={15} /> Dispatch Brief</span>
             </button>
           </div>
         </div>
@@ -139,7 +145,7 @@ const CampaignsManager: React.FC = () => {
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2" style={{ borderColor: 'var(--accent)' }} />
           </div>
         ) : campaigns.length === 0 ? (
-          <div className="glass rounded-2xl p-12 text-center border border-slate-700/40">
+          <div className="glass rounded-2xl border border-slate-700/40 p-6 text-center sm:p-12">
             <span className="text-4xl block mb-3">📁</span>
             <h3 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>No Campaigns Active</h3>
             <p className="text-sm max-w-sm mx-auto mt-1" style={{ color: 'var(--text-secondary)' }}>
@@ -147,24 +153,32 @@ const CampaignsManager: React.FC = () => {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {campaigns.map((camp) => {
               const campPosts = getCampaignPosts(camp.id);
               const ideas = campPosts.filter(p => p.status === 'Idea').length;
               const scheduled = campPosts.filter(p => p.status === 'Scheduled').length;
               const published = campPosts.filter(p => p.status === 'Published').length;
+              const total = campPosts.length;
+              const completion = total > 0 ? Math.round((published / total) * 100) : 0;
 
               return (
-                <div key={camp.id} className="glass rounded-2xl p-5 border border-slate-700/20 flex flex-col justify-between space-y-4">
-                  <div className="space-y-2">
-                    <h3 className="text-md font-bold" style={{ color: 'var(--text-primary)' }}>{camp.title}</h3>
-                    <p className="text-xs line-clamp-3" style={{ color: 'var(--text-secondary)' }}>
+                <article key={camp.id} className="group flex min-w-0 flex-col justify-between gap-5 rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-[var(--accent)]/40 hover:shadow-lg">
+                  <div className="space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="inline-flex rounded-xl bg-[var(--accent)]/10 p-2.5 text-[var(--accent)]"><FolderKanban size={19} /></span>
+                      <span className="rounded-full border border-[var(--border)] bg-[var(--bg-base)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-[var(--text-muted)]">{total} briefs</span>
+                    </div>
+                    <div>
+                      <h3 className="break-words text-base font-bold text-[var(--text-primary)]">{camp.title}</h3>
+                      <p className="mt-1 min-h-10 text-xs leading-5 text-[var(--text-secondary)] line-clamp-2">
                       {camp.description || 'No description provided.'}
-                    </p>
+                      </p>
+                    </div>
                   </div>
 
                   {/* Campaign Post Breakdown Metrics */}
-                  <div className="bg-slate-950/20 border border-[var(--border-light)] p-3 rounded-lg flex justify-between items-center text-xs">
+                  <div className="grid grid-cols-1 gap-3 rounded-lg border border-[var(--border-light)] bg-slate-950/20 p-3 text-xs sm:grid-cols-3">
                     <div>
                       <span className="text-[10px] font-bold uppercase tracking-wider block" style={{ color: 'var(--text-muted)' }}>Briefs (Ideas)</span>
                       <span className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>{ideas}</span>
@@ -178,22 +192,34 @@ const CampaignsManager: React.FC = () => {
                       <span className="font-bold text-sm text-emerald-400">{published}</span>
                     </div>
                   </div>
-                </div>
+
+                  <div className="space-y-3 border-t border-[var(--border)] pt-4">
+                    <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wide text-[var(--text-muted)]">
+                      <span>Publishing progress</span><span>{completion}%</span>
+                    </div>
+                    <div className="h-1.5 overflow-hidden rounded-full bg-[var(--bg-base)]">
+                      <div className="h-full rounded-full bg-[var(--accent)] transition-all" style={{ width: `${completion}%` }} />
+                    </div>
+                    <button onClick={() => openBriefForCampaign(camp.id)} className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[var(--accent)]/25 bg-[var(--accent)]/10 px-3 py-2 text-xs font-bold text-[var(--accent)] transition hover:bg-[var(--accent)] hover:text-slate-950">
+                      <Send size={14} /> Add brief to campaign
+                    </button>
+                  </div>
+                </article>
               );
             })}
           </div>
         )}
 
         {/* Modal for Creating Campaign */}
-        {showCampaignModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
-            <div className="glass w-full max-w-md rounded-2xl overflow-hidden border border-slate-700/50 shadow-2xl flex flex-col">
+        {showCampaignModal && createPortal(
+          <div className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-black/60 p-3 backdrop-blur-sm animate-fade-in sm:items-center sm:p-6">
+            <div className="glass my-auto flex max-h-[calc(100dvh-1.5rem)] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-slate-700/50 shadow-2xl sm:max-h-[calc(100dvh-3rem)]">
               <div className="p-4 border-b flex justify-between items-center" style={{ borderColor: 'var(--border-light)' }}>
                 <h3 className="text-md font-bold" style={{ color: 'var(--text-primary)' }}>Create Marketing Campaign</h3>
                 <button onClick={() => setShowCampaignModal(false)} className="text-slate-400 hover:text-white text-lg font-bold">&times;</button>
               </div>
 
-              <form onSubmit={handleCreateCampaign} className="p-5 space-y-4">
+              <form onSubmit={handleCreateCampaign} className="space-y-4 overflow-y-auto p-4 sm:p-5">
                 <div className="mis-field">
                   <label className="mis-label">Campaign Title *</label>
                   <input
@@ -217,35 +243,36 @@ const CampaignsManager: React.FC = () => {
                   />
                 </div>
 
-                <div className="flex justify-end gap-2 pt-2">
+                <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
                   <button
                     type="button"
                     onClick={() => setShowCampaignModal(false)}
-                    className="px-4 py-2 text-xs font-semibold rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 transition"
+                    className="w-full px-4 py-2 text-xs font-semibold rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 transition sm:w-auto"
                   >
                     Cancel
                   </button>
-                  <button type="submit" className="mis-btn mis-btn-primary px-4 py-2 text-xs font-semibold rounded-lg shadow">
+                  <button type="submit" className="mis-btn mis-btn-primary w-full px-4 py-2 text-xs font-semibold rounded-lg shadow sm:w-auto">
                     Create Campaign
                   </button>
                 </div>
               </form>
             </div>
-          </div>
+          </div>,
+          document.body
         )}
 
         {/* Modal for Dispatching Brief */}
-        {showBriefModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
-            <div className="glass w-full max-w-lg rounded-2xl overflow-hidden border border-slate-700/50 shadow-2xl flex flex-col">
+        {showBriefModal && createPortal(
+          <div className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-black/60 p-3 backdrop-blur-sm animate-fade-in sm:items-center sm:p-6">
+            <div className="glass my-auto flex max-h-[calc(100dvh-1.5rem)] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-slate-700/50 shadow-2xl sm:max-h-[calc(100dvh-3rem)]">
               <div className="p-4 border-b flex justify-between items-center" style={{ borderColor: 'var(--border-light)' }}>
                 <h3 className="text-md font-bold" style={{ color: 'var(--text-primary)' }}>Dispatch Content Brief</h3>
                 <button onClick={() => setShowBriefModal(false)} className="text-slate-400 hover:text-white text-lg font-bold">&times;</button>
               </div>
 
-              <form onSubmit={handleCreateBrief} className="p-5 space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="mis-field col-span-2">
+              <form onSubmit={handleCreateBrief} className="space-y-4 overflow-y-auto p-4 sm:p-5">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div className="mis-field sm:col-span-2">
                     <label className="mis-label">Brief Title *</label>
                     <input
                       type="text"
@@ -257,7 +284,7 @@ const CampaignsManager: React.FC = () => {
                     />
                   </div>
 
-                  <div className="mis-field col-span-2">
+                  <div className="mis-field sm:col-span-2">
                     <label className="mis-label">Linked Campaign *</label>
                     <select
                       className="mis-input"
@@ -320,21 +347,22 @@ const CampaignsManager: React.FC = () => {
                   />
                 </div>
 
-                <div className="flex justify-end gap-2 pt-2">
+                <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
                   <button
                     type="button"
                     onClick={() => setShowBriefModal(false)}
-                    className="px-4 py-2 text-xs font-semibold rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 transition"
+                    className="w-full px-4 py-2 text-xs font-semibold rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 transition sm:w-auto"
                   >
                     Cancel
                   </button>
-                  <button type="submit" className="mis-btn mis-btn-primary px-4 py-2 text-xs font-semibold rounded-lg shadow">
+                  <button type="submit" className="mis-btn mis-btn-primary w-full px-4 py-2 text-xs font-semibold rounded-lg shadow sm:w-auto">
                     Dispatch to Planner
                   </button>
                 </div>
               </form>
             </div>
-          </div>
+          </div>,
+          document.body
         )}
       </div>
     </DashboardLayout>

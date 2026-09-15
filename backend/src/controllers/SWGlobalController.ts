@@ -4,12 +4,17 @@ import { logAudit } from '../utils/auditLogger.js';
 import { HttpStatus } from '../utils/httpStatus.js';
 import fs from 'fs';
 
+const managementRoles = new Set(['hod', 'ceo', 'managing_director', 'director', 'executive', 'admin']);
+const normalizeRole = (role: unknown) => String(role || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+const canViewAllSWGlobalRecords = (user: any) => managementRoles.has(normalizeRole(user?.role));
+
 export class SWGlobalController {
   async getAccountReport(req: Request, res: Response): Promise<void> {
     try {
       const user = (req as any).user;
-      const canViewAll = ['hod', 'ceo', 'managing_director', 'director', 'executive', 'admin'].includes(user?.role);
-      if (!canViewAll && !user?.branch_id) {
+      const canViewAll = canViewAllSWGlobalRecords(user);
+      const ownEntriesOnly = !canViewAll;
+      if (!canViewAll && !ownEntriesOnly && !user?.branch_id) {
         res.status(403).json({ error: 'A branch assignment is required to generate reports.' });
         return;
       }
@@ -21,8 +26,8 @@ export class SWGlobalController {
         }
       }
       if (!!from !== !!to || (from && to && from > to)) throw new Error('Enter a valid start and end date.');
-      const branchId = canViewAll ? (req.query.branchId ? String(req.query.branchId) : undefined) : user.branch_id;
-      res.json(await swGlobalService.getAccountReport(from, to, branchId));
+      const branchId = canViewAll ? (req.query.branchId ? String(req.query.branchId) : undefined) : (ownEntriesOnly ? undefined : user.branch_id);
+      res.json(await swGlobalService.getAccountReport(from, to, branchId, ownEntriesOnly ? user.id : undefined));
     } catch (err: any) {
       res.status(400).json({ error: err.message });
     }
@@ -31,11 +36,12 @@ export class SWGlobalController {
   async getDashboardStats(req: Request, res: Response): Promise<void> {
     try {
       const user = (req as any).user;
-      const canViewAll = ['hod', 'ceo', 'managing_director', 'director', 'executive', 'admin'].includes(user?.role);
+      const canViewAll = canViewAllSWGlobalRecords(user);
+      const ownEntriesOnly = !canViewAll;
       const branchId = canViewAll
         ? (req.query.branchId ? String(req.query.branchId) : undefined)
-        : user?.branch_id;
-      const stats = await swGlobalService.getDashboardStats(branchId);
+        : (ownEntriesOnly ? undefined : user?.branch_id);
+      const stats = await swGlobalService.getDashboardStats(branchId, ownEntriesOnly ? user?.id : undefined);
       res.status(HttpStatus.OK).json(stats);
     } catch (err: any) {
       console.error('Error in getDashboardStats (SW Global):', err);
@@ -48,9 +54,12 @@ export class SWGlobalController {
       const search = req.query.search ? String(req.query.search) : undefined;
       const status = req.query.status ? String(req.query.status) : undefined;
       const user = (req as any).user;
-      const canViewAll = ['hod', 'ceo', 'managing_director', 'director', 'executive', 'admin'].includes(user?.role);
-      const branchId = canViewAll ? undefined : user?.branch_id;
-      const accounts = await swGlobalService.getAccounts(search, status, branchId);
+      const canViewAll = canViewAllSWGlobalRecords(user);
+      const ownEntriesOnly = !canViewAll;
+      const branchId = canViewAll
+        ? (req.query.branchId ? String(req.query.branchId) : undefined)
+        : (ownEntriesOnly ? undefined : user?.branch_id);
+      const accounts = await swGlobalService.getAccounts(search, status, branchId, ownEntriesOnly ? user?.id : undefined);
       res.status(HttpStatus.OK).json(accounts);
     } catch (err: any) {
       console.error('Error in getAccounts (SW Global):', err);
@@ -61,7 +70,12 @@ export class SWGlobalController {
   async saveAccount(req: Request, res: Response): Promise<void> {
     try {
       const user = (req as any).user;
-      const branchId = user?.branch_id;
+      const canChooseBranch = canViewAllSWGlobalRecords(user);
+      const branchId = canChooseBranch ? (req.body.branch_id || user?.branch_id) : user?.branch_id;
+      if (!branchId && canChooseBranch) {
+        res.status(HttpStatus.BAD_REQUEST).json({ error: 'Please select a branch for this account.' });
+        return;
+      }
       const saved = await swGlobalService.saveAccount(req.body, user?.id, branchId);
 
       await logAudit(
@@ -105,7 +119,8 @@ export class SWGlobalController {
     try {
       const rows = Array.isArray(req.body.rows) ? req.body.rows : (Array.isArray(req.body) ? req.body : []);
       const user = (req as any).user;
-      const result = await swGlobalService.bulkImportAccounts(rows, user?.id, user?.branch_id);
+      const canChooseBranch = canViewAllSWGlobalRecords(user);
+      const result = await swGlobalService.bulkImportAccounts(rows, user?.id, canChooseBranch ? undefined : user?.branch_id, !canChooseBranch);
 
       await logAudit(
         req,
@@ -126,7 +141,8 @@ export class SWGlobalController {
   async getEvents(req: Request, res: Response): Promise<void> {
     try {
       const search = req.query.search ? String(req.query.search) : undefined;
-      const events = await swGlobalService.getEvents(search);
+      const user = (req as any).user;
+      const events = await swGlobalService.getEvents(search, canViewAllSWGlobalRecords(user) ? undefined : user?.id);
       res.status(HttpStatus.OK).json(events);
     } catch (err: any) {
       console.error('Error in getEvents (SW Global):', err);
@@ -181,7 +197,8 @@ export class SWGlobalController {
       const eventId = req.query.eventId ? String(req.query.eventId) : undefined;
       const stage = req.query.stage ? String(req.query.stage) : undefined;
       const search = req.query.search ? String(req.query.search) : undefined;
-      const leads = await swGlobalService.getLeads(eventId, stage, search);
+      const user = (req as any).user;
+      const leads = await swGlobalService.getLeads(eventId, stage, search, canViewAllSWGlobalRecords(user) ? undefined : user?.id);
       res.status(HttpStatus.OK).json(leads);
     } catch (err: any) {
       console.error('Error in getLeads (SW Global):', err);
@@ -278,7 +295,7 @@ export class SWGlobalController {
   async getUploads(req: Request, res: Response): Promise<void> {
     try {
       const user = (req as any).user;
-      const uploads = await swGlobalService.getUploads(user?.id);
+      const uploads = await swGlobalService.getUploads(canViewAllSWGlobalRecords(user) ? undefined : user?.id);
       res.status(HttpStatus.OK).json(uploads);
     } catch (err: any) {
       console.error('Error in getUploads (SW Global):', err);

@@ -92,7 +92,7 @@ export interface SWGlobalUploadRow {
 }
 
 export class SWGlobalService {
-  async getAccountReport(from?: string, to?: string, branchId?: string) {
+  async getAccountReport(from?: string, to?: string, branchId?: string, createdBy?: string) {
     if (!client) throw new Error('Database connection unavailable.');
     const rows: any[] = [];
     for (let offset = 0; ; offset += 1000) {
@@ -100,6 +100,7 @@ export class SWGlobalService {
         .select('*, sw_global_clients(*), branches(name)')
         .order('created_at').order('id').range(offset, offset + 999);
       if (branchId) query = query.eq('branch_id', branchId);
+      if (createdBy) query = query.eq('created_by', createdBy);
       if (from) query = query.gte('created_at', `${from}T00:00:00.000Z`);
       if (to) {
         const end = new Date(`${to}T00:00:00.000Z`);
@@ -166,14 +167,23 @@ export class SWGlobalService {
   /**
    * Retrieves overall KPI dashboard stats and event performance breakdown for HOD/Management.
    */
-  async getDashboardStats(branchId?: string) {
+  async getDashboardStats(branchId?: string, createdBy?: string) {
     if (!client) throw new Error('Database connection unavailable.');
 
+    let accountsQuery = client.from('sw_global_accounts').select('*, sw_global_clients(*)');
+    let eventsQuery = client.from('sw_global_events').select('*').order('date', { ascending: false });
+    let leadsQuery = client.from('sw_global_leads').select('*');
+    if (branchId) accountsQuery = accountsQuery.eq('branch_id', branchId);
+    if (createdBy) {
+      accountsQuery = accountsQuery.eq('created_by', createdBy);
+      eventsQuery = eventsQuery.eq('created_by', createdBy);
+      leadsQuery = leadsQuery.eq('created_by', createdBy);
+    }
     const [accountsRes, clientsRes, eventsRes, leadsRes] = await Promise.all([
-      client.from('sw_global_accounts').select('*, sw_global_clients(*)'),
+      accountsQuery,
       client.from('sw_global_clients').select('*'),
-      client.from('sw_global_events').select('*').order('date', { ascending: false }),
-      client.from('sw_global_leads').select('*')
+      eventsQuery,
+      leadsQuery
     ]);
 
     if (accountsRes.error) throw friendlyDatabaseError(accountsRes.error, 'fetch accounts');
@@ -195,7 +205,9 @@ export class SWGlobalService {
     const leads = leadsRes.data || [];
 
     const totalAccounts = accounts.length;
-    const totalClients = clients.length;
+    const totalClients = branchId || createdBy
+      ? new Set(accounts.map((a: any) => a.client_code)).size
+      : clients.length;
     const activeAccounts = accounts.filter((a: any) => a.status === 'Active').length;
     const pendingAccounts = accounts.filter((a: any) => a.status === 'Pending').length;
     const closedAccounts = accounts.filter((a: any) => a.status === 'Closed').length;
@@ -251,7 +263,7 @@ export class SWGlobalService {
   /**
    * Retrieves client accounts with optional status and search filtering.
    */
-  async getAccounts(search?: string, status?: string, branchId?: string): Promise<SWGlobalAccountRow[]> {
+  async getAccounts(search?: string, status?: string, branchId?: string, createdBy?: string): Promise<SWGlobalAccountRow[]> {
     if (!client) return [];
 
     let query = client
@@ -262,6 +274,7 @@ export class SWGlobalService {
     if (branchId) {
       query = query.eq('branch_id', branchId);
     }
+    if (createdBy) query = query.eq('created_by', createdBy);
 
     if (status && status !== 'All') {
       query = query.eq('status', status);
@@ -426,7 +439,7 @@ export class SWGlobalService {
   /**
    * Retrieves all events with lead statistics.
    */
-  async getEvents(search?: string): Promise<SWGlobalEventRow[]> {
+  async getEvents(search?: string, createdBy?: string): Promise<SWGlobalEventRow[]> {
     if (!client) return [];
 
     let query = client
@@ -437,10 +450,14 @@ export class SWGlobalService {
     if (search && search.trim()) {
       query = query.ilike('title', `%${search.trim()}%`);
     }
+    if (createdBy) query = query.eq('created_by', createdBy);
+
+    let leadsQuery = client.from('sw_global_leads').select('id, event_id, stage');
+    if (createdBy) leadsQuery = leadsQuery.eq('created_by', createdBy);
 
     const [eventsRes, leadsRes] = await Promise.all([
       query,
-      client.from('sw_global_leads').select('id, event_id, stage')
+      leadsQuery
     ]);
 
     if (eventsRes.error) throw friendlyDatabaseError(eventsRes.error, 'fetch events');
@@ -532,7 +549,7 @@ export class SWGlobalService {
   /**
    * Retrieves leads with optional filtering by event and stage.
    */
-  async getLeads(eventId?: string, stage?: string, search?: string): Promise<SWGlobalLeadRow[]> {
+  async getLeads(eventId?: string, stage?: string, search?: string, createdBy?: string): Promise<SWGlobalLeadRow[]> {
     if (!client) return [];
 
     let query = client
@@ -547,6 +564,7 @@ export class SWGlobalService {
     if (stage && stage !== 'All') {
       query = query.eq('stage', stage);
     }
+    if (createdBy) query = query.eq('created_by', createdBy);
 
     const { data, error } = await query;
     if (error) throw friendlyDatabaseError(error, 'fetch leads');
@@ -782,12 +800,21 @@ export class SWGlobalService {
   /**
    * Bulk import accounts from CSV.
    */
-  async bulkImportAccounts(rows: any[], userId?: string, branchId?: string) {
+  async bulkImportAccounts(rows: any[], userId?: string, branchId?: string, allowUnassigned = false) {
     if (!rows || rows.length === 0) throw new Error('No account records provided.');
+    if (rows.length > 500) throw new Error('A maximum of 500 accounts can be imported at one time.');
+
+    const { data: branches, error: branchError } = await client.from('branches').select('id, name');
+    if (branchError) throw friendlyDatabaseError(branchError, 'load branches for import');
+    const branchByName = new Map((branches || []).map((branch: any) => [String(branch.name).trim().toLowerCase(), branch.id]));
 
     let count = 0;
-    for (const r of rows) {
-      await this.saveAccount(r, userId, branchId);
+    for (let index = 0; index < rows.length; index++) {
+      const r = { ...rows[index] };
+      if (!r.branch_id && r.branch_name) r.branch_id = branchByName.get(String(r.branch_name).trim().toLowerCase());
+      const resolvedBranchId = branchId || r.branch_id;
+      if (!resolvedBranchId && !allowUnassigned) throw new Error(`Row ${index + 2}: enter a valid existing branch_name or branch_id.`);
+      await this.saveAccount(r, userId, resolvedBranchId);
       count++;
     }
 
@@ -816,10 +843,12 @@ export class SWGlobalService {
     if (!client) return [];
 
     try {
-      const { data, error } = await client
+      let query = client
         .from('sw_global_uploads')
         .select('*')
         .order('created_at', { ascending: false });
+      if (userId) query = query.eq('created_by', userId);
+      const { data, error } = await query;
 
       if (error) {
         console.warn('Error fetching sw-global uploads:', error.message);

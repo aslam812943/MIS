@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import { swGlobalService } from '../../services/swGlobal.service';
 import type {
@@ -26,15 +26,22 @@ import toast from 'react-hot-toast';
 import './SWGlobal.css';
 import SWGlobalReports from './SWGlobalReports';
 import { authService } from '../../services/auth.service';
+import { orgService, type Branch } from '../../services/org.service';
 
 export const SWGlobalDashboardPage: React.FC = () => {
-  const readOnly = ['admin', 'ceo'].includes(authService.getCurrentUser()?.role || '');
+  const currentUser = authService.getCurrentUser();
+  const currentRole = String(currentUser?.role || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+  const readOnly = ['admin', 'ceo'].includes(currentRole);
+  const canViewAllBranches = ['hod', 'ceo', 'managing_director', 'director', 'executive', 'admin'].includes(currentRole);
   const [stats, setStats] = useState<SWGlobalDashboardStats | null>(null);
   const [accounts, setAccounts] = useState<SWGlobalAccount[]>([]);
   const [events, setEvents] = useState<SWGlobalEvent[]>([]);
   const [leads, setLeads] = useState<SWGlobalLead[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [branchId, setBranchId] = useState('');
+  const fetchSequence = useRef(0);
 
   // Tab for detail registers
   const [activeTab, setActiveTab] = useState<'events' | 'accounts' | 'leads'>('events');
@@ -53,31 +60,43 @@ export const SWGlobalDashboardPage: React.FC = () => {
   const [selectedLead, setSelectedLead] = useState<SWGlobalLead | null>(null);
 
   const fetchData = async (showToast = false) => {
+    const sequence = ++fetchSequence.current;
+    const selectedBranchId = branchId;
     try {
       if (showToast) setRefreshing(true);
       const [statsData, accountsData, eventsData, leadsData] = await Promise.all([
-        swGlobalService.getDashboardStats(),
-        swGlobalService.getAccounts(),
+        swGlobalService.getDashboardStats(selectedBranchId || undefined),
+        swGlobalService.getAccounts(undefined, undefined, selectedBranchId || undefined),
         swGlobalService.getEvents(),
         swGlobalService.getLeads()
       ]);
+      if (sequence !== fetchSequence.current) return;
       setStats(statsData);
       setAccounts(accountsData);
       setEvents(eventsData);
       setLeads(leadsData);
       if (showToast) toast.success('SW Global dashboard updated');
     } catch (err: any) {
+      if (sequence !== fetchSequence.current) return;
       console.error('Error fetching SW Global dashboard data:', err);
       toast.error(err.response?.data?.error || err.message || 'Failed to load dashboard data.');
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (sequence === fetchSequence.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   };
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [branchId]);
+
+  useEffect(() => {
+    if (canViewAllBranches) {
+      orgService.getBranches().then(setBranches).catch(() => toast.error('Could not load branches.'));
+    }
+  }, [canViewAllBranches]);
 
   const filteredAccounts = useMemo(() => {
     const q = accountSearch.trim().toLowerCase();
@@ -151,7 +170,7 @@ export const SWGlobalDashboardPage: React.FC = () => {
             <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1">
               <span>SW Global Department</span>
               <ChevronRight className="w-3.5 h-3.5" />
-              <span className="text-[var(--accent)] font-bold">Executive & HOD Analytics</span>
+              <span className="text-[var(--accent)] font-bold">{canViewAllBranches ? 'Executive & HOD Analytics' : 'My Performance'}</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-[var(--text-primary)] tracking-tight flex items-center gap-3">
               SW Global Account Workspace
@@ -160,15 +179,26 @@ export const SWGlobalDashboardPage: React.FC = () => {
               </span>
             </h1>
             <p className="text-xs sm:text-sm text-[var(--text-secondary)] mt-1">
-              Consolidated accounts, pipeline conversion, webinar performance, and pending follow-ups.
+              {canViewAllBranches
+                ? 'Consolidated accounts, pipeline conversion, webinar performance, and pending follow-ups.'
+                : 'Your accounts, leads, events, conversion performance, and pending follow-ups.'}
             </p>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex w-full flex-col items-stretch gap-2.5 sm:w-auto sm:flex-row sm:items-center">
+            {canViewAllBranches && <select
+              value={branchId}
+              onChange={e => setBranchId(e.target.value)}
+              aria-label="Filter dashboard by branch"
+              className="w-full px-3.5 py-2 text-xs font-semibold rounded-xl border border-[var(--border)] bg-[var(--bg-card)] text-[var(--text-primary)] outline-none sm:w-auto"
+            >
+              <option value="">All Branches</option>
+              {branches.map(branch => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+            </select>}
             <button
               onClick={() => fetchData(true)}
               disabled={refreshing}
-              className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-xl border border-[var(--border)] bg-[var(--bg-card)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition shadow-sm"
+              className="inline-flex items-center justify-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-xl border border-[var(--border)] bg-[var(--bg-card)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition shadow-sm"
               title="Refresh records"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
@@ -177,7 +207,7 @@ export const SWGlobalDashboardPage: React.FC = () => {
 
             {!readOnly && <Link
               to={ROUTES.SW_GLOBAL_DATA_ENTRY}
-              className="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl bg-[var(--accent)] text-slate-950 hover:bg-[var(--accent-hover)] transition shadow-sm"
+              className="inline-flex items-center justify-center gap-2 px-4 py-2 text-xs font-bold rounded-xl bg-[var(--accent)] text-slate-950 hover:bg-[var(--accent-hover)] transition shadow-sm"
             >
               Data Entry Workspace
               <ArrowUpRight className="w-4 h-4" />
@@ -185,7 +215,11 @@ export const SWGlobalDashboardPage: React.FC = () => {
           </div>
         </div>
 
-        <SWGlobalReports />
+        <SWGlobalReports
+          branches={canViewAllBranches ? branches : []}
+          initialBranchId={branchId}
+          onBranchChange={setBranchId}
+        />
 
         {/* Loading State */}
         {loading && (

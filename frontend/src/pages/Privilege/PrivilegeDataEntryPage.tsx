@@ -40,6 +40,29 @@ const getRequestErrorMessage = (error: any, fallback: string): string => {
   return fallback;
 };
 
+const parseCsvPreview = (text: string) => {
+  const parsed: string[][] = [];
+  let row: string[] = [], value = '', quoted = false;
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    if (char === '"' && quoted && text[index + 1] === '"') { value += '"'; index += 1; }
+    else if (char === '"') quoted = !quoted;
+    else if (char === ',' && !quoted) { row.push(value.trim()); value = ''; }
+    else if ((char === '\n' || char === '\r') && !quoted) {
+      if (char === '\r' && text[index + 1] === '\n') index += 1;
+      row.push(value.trim());
+      if (row.some(cell => cell)) parsed.push(row);
+      row = []; value = '';
+    } else value += char;
+  }
+  row.push(value.trim());
+  if (row.some(cell => cell)) parsed.push(row);
+  if (parsed.length < 2) throw new Error('CSV must contain a header row and at least one record.');
+  const headers = parsed[0].map(header => header.replace(/^\uFEFF/, '').trim().toLowerCase());
+  const rows = parsed.slice(1).map(cells => Object.fromEntries(headers.map((header, index) => [header, cells[index] || ''])));
+  return { headers, rows };
+};
+
 export const PrivilegeDataEntryPage: React.FC = () => {
   const currentUser = authService.getCurrentUser();
   const [tab, setTab] = useState<'Accounts' | 'Uploads'>('Accounts');
@@ -50,6 +73,7 @@ export const PrivilegeDataEntryPage: React.FC = () => {
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [uploadKind, setUploadKind] = useState<string>('Accounts CSV');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [csvPreview, setCsvPreview] = useState<{ headers: string[]; rows: Record<string, string>[] } | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
@@ -203,13 +227,8 @@ export const PrivilegeDataEntryPage: React.FC = () => {
       setIsBusy(true);
 
       if (uploadKind === 'Accounts CSV') {
-        const text = await selectedFile.text();
-        const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
-        if (lines.length < 2) {
-          throw new Error('CSV must contain header row and at least 1 record.');
-        }
-
-        const headers = lines[0].split(',').map((h) => h.trim().toLowerCase());
+        if (!csvPreview) throw new Error('Preview and validate the CSV before uploading.');
+        const { headers } = csvPreview;
         const expected = ['name', 'account_date', 'mobile_no', 'aum', 'utilised'];
         const missing = expected.filter((col) => !headers.includes(col));
         if (missing.length > 0) {
@@ -217,15 +236,7 @@ export const PrivilegeDataEntryPage: React.FC = () => {
         }
 
         const rows: Partial<PrivilegeAccount>[] = [];
-        for (let i = 1; i < lines.length; i++) {
-          const cols = lines[i].split(',').map((c) => c.trim().replace(/^["']|["']$/g, ''));
-          if (cols.length < headers.length) continue;
-
-          const rowObj: any = {};
-          headers.forEach((h, idx) => {
-            rowObj[h] = cols[idx];
-          });
-
+        for (const rowObj of csvPreview.rows) {
           rows.push({
             name: rowObj.name,
             account_date: rowObj.account_date,
@@ -256,6 +267,7 @@ export const PrivilegeDataEntryPage: React.FC = () => {
 
       setIsUploadOpen(false);
       setSelectedFile(null);
+      setCsvPreview(null);
       await fetchData();
     } catch (err: any) {
       console.error('Upload error:', err);
@@ -266,10 +278,26 @@ export const PrivilegeDataEntryPage: React.FC = () => {
     }
   };
 
+  const previewSelectedCsv = async () => {
+    if (!selectedFile) return toast.error('Please choose a CSV file first.');
+    try {
+      const parsed = parseCsvPreview(await selectedFile.text());
+      const required = ['name', 'account_date', 'mobile_no', 'aum', 'utilised'];
+      const missing = required.filter(header => !parsed.headers.includes(header));
+      if (missing.length) throw new Error(`CSV missing mandatory columns: ${missing.join(', ')}`);
+      setCsvPreview(parsed);
+      toast.success(`${parsed.rows.length} record${parsed.rows.length === 1 ? '' : 's'} ready to upload`);
+    } catch (error: any) {
+      setCsvPreview(null);
+      toast.error(error.message || 'Could not preview this CSV.');
+    }
+  };
+
   const downloadCSVTemplate = () => {
     const csvContent =
       'name,account_date,mobile_no,scheme,introducer,rm,dealer,branch,trading_started,remarks,location,occupation,contact,aum,utilised,returns,stocks\n' +
-      'Arjun Mehta,2026-09-14,9876543210,Privilege,Direct,Rahul,Neha,Mumbai,Yes,Priority client,Mumbai,Business owner,9876543210,8500000,6300000,12.8,"HDFCBANK, RELIANCE, INFY"';
+      'Arjun Mehta,2026-09-14,9876543210,Privilege Plus,Direct,Rahul Menon,Neha Patil,Mumbai Central,Yes,Priority client,Mumbai,Business owner,9876543210,8500000,6300000,12.8,"HDFCBANK, RELIANCE, INFY"\n' +
+      'Naina Kapoor,2026-09-15,9876543211,Privilege Elite,Referral,Meera Shah,Karan Joshi,Bengaluru,No,Trading activation pending,Bengaluru,Consultant,9876543211,6500000,4100000,9.6,"TCS, ICICIBANK"\n';
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -547,7 +575,7 @@ export const PrivilegeDataEntryPage: React.FC = () => {
                   </div>
                   {canEdit && (
                     <button
-                      onClick={() => { setIsUploadOpen(true); setSelectedFile(null); }}
+                      onClick={() => { setIsUploadOpen(true); setSelectedFile(null); setCsvPreview(null); }}
                       className="inline-flex items-center justify-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-xl bg-[var(--accent)] text-slate-950 hover:bg-[var(--accent-hover)] transition shadow-sm w-full sm:w-auto"
                     >
                       <Upload className="w-4 h-4" /> Upload new file
@@ -620,7 +648,7 @@ export const PrivilegeDataEntryPage: React.FC = () => {
                     </p>
                     {canEdit && (
                       <button
-                        onClick={() => { setIsUploadOpen(true); setSelectedFile(null); }}
+                        onClick={() => { setIsUploadOpen(true); setSelectedFile(null); setCsvPreview(null); }}
                         className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-xl bg-[var(--accent)] text-slate-950 hover:bg-[var(--accent-hover)] transition shadow-sm"
                       >
                         <FileUp className="w-4 h-4" /> Upload details
@@ -1033,6 +1061,7 @@ export const PrivilegeDataEntryPage: React.FC = () => {
                     onChange={(e) => {
                       setUploadKind(e.target.value);
                       setSelectedFile(null);
+                      setCsvPreview(null);
                     }}
                     className="w-full px-3.5 py-2.5 text-sm bg-[var(--bg-base)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] transition"
                   >
@@ -1086,9 +1115,26 @@ export const PrivilegeDataEntryPage: React.FC = () => {
                         return;
                       }
                       setSelectedFile(f || null);
+                      setCsvPreview(null);
                     }}
                   />
                 </label>
+
+                {uploadKind === 'Accounts CSV' && selectedFile && !csvPreview && (
+                  <button type="button" onClick={previewSelectedCsv} className="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--accent)] px-4 py-2.5 text-sm font-semibold text-[var(--accent)] hover:bg-[var(--accent-bg)]">
+                    <Eye className="h-4 w-4" /> Preview & Validate CSV
+                  </button>
+                )}
+                {csvPreview && (
+                  <div className="rounded-xl border border-[var(--border)] overflow-hidden">
+                    <div className="px-3 py-2 bg-[var(--accent-bg)] text-xs font-bold text-[var(--accent)]">Preview: {csvPreview.rows.length} records ready</div>
+                    <div className="overflow-x-auto max-h-48">
+                      <table className="w-full text-xs"><thead><tr>{csvPreview.headers.slice(0, 5).map(h => <th key={h} className="p-2 text-left whitespace-nowrap">{h}</th>)}</tr></thead>
+                        <tbody>{csvPreview.rows.slice(0, 5).map((row, i) => <tr key={i} className="border-t border-[var(--border)]">{csvPreview.headers.slice(0, 5).map(h => <td key={h} className="p-2 whitespace-nowrap">{row[h] || '—'}</td>)}</tr>)}</tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Modal Footer */}
@@ -1104,7 +1150,7 @@ export const PrivilegeDataEntryPage: React.FC = () => {
                     Cancel
                   </button>
                   <button
-                    disabled={!selectedFile || isBusy}
+                    disabled={!selectedFile || isBusy || (uploadKind === 'Accounts CSV' && !csvPreview)}
                     onClick={handleUpload}
                     className="inline-flex items-center justify-center gap-2 px-5 py-2 text-sm font-semibold rounded-xl bg-[var(--accent)] text-slate-950 hover:bg-[var(--accent-hover)] transition shadow-sm disabled:opacity-50 flex-1 sm:flex-initial"
                   >

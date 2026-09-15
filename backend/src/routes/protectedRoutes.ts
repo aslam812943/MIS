@@ -350,6 +350,7 @@ router.post('/notifications/run-check', requireAuth, requireAdmin, notificationC
  */
 router.get('/ra/dashboard', requireAuth, (req, res) => raController.getDashboardStats(req, res));
 router.get('/ra/clients', requireAuth, (req, res) => raController.getClients(req, res));
+router.post('/ra/clients/bulk', requireAuth, (req, res) => raController.bulkCreateClients(req, res));
 router.post('/ra/clients', requireAuth, (req, res) => raController.createClient(req, res));
 router.get('/ra/clients/:id', requireAuth, (req, res) => raController.getClientById(req, res));
 router.put('/ra/clients/:id', requireAuth, (req, res) => raController.updateClient(req, res));

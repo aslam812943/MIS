@@ -84,6 +84,10 @@ const DEFAULT_PACKAGES: RAPackage[] = [
 ];
 
 export class RAService {
+  private canViewAllRecords(access: { role?: string | undefined; isHOD?: boolean | undefined }): boolean {
+    const role = String(access.role || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+    return Boolean(access.isHOD) || role === 'admin' || role === 'ceo';
+  }
   private sanitizeText(str: string): string {
     if (!str) return '';
     const controlCharPattern = new RegExp('[' + String.fromCharCode(0) + '-' + String.fromCharCode(31) + String.fromCharCode(127) + ']', 'g');
@@ -368,8 +372,8 @@ export class RAService {
       .select('*, profiles:created_by(full_name), branches:branch_id(name)')
       .order('created_at', { ascending: false });
 
-    if (!access.isExecutive && !access.isHOD && access.branchId) {
-      query = query.eq('branch_id', access.branchId);
+    if (!this.canViewAllRecords(access)) {
+      query = query.eq('created_by', userId);
     } else if (options.branchId) {
       query = query.eq('branch_id', options.branchId);
     }
@@ -453,7 +457,7 @@ export class RAService {
       remarks: data.remarks ? this.sanitizeText(data.remarks) : null,
       subscription_start_date: data.subscription_start_date || null,
       subscription_end_date: data.subscription_end_date || null,
-      branch_id: data.branch_id || access.branchId || null,
+      branch_id: this.canViewAllRecords(access) ? (data.branch_id || access.branchId || null) : (access.branchId || null),
       created_by: creatorId
     };
 
@@ -467,12 +471,41 @@ export class RAService {
     return inserted;
   }
 
+  async bulkCreateClients(rows: any[], creatorId: string): Promise<{ inserted: number; failed: Array<{ row: number; error: string }> }> {
+    if (!Array.isArray(rows) || rows.length === 0) throw new Error('The CSV does not contain any client rows.');
+    if (rows.length > 500) throw new Error('A maximum of 500 clients can be imported at one time.');
+
+    const client = supabaseAdmin;
+    if (!client) throw new Error('Supabase admin client is not configured.');
+    const { data: branches, error: branchError } = await client.from('branches').select('id, name');
+    if (branchError) throw branchError;
+    const branchByName = new Map((branches || []).map((branch: any) => [String(branch.name).trim().toLowerCase(), branch.id]));
+
+    let inserted = 0;
+    const failed: Array<{ row: number; error: string }> = [];
+    for (let index = 0; index < rows.length; index += 1) {
+      const row = { ...rows[index] };
+      if (!row.branch_id && row.branch_name) row.branch_id = branchByName.get(String(row.branch_name).trim().toLowerCase());
+      try {
+        await this.createClient(row, creatorId);
+        inserted += 1;
+      } catch (error: any) {
+        failed.push({ row: index + 2, error: error?.message || 'Unable to import row' });
+      }
+    }
+    return { inserted, failed };
+  }
+
   async updateClient(id: string, data: Partial<RAClient>, userId: string): Promise<RAClient> {
     const client = supabaseAdmin;
     if (!client) throw new Error('Supabase admin client is not configured.');
 
     const access = await this.verifyAccess(userId);
     if (!access.authorized) throw new Error('Unauthorized to update RA clients.');
+    if (!this.canViewAllRecords(access)) {
+      const { data: owned } = await client.from('ra_clients').select('id').eq('id', id).eq('created_by', userId).maybeSingle();
+      if (!owned) throw new Error('You can update only clients entered by you.');
+    }
 
     const updatePayload: any = {};
     if (data.client_name !== undefined) updatePayload.client_name = this.sanitizeText(data.client_name);
@@ -495,7 +528,7 @@ export class RAService {
     if (data.remarks !== undefined) updatePayload.remarks = data.remarks ? this.sanitizeText(data.remarks) : null;
     if (data.subscription_start_date !== undefined) updatePayload.subscription_start_date = data.subscription_start_date || null;
     if (data.subscription_end_date !== undefined) updatePayload.subscription_end_date = data.subscription_end_date || null;
-    if (data.branch_id !== undefined) updatePayload.branch_id = data.branch_id || null;
+    if (data.branch_id !== undefined && this.canViewAllRecords(access)) updatePayload.branch_id = data.branch_id || null;
     updatePayload.updated_at = new Date().toISOString();
 
     const { data: updated, error } = await client
@@ -516,10 +549,12 @@ export class RAService {
     const access = await this.verifyAccess(userId);
     if (!access.authorized) throw new Error('Unauthorized to delete RA clients.');
 
-    const { error } = await client
+    let query = client
       .from('ra_clients')
       .delete()
       .eq('id', id);
+    if (!this.canViewAllRecords(access)) query = query.eq('created_by', userId);
+    const { error } = await query;
 
     if (error) throw error;
     return true;
@@ -713,8 +748,8 @@ export class RAService {
       .select('*, ra_clients(client_name, package, mobile_number, pan), profiles:created_by(full_name), branches:branch_id(name)')
       .order('created_at', { ascending: false });
 
-    if (!access.isExecutive && !access.isHOD && access.branchId) {
-      query = query.eq('branch_id', access.branchId);
+    if (!this.canViewAllRecords(access)) {
+      query = query.eq('created_by', userId);
     } else if (options.branchId) {
       query = query.eq('branch_id', options.branchId);
     }
@@ -764,11 +799,13 @@ export class RAService {
       throw new Error('Client ID and feedback text are required.');
     }
 
-    const { data: raClient } = await client
+    let clientQuery = client
       .from('ra_clients')
       .select('client_name, package, branch_id')
-      .eq('id', data.client_id)
-      .single();
+      .eq('id', data.client_id);
+    if (!this.canViewAllRecords(access)) clientQuery = clientQuery.eq('created_by', creatorId);
+    const { data: raClient } = await clientQuery.maybeSingle();
+    if (!raClient) throw new Error('Select a client entered by you.');
 
     const ratingVal = Number(data.rating) || 5;
     const rating = Math.max(1, Math.min(5, ratingVal));
@@ -783,7 +820,7 @@ export class RAService {
       screenshot_url: data.screenshot_url || null,
       is_featured: Boolean(data.is_featured),
       is_verified: data.is_verified !== undefined ? Boolean(data.is_verified) : true,
-      branch_id: data.branch_id || raClient?.branch_id || access.branchId || null,
+      branch_id: this.canViewAllRecords(access) ? (data.branch_id || raClient.branch_id || access.branchId || null) : (raClient.branch_id || access.branchId || null),
       created_by: creatorId
     };
 
@@ -803,6 +840,10 @@ export class RAService {
 
     const access = await this.verifyAccess(userId);
     if (!access.authorized) throw new Error('Unauthorized to update testimonials.');
+    if (!this.canViewAllRecords(access)) {
+      const { data: owned } = await client.from('ra_testimonials').select('id').eq('id', id).eq('created_by', userId).maybeSingle();
+      if (!owned) throw new Error('You can update only testimonials entered by you.');
+    }
 
     const updatePayload: any = {};
     if (data.client_name !== undefined) updatePayload.client_name = this.sanitizeText(data.client_name);
@@ -833,10 +874,12 @@ export class RAService {
     const access = await this.verifyAccess(userId);
     if (!access.authorized) throw new Error('Unauthorized to delete testimonials.');
 
-    const { error } = await client
+    let query = client
       .from('ra_testimonials')
       .delete()
       .eq('id', id);
+    if (!this.canViewAllRecords(access)) query = query.eq('created_by', userId);
+    const { error } = await query;
 
     if (error) throw error;
     return true;
