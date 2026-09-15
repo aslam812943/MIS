@@ -89,6 +89,7 @@ export const PrivilegeDataEntryPage: React.FC = () => {
   const [isBusy, setIsBusy] = useState(false);
   const [selectedCodes, setSelectedCodes] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [confirmTradingStatus, setConfirmTradingStatus] = useState<boolean | null>(null);
   const [importResult, setImportResult] = useState<{ saved: number; requested: number } | null>(null);
   const [formOptions, setFormOptions] = useState<{ branches: Array<{ id: string; name: string }>; employees: Array<{ id: string; name: string }> }>({ branches: [], employees: [] });
 
@@ -178,7 +179,10 @@ export const PrivilegeDataEntryPage: React.FC = () => {
       await fetchData();
     } catch (error: any) {
       toast.error(getRequestErrorMessage(error, 'Could not update the selected accounts.'));
-    } finally { setBulkBusy(false); }
+    } finally {
+      setBulkBusy(false);
+      setConfirmTradingStatus(null);
+    }
   };
 
   const formatMoney = (n: number) => {
@@ -499,8 +503,8 @@ export const PrivilegeDataEntryPage: React.FC = () => {
                     {importResult && <span className="text-xs font-semibold text-emerald-500 mr-auto">Stored {importResult.saved} of {importResult.requested} CSV records</span>}
                     {selectedCodes.size > 0 && <span className="text-xs font-bold text-[var(--accent)] mr-2">{selectedCodes.size} selected</span>}
                     {selectedCodes.size > 0 && <>
-                      <button disabled={bulkBusy} onClick={() => updateSelectedTradingStatus(true)} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500/10 text-emerald-500 disabled:opacity-50">Trading: Yes</button>
-                      <button disabled={bulkBusy} onClick={() => updateSelectedTradingStatus(false)} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500/10 text-amber-500 disabled:opacity-50">Trading: No</button>
+                      <button disabled={bulkBusy} onClick={() => setConfirmTradingStatus(true)} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500/10 text-emerald-500 disabled:opacity-50">Trading: Yes</button>
+                      <button disabled={bulkBusy} onClick={() => setConfirmTradingStatus(false)} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500/10 text-amber-500 disabled:opacity-50">Trading: No</button>
                       <button disabled={bulkBusy} onClick={() => { setDeleteConfirmed(false); setConfirmDelete({ type: 'account-bulk', id: 'bulk', name: `${selectedCodes.size} selected accounts` }); }} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-500/10 text-rose-500 disabled:opacity-50">Delete selected</button>
                     </>}
                   </div>
@@ -1240,6 +1244,25 @@ export const PrivilegeDataEntryPage: React.FC = () => {
                     {isBusy ? <><Loader2 className="w-4 h-4 animate-spin" /> {uploadKind === 'Accounts CSV' ? `Storing ${csvPreview?.rows.length || 0} accounts…` : 'Uploading…'}</> : 'Upload'}
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Trading status confirmation ── */}
+        {confirmTradingStatus !== null && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn" onClick={() => !bulkBusy && setConfirmTradingStatus(null)}>
+            <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl shadow-2xl max-w-md w-full p-6 text-center animate-scaleIn" onClick={(e) => e.stopPropagation()}>
+              <div className={`mx-auto mb-4 w-14 h-14 rounded-2xl flex items-center justify-center border ${confirmTradingStatus ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' : 'bg-amber-500/10 border-amber-500/20 text-amber-500'}`}>
+                <TrendingUp className="w-7 h-7" />
+              </div>
+              <h3 className="text-lg font-bold text-[var(--text-primary)]">Confirm Trading Status Change</h3>
+              <p className="text-sm text-[var(--text-secondary)] mt-2 leading-relaxed">Change trading status to <strong className={confirmTradingStatus ? 'text-emerald-500' : 'text-amber-500'}>{confirmTradingStatus ? 'Yes' : 'No'}</strong> for all <strong className="text-[var(--text-primary)]">{selectedCodes.size} selected accounts</strong>?</p>
+              <div className="mt-6 flex items-center gap-3">
+                <button type="button" disabled={bulkBusy} onClick={() => setConfirmTradingStatus(null)} className="flex-1 px-4 py-2.5 text-sm font-medium rounded-xl border border-[var(--border)] bg-[var(--bg-card)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] disabled:opacity-50">Cancel</button>
+                <button type="button" disabled={bulkBusy} onClick={() => updateSelectedTradingStatus(confirmTradingStatus)} className={`flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-xl text-white disabled:opacity-50 ${confirmTradingStatus ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-amber-600 hover:bg-amber-700'}`}>
+                  {bulkBusy ? <><RefreshCw className="w-4 h-4 animate-spin" />Updating…</> : `Yes, set to ${confirmTradingStatus ? 'Yes' : 'No'}`}
+                </button>
               </div>
             </div>
           </div>
