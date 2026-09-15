@@ -31,6 +31,16 @@ export const privilegeService = {
     return res.data;
   },
 
+  bulkDeleteAccounts: async (codes: string[]): Promise<{ message: string; count: number }> => {
+    const res = await api.delete('/admin/privilege/accounts', { data: { codes } });
+    return res.data;
+  },
+
+  bulkUpdateTradingStatus: async (codes: string[], tradingStarted: boolean): Promise<{ message: string; count: number }> => {
+    const res = await api.patch('/admin/privilege/accounts', { codes, trading_started: tradingStarted });
+    return res.data;
+  },
+
   bulkImportAccounts: async (accounts: Partial<PrivilegeAccount>[]): Promise<{ message: string; saved: number }> => {
     const res = await api.post('/admin/privilege/accounts/bulk', accounts);
     return res.data;

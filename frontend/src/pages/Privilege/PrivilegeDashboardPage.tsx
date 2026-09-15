@@ -76,7 +76,8 @@ export const PrivilegeDashboardPage: React.FC = () => {
   const [files, setFiles] = useState<PrivilegeUpload[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [period, setPeriod] = useState<'week' | 'month' | 'year' | 'custom' | 'all'>('month');
+  // Show the complete register initially. Date filters remain available for reports.
+  const [period, setPeriod] = useState<'week' | 'month' | 'year' | 'custom' | 'all'>('all');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [branches, setBranches] = useState<Branch[]>([]);

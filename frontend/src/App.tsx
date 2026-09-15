@@ -3,6 +3,7 @@ import { authService } from './services/auth.service';
 import SWGlobalDataEntryPage from './pages/SWGlobal/SWGlobalDataEntryPage';
 import PrivilegeDashboardPage from './pages/Privilege/PrivilegeDashboardPage';
 import PrivilegeDataEntryPage from './pages/Privilege/PrivilegeDataEntryPage';
+import PrivilegeReportsPage from './pages/Privilege/PrivilegeReportsPage';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
@@ -393,6 +394,15 @@ function App() {
           element={
             <ProtectedRoute>
               <PrivilegeDataEntryPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path={ROUTES.PRIVILEGE_REPORTS}
+          element={
+            <ProtectedRoute>
+              <PrivilegeReportsPage />
             </ProtectedRoute>
           }
         />

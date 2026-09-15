@@ -307,12 +307,41 @@ export class PrivilegeService {
     const validated: PrivilegeAccountRow[] = [];
     const codes = new Set<string>();
     const serialNumbers = new Set<number>();
+    const branchIdsByName = new Map<string, string>();
     if (client) {
-      const { data: existing, error } = await client.from('privilege_accounts').select('sl_no, code');
+      const [accountResult, branchResult] = await Promise.all([
+        client.from('privilege_accounts').select('sl_no, code'),
+        client.from('branches').select('id, name')
+      ]);
+      const { data: existing, error } = accountResult;
       if (error) throw friendlyDatabaseError(error, 'check existing account identifiers');
+      if (branchResult.error) throw friendlyDatabaseError(branchResult.error, 'load branches');
       for (const item of existing || []) {
         if (item.code) codes.add(String(item.code));
         if (item.sl_no != null) serialNumbers.add(Number(item.sl_no));
+      }
+      for (const item of branchResult.data || []) {
+        branchIdsByName.set(String(item.name).trim().toLocaleLowerCase(), String(item.id));
+      }
+    }
+
+    // Resolve every distinct CSV branch before validating rows. Branch matching is
+    // case-insensitive; management imports create names that do not exist yet.
+    if (!branchId && client) {
+      const csvBranchNames = new Map<string, string>();
+      for (const row of rows) {
+        const name = String(row?.branch || '').trim();
+        if (name) csvBranchNames.set(name.toLocaleLowerCase(), name);
+      }
+      for (const [normalizedName, displayName] of csvBranchNames) {
+        if (branchIdsByName.has(normalizedName)) continue;
+        const { data: inserted, error } = await client
+          .from('branches')
+          .insert({ name: displayName })
+          .select('id, name')
+          .single();
+        if (error) throw friendlyDatabaseError(error, `create branch "${displayName}"`);
+        branchIdsByName.set(normalizedName, String(inserted.id));
       }
     }
 
@@ -332,6 +361,7 @@ export class PrivilegeService {
       const rm = String(r.rm || '').trim();
       const dealer = String(r.dealer || '').trim();
       const branch = String(r.branch || '').trim();
+      const resolvedBranchId = branchId || branchIdsByName.get(branch.toLocaleLowerCase()) || null;
 
       if (!name || !accountDate || !mobileNo || r.aum === '' || r.aum === null || r.aum === undefined || r.utilised === '' || r.utilised === null || r.utilised === undefined) {
         throw new Error(`Row ${i + 1}: Complete all required fields.`);
@@ -395,7 +425,7 @@ export class PrivilegeService {
         utilised,
         returns,
         stocks,
-        branch_id: branchId || null,
+        branch_id: resolvedBranchId,
         created_by: userId || null,
         updated_at: new Date().toISOString()
       });
@@ -541,6 +571,33 @@ export class PrivilegeService {
     }
 
     return true;
+  }
+
+  async bulkDeleteAccounts(codes: string[], ownerId?: string): Promise<number> {
+    const uniqueCodes = [...new Set((codes || []).map(code => String(code).trim()).filter(Boolean))];
+    if (!uniqueCodes.length || uniqueCodes.length > 500) throw new Error('Select between 1 and 500 accounts.');
+    if (!client) throw new Error('Database client is not available.');
+
+    let query = client.from('privilege_accounts').delete({ count: 'exact' }).in('code', uniqueCodes);
+    if (ownerId) query = query.eq('created_by', ownerId);
+    const { error, count } = await query;
+    if (error) throw friendlyDatabaseError(error, 'delete the selected accounts');
+    return count || 0;
+  }
+
+  async bulkUpdateTradingStatus(codes: string[], tradingStarted: boolean, ownerId?: string): Promise<number> {
+    const uniqueCodes = [...new Set((codes || []).map(code => String(code).trim()).filter(Boolean))];
+    if (!uniqueCodes.length || uniqueCodes.length > 500) throw new Error('Select between 1 and 500 accounts.');
+    if (!client) throw new Error('Database client is not available.');
+
+    let query = client
+      .from('privilege_accounts')
+      .update({ trading_started: tradingStarted, updated_at: new Date().toISOString() }, { count: 'exact' })
+      .in('code', uniqueCodes);
+    if (ownerId) query = query.eq('created_by', ownerId);
+    const { error, count } = await query;
+    if (error) throw friendlyDatabaseError(error, 'update the selected accounts');
+    return count || 0;
   }
 
   /**
