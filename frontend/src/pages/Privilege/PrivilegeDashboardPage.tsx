@@ -146,13 +146,6 @@ export const PrivilegeDashboardPage: React.FC = () => {
   const selectedBranchName = selectedBranch === 'all'
     ? (canViewAllBranches ? 'All Branches' : 'My Entries')
     : branches.find((b) => b.id === selectedBranch)?.name || 'Selected Branch';
-  const branchSummaries = useMemo(() => branches.map((branch) => {
-    const branchAccounts = dateFilteredAccounts.filter((a) => a.branch_id === branch.id);
-    const branchAum = branchAccounts.reduce((sum, a) => sum + Number(a.aum || 0), 0);
-    const branchUsed = branchAccounts.reduce((sum, a) => sum + Number(a.utilised || 0), 0);
-    return { ...branch, accounts: branchAccounts.length, aum: branchAum, utilised: branchUsed, ratio: branchAum > 0 ? (branchUsed / branchAum) * 100 : 0 };
-  }), [branches, dateFilteredAccounts]);
-
   const reportTitle = `Privilege Account Report - ${selectedBranchName} - ${periodRange.label}`;
   const reportRows = filteredAccounts.map((a) => [
     String(a.sl_no || ''), a.code, a.name, a.account_date || '', a.mobile_no || '', a.scheme || '',
@@ -346,32 +339,6 @@ export const PrivilegeDashboardPage: React.FC = () => {
             {/* ── Tab: Overview ── */}
             {tab === 'Overview' && (
               <>
-                {canViewAllBranches && selectedBranch === 'all' && (
-                  <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl shadow-sm overflow-hidden">
-                    <div className="px-5 sm:px-6 py-4 border-b border-[var(--border)]">
-                      <h2 className="text-base font-bold text-[var(--text-primary)]">Branch-wise Analysis</h2>
-                      <p className="text-xs text-[var(--text-muted)] mt-0.5">Separate performance for each branch during {periodRange.label.toLowerCase()}.</p>
-                    </div>
-                    <div className="overflow-x-auto">
-                      <table className="w-full min-w-[700px] text-sm">
-                        <thead className="bg-[var(--table-header-bg)] text-xs uppercase tracking-wider text-[var(--text-muted)]"><tr><th className="px-6 py-3 text-left">Branch</th><th className="px-6 py-3 text-right">Accounts</th><th className="px-6 py-3 text-right">AUM</th><th className="px-6 py-3 text-right">Funds Utilised</th><th className="px-6 py-3 text-right">Available</th><th className="px-6 py-3 text-right">Utilisation</th><th className="px-6 py-3 text-right">View</th></tr></thead>
-                        <tbody className="divide-y divide-[var(--border)]">
-                          {branchSummaries.map((branch) => (
-                            <tr key={branch.id} className="hover:bg-[var(--bg-hover)]">
-                              <td className="px-6 py-3 font-semibold text-[var(--text-primary)]">{branch.name}</td>
-                              <td className="px-6 py-3 text-right text-[var(--text-secondary)]">{branch.accounts}</td>
-                              <td className="px-6 py-3 text-right font-semibold text-[var(--text-primary)]">{formatMoney(branch.aum)}</td>
-                              <td className="px-6 py-3 text-right text-[var(--text-primary)]">{formatMoney(branch.utilised)}</td>
-                              <td className="px-6 py-3 text-right text-[var(--text-secondary)]">{formatMoney(Math.max(0, branch.aum - branch.utilised))}</td>
-                              <td className="px-6 py-3 text-right font-semibold text-[var(--accent)]">{branch.ratio.toFixed(1)}%</td>
-                              <td className="px-6 py-3 text-right"><button type="button" onClick={() => setSelectedBranch(branch.id)} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[var(--accent-bg)] text-[var(--accent)] hover:bg-[var(--accent)] hover:text-slate-950 transition">Open</button></td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
                 {/* 3 KPI Metric Cards */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
                   {/* Total Accounts */}

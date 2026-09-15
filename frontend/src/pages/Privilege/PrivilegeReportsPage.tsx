@@ -14,22 +14,35 @@ type Filters = {
 
 const EMPTY_FILTERS: Filters = { search: '', from: '', to: '', branch: '', rm: '', dealer: '', scheme: '', trading: '', location: '', occupation: '', minAum: '', maxAum: '' };
 const money = (value: number) => `₹${Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
-const unique = (accounts: PrivilegeAccount[], key: keyof PrivilegeAccount) => [...new Set(accounts.map(a => String(a[key] || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
-const ranking = (accounts: PrivilegeAccount[], key: keyof PrivilegeAccount) => {
-  const groups = new Map<string, { count: number; aum: number; utilised: number }>();
+const normalize = (value: unknown) => String(value || '').trim().toLocaleLowerCase();
+const displayName = (value: string) => value === value.toLocaleLowerCase()
+  ? value.replace(/\b\p{L}/gu, letter => letter.toLocaleUpperCase())
+  : value;
+const unique = (accounts: PrivilegeAccount[], key: keyof PrivilegeAccount) => {
+  const values = new Map<string, string>();
   accounts.forEach(account => {
-    const name = String(account[key] || '').trim() || 'Not assigned';
-    const current = groups.get(name) || { count: 0, aum: 0, utilised: 0 };
-    current.count += 1; current.aum += Number(account.aum || 0); current.utilised += Number(account.utilised || 0);
-    groups.set(name, current);
+    const raw = String(account[key] || '').trim();
+    if (raw && !values.has(normalize(raw))) values.set(normalize(raw), displayName(raw));
   });
-  return [...groups.entries()].map(([name, values]) => ({ name, ...values })).sort((a, b) => b.count - a.count || b.aum - a.aum);
+  return [...values.values()].sort((a, b) => a.localeCompare(b));
+};
+const ranking = (accounts: PrivilegeAccount[], key: keyof PrivilegeAccount, metric: 'clients' | 'aum') => {
+  const groups = new Map<string, { name: string; count: number; aum: number; utilised: number }>();
+  accounts.forEach(account => {
+    const rawName = String(account[key] || '').trim() || 'Not assigned';
+    const groupKey = normalize(rawName);
+    const current = groups.get(groupKey) || { name: displayName(rawName), count: 0, aum: 0, utilised: 0 };
+    current.count += 1; current.aum += Number(account.aum || 0); current.utilised += Number(account.utilised || 0);
+    groups.set(groupKey, current);
+  });
+  return [...groups.values()].sort((a, b) => metric === 'aum' ? b.aum - a.aum || b.count - a.count : b.count - a.count || b.aum - a.aum);
 };
 
 const PrivilegeReportsPage: React.FC = () => {
   const [accounts, setAccounts] = useState<PrivilegeAccount[]>([]);
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [loading, setLoading] = useState(true);
+  const [resultMetric, setResultMetric] = useState<'clients' | 'aum'>('clients');
 
   const load = async () => {
     try { setLoading(true); setAccounts(await privilegeService.getAccounts()); }
@@ -47,9 +60,9 @@ const PrivilegeReportsPage: React.FC = () => {
     const searchText = [a.code, a.name, a.mobile_no, a.contact, a.stocks, a.remarks, a.introducer].join(' ').toLowerCase();
     return (!filters.search || searchText.includes(filters.search.toLowerCase()))
       && (!filters.from || a.account_date >= filters.from) && (!filters.to || a.account_date <= filters.to)
-      && (!filters.branch || a.branch === filters.branch) && (!filters.rm || a.rm === filters.rm)
-      && (!filters.dealer || a.dealer === filters.dealer) && (!filters.scheme || a.scheme === filters.scheme)
-      && (!filters.location || a.location === filters.location) && (!filters.occupation || a.occupation === filters.occupation)
+      && (!filters.branch || normalize(a.branch) === normalize(filters.branch)) && (!filters.rm || normalize(a.rm) === normalize(filters.rm))
+      && (!filters.dealer || normalize(a.dealer) === normalize(filters.dealer)) && (!filters.scheme || normalize(a.scheme) === normalize(filters.scheme))
+      && (!filters.location || normalize(a.location) === normalize(filters.location)) && (!filters.occupation || normalize(a.occupation) === normalize(filters.occupation))
       && (!filters.trading || String(a.trading_started) === filters.trading)
       && (!filters.minAum || Number(a.aum) >= Number(filters.minAum))
       && (!filters.maxAum || Number(a.aum) <= Number(filters.maxAum));
@@ -57,10 +70,11 @@ const PrivilegeReportsPage: React.FC = () => {
 
   const totalAum = filtered.reduce((sum, a) => sum + Number(a.aum || 0), 0);
   const totalUsed = filtered.reduce((sum, a) => sum + Number(a.utilised || 0), 0);
-  const rmRanking = useMemo(() => ranking(filtered, 'rm'), [filtered]);
-  const dealerRanking = useMemo(() => ranking(filtered, 'dealer'), [filtered]);
-  const branchRanking = useMemo(() => ranking(filtered, 'branch'), [filtered]);
-  const schemeRanking = useMemo(() => ranking(filtered, 'scheme'), [filtered]);
+  const rmRanking = useMemo(() => ranking(filtered, 'rm', resultMetric), [filtered, resultMetric]);
+  const dealerRanking = useMemo(() => ranking(filtered, 'dealer', resultMetric), [filtered, resultMetric]);
+  const branchRanking = useMemo(() => ranking(filtered, 'branch', resultMetric), [filtered, resultMetric]);
+  const schemeRanking = useMemo(() => ranking(filtered, 'scheme', resultMetric), [filtered, resultMetric]);
+  const branchAnalysis = useMemo(() => ranking(filtered, 'branch', 'clients').sort((a, b) => a.name.localeCompare(b.name)), [filtered]);
   const set = (key: keyof Filters, value: string) => setFilters(previous => ({ ...previous, [key]: value }));
 
   const downloadPdf = () => {
@@ -76,11 +90,12 @@ const PrivilegeReportsPage: React.FC = () => {
 
   const RankCard = ({ title, rows }: { title: string; rows: ReturnType<typeof ranking> }) => (
     <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] overflow-hidden">
-      <div className="p-4 border-b border-[var(--border)]"><h2 className="font-bold text-[var(--text-primary)]">{title}</h2><p className="text-xs text-[var(--text-muted)]">Ranked by number of filtered clients</p></div>
+      <div className="p-4 border-b border-[var(--border)]"><h2 className="font-bold text-[var(--text-primary)]">{title}</h2><p className="text-xs text-[var(--text-muted)]">Ranked by {resultMetric === 'clients' ? 'number of filtered clients' : 'total filtered AUM'}</p></div>
       <div className="max-h-64 overflow-auto divide-y divide-[var(--border)]">
-        {rows.map((row, index) => <div key={row.name} className="p-3 flex items-center gap-3"><span className="relative block w-8 h-8 shrink-0 rounded-full bg-[var(--accent-bg)] text-[var(--accent)]"><span className="absolute inset-0 flex items-center justify-center text-center text-xs font-black leading-none tabular-nums">{index + 1}</span></span><div className="min-w-0 flex-1"><div className="text-sm font-semibold text-[var(--text-primary)] truncate">{row.name}</div><div className="text-xs text-[var(--text-muted)]">AUM {money(row.aum)}</div></div><span className="text-lg font-black text-[var(--accent)]">{row.count}</span></div>)}
+        {rows.map((row, index) => <div key={row.name} className="p-3 flex items-center gap-3"><span className="relative block w-8 h-8 shrink-0 rounded-full bg-[var(--accent-bg)] text-[var(--accent)]"><span className="absolute inset-0 flex items-center justify-center text-center text-xs font-black leading-none tabular-nums">{index + 1}</span></span><div className="min-w-0 flex-1"><div className="text-sm font-semibold text-[var(--text-primary)] truncate">{row.name}</div><div className="text-xs text-[var(--text-muted)]">{row.count} client{row.count === 1 ? '' : 's'} · AUM {money(row.aum)}</div></div><span className="text-base font-black text-[var(--accent)] whitespace-nowrap">{resultMetric === 'clients' ? row.count : money(row.aum)}</span></div>)}
         {!rows.length && <div className="p-6 text-center text-xs text-[var(--text-muted)]">No matching data</div>}
       </div>
+
     </div>
   );
 
@@ -104,10 +119,27 @@ const PrivilegeReportsPage: React.FC = () => {
         </div>
       </div>
 
+      <div className="report-actions rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] p-4 flex flex-wrap items-center justify-between gap-3"><div><h2 className="font-bold text-[var(--text-primary)]">Show report results by</h2><p className="text-xs text-[var(--text-muted)]">Choose how rankings and top performers are calculated.</p></div><div className="inline-flex rounded-xl bg-[var(--bg-base)] border border-[var(--border)] p-1"><button onClick={() => setResultMetric('clients')} className={`px-5 py-2 rounded-lg text-sm font-bold ${resultMetric === 'clients' ? 'bg-[var(--accent)] text-slate-950' : 'text-[var(--text-secondary)]'}`}>Number of Clients</button><button onClick={() => setResultMetric('aum')} className={`px-5 py-2 rounded-lg text-sm font-bold ${resultMetric === 'aum' ? 'bg-[var(--accent)] text-slate-950' : 'text-[var(--text-secondary)]'}`}>Total AUM</button></div></div>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">{[[Users,'Filtered Clients',filtered.length],[Wallet,'Total AUM',money(totalAum)],[TrendingUp,'Funds Utilised',money(totalUsed)],[FileBarChart,'Top RM',rmRanking[0]?.name || '—']].map(([Icon,label,value]: any) => <div key={label} className="rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] p-5"><Icon className="w-5 h-5 text-[var(--accent)] mb-3"/><div className="text-xs uppercase font-bold text-[var(--text-muted)]">{label}</div><div className="text-xl font-black text-[var(--text-primary)] mt-1 truncate">{value}</div></div>)}</div>
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-4"><RankCard title="RM Client Ranking" rows={rmRanking}/><RankCard title="Dealer Client Ranking" rows={dealerRanking}/><RankCard title="Branch Client Ranking" rows={branchRanking}/><RankCard title="Scheme Popularity" rows={schemeRanking}/></div>
 
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] overflow-hidden"><div className="p-4 border-b border-[var(--border)]"><h2 className="font-bold text-[var(--text-primary)]">Detailed Filtered Client Report</h2><p className="text-xs text-[var(--text-muted)]">{filtered.length} of {accounts.length} clients</p></div><div className="report-table overflow-auto max-h-[65vh]"><table className="w-full min-w-[1700px] text-xs"><thead className="sticky top-0 bg-[var(--table-header-bg)] text-[var(--text-muted)] uppercase"><tr>{['Sl','Code','Client','Date','Mobile','Scheme','Introducer','RM','Dealer','Branch','Location','Occupation','Trading','AUM','Utilised','Returns','Stocks','Remarks'].map(h => <th key={h} className="p-3 text-left whitespace-nowrap">{h}</th>)}</tr></thead><tbody className="divide-y divide-[var(--border)]">{filtered.map(a => <tr key={a.code} className="hover:bg-[var(--bg-hover)]">{[a.sl_no,a.code,a.name,a.account_date,a.mobile_no,a.scheme,a.introducer,a.rm,a.dealer,a.branch,a.location,a.occupation,a.trading_started?'Yes':'No',money(a.aum),money(a.utilised),a.returns,a.stocks,a.remarks].map((v,i) => <td key={i} className="p-3 whitespace-nowrap max-w-56 truncate" title={String(v || '')}>{String(v ?? '—') || '—'}</td>)}</tr>)}</tbody></table>{!loading && !filtered.length && <div className="p-12 text-center text-[var(--text-muted)]">No clients match these filters.</div>}</div></div>
+
+      <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] overflow-hidden">
+        <div className="px-5 py-4 border-b border-[var(--border)]"><h2 className="text-lg font-bold text-[var(--text-primary)]">Branch-wise Analysis</h2><p className="text-sm text-[var(--text-muted)] mt-0.5">Separate performance for each branch using the currently filtered report data.</p></div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[900px] text-sm">
+            <thead className="bg-[var(--table-header-bg)] text-xs uppercase tracking-wider text-[var(--text-muted)]"><tr><th className="px-6 py-3 text-left">Branch</th><th className="px-6 py-3 text-right">Accounts</th><th className="px-6 py-3 text-right">AUM</th><th className="px-6 py-3 text-right">Funds Utilised</th><th className="px-6 py-3 text-right">Available</th><th className="px-6 py-3 text-right">Utilisation</th><th className="report-actions px-6 py-3 text-right">View</th></tr></thead>
+            <tbody className="divide-y divide-[var(--border)]">{branchAnalysis.map(branch => {
+              const available = Math.max(0, branch.aum - branch.utilised);
+              const utilisation = branch.aum > 0 ? branch.utilised / branch.aum * 100 : 0;
+              return <tr key={normalize(branch.name)} className="hover:bg-[var(--bg-hover)]"><td className="px-6 py-3 font-semibold text-[var(--text-primary)]">{branch.name}</td><td className="px-6 py-3 text-right text-[var(--text-secondary)] tabular-nums">{branch.count}</td><td className="px-6 py-3 text-right font-semibold text-[var(--text-primary)]">{money(branch.aum)}</td><td className="px-6 py-3 text-right text-[var(--text-primary)]">{money(branch.utilised)}</td><td className="px-6 py-3 text-right text-[var(--text-secondary)]">{money(available)}</td><td className="px-6 py-3 text-right font-semibold text-[var(--accent)]">{utilisation.toFixed(1)}%</td><td className="report-actions px-6 py-3 text-right"><button type="button" onClick={() => { set('branch', branch.name); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[var(--accent-bg)] text-[var(--accent)] hover:bg-[var(--accent)] hover:text-slate-950 transition">Open</button></td></tr>;
+            })}</tbody>
+          </table>
+          {!loading && !branchAnalysis.length && <div className="p-10 text-center text-sm text-[var(--text-muted)]">No branch data matches the selected filters.</div>}
+        </div>
+      </div>
     </div>
   </DashboardLayout>;
 };
