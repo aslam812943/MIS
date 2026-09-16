@@ -4,6 +4,7 @@ import { ROUTES } from '../../constants/routes';
 import { authService } from '../../services/auth.service';
 import { notificationService } from '../../services/notification.service';
 import { taskService } from '../../services/task.service';
+import { raService } from '../../services/ra.service';
 import { useLayout } from './LayoutContext';
 import { useTheme } from '../../context/ThemeContext';
 
@@ -133,10 +134,11 @@ interface NavItemProps {
   label: string;
   badge?: string;
   count?: number;
+  countColor?: 'red';
   onClick?: () => void;
 }
 
-const NavItem: React.FC<NavItemProps> = ({ to, icon, label, badge, count, onClick }) => (
+const NavItem: React.FC<NavItemProps> = ({ to, icon, label, badge, count, countColor, onClick }) => (
   <NavLink
     to={to}
     className={({ isActive }) => `mis-nav-item${isActive ? ' active' : ''}`}
@@ -145,7 +147,7 @@ const NavItem: React.FC<NavItemProps> = ({ to, icon, label, badge, count, onClic
     <span className="mis-nav-icon">{icon}</span>
     <span className="mis-nav-label">{label}</span>
     {badge && <span className="mis-nav-badge">{badge}</span>}
-    {count !== undefined && count > 0 && <span className="mis-nav-count">{count}</span>}
+    {count !== undefined && count > 0 && <span className="mis-nav-count" style={countColor === 'red' ? { backgroundColor: '#dc2626', color: '#ffffff', width: 24, height: 24, minWidth: 24, padding: 0, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 11, fontWeight: 700, lineHeight: 1 } : undefined}>{countColor === 'red' && count > 99 ? '99+' : count}</span>}
   </NavLink>
 );
 
@@ -155,6 +157,16 @@ export const Sidebar: React.FC = () => {
   const { theme, toggleTheme } = useTheme();
   const user = authService.getCurrentUser();
   const [unreadCount, setUnreadCount] = useState(0);
+  const [identityPendingCount,setIdentityPendingCount]=useState(0);
+  useEffect(()=>{
+    if(user?.role!=='admin')return;
+    let active=true;
+    const refresh=async()=>{try{const requests=await raService.getIdentityRequests();if(active)setIdentityPendingCount(requests.filter((request:any)=>request.status==='Pending').length);}catch{}};
+    refresh();
+    const timer=setInterval(refresh,30000);
+    window.addEventListener('ra-identity-updated',refresh);
+    return()=>{active=false;clearInterval(timer);window.removeEventListener('ra-identity-updated',refresh);};
+  },[user?.id,user?.role]);
   const [taskCount, setTaskCount] = useState(0);
   const navRef = useRef<HTMLElement | null>(null);
 
@@ -605,7 +617,7 @@ export const Sidebar: React.FC = () => {
               label="RA Dashboard"
               onClick={closeOnMobile}
             />
-            <NavItem to={ROUTES.RA_IDENTITY_HISTORY} icon={<IconShield/>} label="Identity Request History" onClick={closeOnMobile}/>
+            <NavItem to={ROUTES.RA_IDENTITY_HISTORY} icon={<IconShield/>} label="Identity Request History" count={isAdmin?identityPendingCount:undefined} countColor="red" onClick={closeOnMobile}/>
           </>
         )}
 

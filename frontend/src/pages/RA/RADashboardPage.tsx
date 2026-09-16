@@ -4,7 +4,6 @@ import { Chart, registerables } from 'chart.js';
 import toast from 'react-hot-toast';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import { raService } from '../../services/ra.service';
-import RAIdentityAccessPanel from './RAIdentityAccessPanel';
 import { orgService } from '../../services/org.service';
 import { authService } from '../../services/auth.service';
 import { useTheme } from '../../context/ThemeContext';
@@ -268,7 +267,6 @@ export const RADashboardPage: React.FC = () => {
   return (
     <DashboardLayout>
       <div className="mis-page mis-animate-in max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6 pb-16">
-        {(isAdmin || isHOD) && <RAIdentityAccessPanel/>}
         {/* Header section */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[var(--bg-card)] p-6 rounded-2xl shadow-sm border border-[var(--border)]">
           <div>

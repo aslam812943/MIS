@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { randomUUID } from 'crypto';
 import { supabaseAdmin } from '../config/supabase.js';
 import type {
   RAClient,
@@ -93,10 +94,18 @@ export class RAService {
     const access = await this.verifyAccess(userId);
     if (!access.authorized) throw new Error('Unauthorized.');
     let query = supabaseAdmin!.from('ra_identity_requests').select('*, client:client_id(client_name), requester:requester_id(full_name), branch:branch_id(name), decider:decided_by(full_name)').order('requested_at', { ascending: false });
-    if (access.role !== 'admin' && !access.isHOD) query = query.eq('requester_id', userId);
+    // CEO oversight is read-only; approval remains restricted to admins.
+    if (!this.canViewAllRecords(access)) query = query.eq('requester_id', userId);
     const { data, error } = await query;
     if (error) throw new Error('Unable to load identity requests. Run database_ra_identity_access.sql if not installed.');
-    return data || [];
+    const groups = new Map<string, any>();
+    for (const row of data || []) {
+      const key = row.batch_id || row.id;
+      if (!groups.has(key)) groups.set(key,{...row,clients:[]});
+      if(row.revoked_at) groups.get(key).revoked_at=row.revoked_at;
+      groups.get(key).clients.push({id:row.client_id,name:row.client?.client_name || row.client_name,status:row.status,consumed_at:row.consumed_at,branch:row.branch?.name});
+    }
+    return [...groups.values()].map(group=>({...group, status:group.clients.some((c:any)=>c.status==='Pending')?'Pending':group.clients.some((c:any)=>c.status==='Approved')?'Approved':group.clients.some((c:any)=>c.status==='Revoked')?'Revoked':group.status, client:{client_name:`${group.clients.length} client${group.clients.length===1?'':'s'}`}, consumed_at:group.clients.every((c:any)=>c.status==='Consumed')?group.clients.map((c:any)=>c.consumed_at).sort().at(-1):null}));
   }
 
   async requestIdentityAccess(userId: string, ids: string[], reason: string) {
@@ -106,17 +115,38 @@ export class RAService {
     const visible = await this.getClients(userId);
     const permitted = new Set(visible.map(client => client.id));
     if (ids.some(id => !permitted.has(id))) throw new Error('One or more clients are outside your access.');
-    const { error } = await supabaseAdmin!.from('ra_identity_requests').insert([...new Set(ids)].map(id => ({ client_id:id, client_name:visible.find(client=>client.id===id)!.client_name, requester_id:userId, requester_role:access.role, branch_id:visible.find(client=>client.id===id)?.branch_id || null, reason:reason.trim() })));
-    if (error) throw new Error(error.code === '23505' ? 'A pending or approved request already exists for one of these clients.' : 'Unable to submit identity requests.');
+    const batchId=randomUUID();
+    const requestedAt=new Date().toISOString();
+    const { error } = await supabaseAdmin!.from('ra_identity_requests').insert([...new Set(ids)].map(id => ({ batch_id:batchId, requested_at:requestedAt, client_id:id, client_name:visible.find(client=>client.id===id)!.client_name, requester_id:userId, requester_role:access.role, branch_id:visible.find(client=>client.id===id)?.branch_id || null, reason:reason.trim() })));
+    if (error) {
+      // Do not log submitted names, reasons, or identity values.
+      console.error('RA identity request submission failed', { code: error.code });
+      if (['PGRST204', 'PGRST205', '42P01', '42703'].includes(error.code)) {
+        throw new Error('Identity access database needs an upgrade. Ask your admin to run the complete backend/database_ra_identity_access.sql in Supabase SQL Editor, then retry.');
+      }
+      if (error.code === '23505') throw new Error('A pending or approved request already exists for one of these clients. Check Identity Request History before requesting again.');
+      if (error.code === '23503') throw new Error('A selected client, branch, or requester no longer exists. Refresh the client directory and try again.');
+      if (error.code === '42501') throw new Error('Identity request storage permissions are missing. Ask your admin to rerun backend/database_ra_identity_access.sql.');
+      throw new Error(`Unable to submit identity requests (${error.code || 'connection error'}). Please retry or share this error code with your admin.`);
+    }
   }
 
-  async decideIdentityRequest(userId: string, id: string, approve: boolean, note: string) {
+  async decideIdentityRequest(userId: string, id: string, approve: boolean, note: string, approvedClientIds?: string[]) {
     const access = await this.verifyAccess(userId);
     if (access.role !== 'admin') throw new Error('Only admins can decide identity requests.');
-    const { data: request, error: lookupError } = await supabaseAdmin!.from('ra_identity_requests').select('requester_id').eq('id',id).single();
+    const { data: request, error: lookupError } = await supabaseAdmin!.from('ra_identity_requests').select('requester_id,batch_id').eq('id',id).single();
     if (lookupError) throw new Error('Request not found.');
     if (request.requester_id === userId) throw new Error('Another admin must verify your own request.');
-    const { data, error } = await supabaseAdmin!.from('ra_identity_requests').update({ status:approve?'Approved':'Rejected', decided_by:userId, decided_at:new Date().toISOString(), decision_note:String(note || '').trim() }).eq('id',id).eq('status','Pending').select('id');
+    if (approvedClientIds !== undefined) {
+      if (!Array.isArray(approvedClientIds) || approvedClientIds.some(value => typeof value !== 'string')) throw new Error('Invalid client selection.');
+      const { error } = await supabaseAdmin!.rpc('decide_ra_identity_batch', {
+        p_admin_id:userId, p_request_id:id, p_approved_client_ids:approvedClientIds,
+        p_note:String(note || '').trim()
+      });
+      if (error) throw new Error(['PGRST202','42883'].includes(error.code) ? 'Run the updated database_ra_identity_access.sql before approving selected clients.' : 'Unable to record client decisions. Refresh the request and try again.');
+      return;
+    }
+    const { data, error } = await supabaseAdmin!.from('ra_identity_requests').update({ status:approve?'Approved':'Rejected', decided_by:userId, decided_at:new Date().toISOString(), decision_note:String(note || '').trim() }).eq('batch_id',request.batch_id).eq('requester_id',request.requester_id).eq('status','Pending').select('id');
     if (error || !data?.length) throw new Error('Request was already decided or could not be updated.');
   }
 
@@ -127,6 +157,14 @@ export class RAService {
     const { data: identity, error: identityError } = await supabaseAdmin!.from('ra_clients').select('pan,aadhaar_no').eq('id',id).single();
     if (identityError) throw new Error('Unable to load identity.');
     return identity;
+  }
+
+  async revokeIdentityAccess(userId:string,id:string) {
+    if ((await this.verifyAccess(userId)).role !== 'admin') throw new Error('Only admins can revoke access.');
+    const {data:request,error:lookupError}=await supabaseAdmin!.from('ra_identity_requests').select('batch_id,requester_id').eq('id',id).single();
+    if(lookupError) throw new Error('Request not found.');
+    const {data,error}=await supabaseAdmin!.from('ra_identity_requests').update({status:'Revoked',revoked_by:userId,revoked_at:new Date().toISOString()}).eq('batch_id',request.batch_id).eq('requester_id',request.requester_id).eq('status','Approved').select('id');
+    if(error || !data?.length) throw new Error('No active approved access remains in this request.');
   }
 
   async saveApprovedIdentity(userId: string, id: string, pan: string, aadhaar: string) {

@@ -12,8 +12,9 @@ export class RAController {
       else if (req.method === 'POST' && !action) { await raService.requestIdentityAccess(userId,req.body.client_ids,req.body.reason); res.json({ message:'Requests submitted' }); }
       else if (action === 'decision') {
         if (typeof req.body.approve !== 'boolean') throw new Error('Choose approve or reject.');
-        await raService.decideIdentityRequest(userId,String(req.params.id),req.body.approve,req.body.note); res.json({ message:'Decision saved' });
-      } else if (action === 'identity' && req.method === 'GET') res.json(await raService.getApprovedIdentity(userId,String(req.params.id)));
+        await raService.decideIdentityRequest(userId,String(req.params.id),req.body.approve,req.body.note,req.body.approved_client_ids); res.json({ message:'Decision saved' });
+      } else if (action === 'revoke' && req.method === 'POST') { await raService.revokeIdentityAccess(userId,String(req.params.id)); res.json({message:'Access revoked'}); }
+      else if (action === 'identity' && req.method === 'GET') res.json(await raService.getApprovedIdentity(userId,String(req.params.id)));
       else if (action === 'identity' && req.method === 'PUT') { await raService.saveApprovedIdentity(userId,String(req.params.id),req.body.pan,req.body.aadhaar_no); res.json({ message:'Identity saved. Approval is now closed.' }); }
       else res.status(400).json({ error:'Invalid identity action' });
     } catch (error:any) { res.status(400).json({ error:error.message || 'Identity operation failed' }); }
