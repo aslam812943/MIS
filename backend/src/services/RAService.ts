@@ -84,6 +84,56 @@ const DEFAULT_PACKAGES: RAPackage[] = [
 ];
 
 export class RAService {
+  private maskIdentity<T extends { pan?: any; aadhaar_no?: any }>(data: T): T {
+    const mask = (value: unknown) => value ? `******${String(value).slice(-4)}` : null;
+    return { ...data, pan: mask(data.pan), aadhaar_no: mask(data.aadhaar_no) };
+  }
+
+  async getIdentityRequests(userId: string) {
+    const access = await this.verifyAccess(userId);
+    if (!access.authorized) throw new Error('Unauthorized.');
+    let query = supabaseAdmin!.from('ra_identity_requests').select('*, client:client_id(client_name), requester:requester_id(full_name), branch:branch_id(name), decider:decided_by(full_name)').order('requested_at', { ascending: false });
+    if (access.role !== 'admin' && !access.isHOD) query = query.eq('requester_id', userId);
+    const { data, error } = await query;
+    if (error) throw new Error('Unable to load identity requests. Run database_ra_identity_access.sql if not installed.');
+    return data || [];
+  }
+
+  async requestIdentityAccess(userId: string, ids: string[], reason: string) {
+    const access = await this.verifyAccess(userId);
+    if (!access.authorized || !['employee','hod','admin'].includes(access.role || '')) throw new Error('Unauthorized to request identity access.');
+    if (!Array.isArray(ids) || !ids.length || ids.length > 500 || typeof reason !== 'string' || reason.trim().length < 5) throw new Error('Select clients and enter a reason of at least five characters.');
+    const visible = await this.getClients(userId);
+    const permitted = new Set(visible.map(client => client.id));
+    if (ids.some(id => !permitted.has(id))) throw new Error('One or more clients are outside your access.');
+    const { error } = await supabaseAdmin!.from('ra_identity_requests').insert([...new Set(ids)].map(id => ({ client_id:id, client_name:visible.find(client=>client.id===id)!.client_name, requester_id:userId, requester_role:access.role, branch_id:visible.find(client=>client.id===id)?.branch_id || null, reason:reason.trim() })));
+    if (error) throw new Error(error.code === '23505' ? 'A pending or approved request already exists for one of these clients.' : 'Unable to submit identity requests.');
+  }
+
+  async decideIdentityRequest(userId: string, id: string, approve: boolean, note: string) {
+    const access = await this.verifyAccess(userId);
+    if (access.role !== 'admin') throw new Error('Only admins can decide identity requests.');
+    const { data: request, error: lookupError } = await supabaseAdmin!.from('ra_identity_requests').select('requester_id').eq('id',id).single();
+    if (lookupError) throw new Error('Request not found.');
+    if (request.requester_id === userId) throw new Error('Another admin must verify your own request.');
+    const { data, error } = await supabaseAdmin!.from('ra_identity_requests').update({ status:approve?'Approved':'Rejected', decided_by:userId, decided_at:new Date().toISOString(), decision_note:String(note || '').trim() }).eq('id',id).eq('status','Pending').select('id');
+    if (error || !data?.length) throw new Error('Request was already decided or could not be updated.');
+  }
+
+  async getApprovedIdentity(userId: string, id: string) {
+    if (!(await this.getClients(userId)).some(client=>client.id===id)) throw new Error('Client is outside your access.');
+    const { data: grant, error } = await supabaseAdmin!.from('ra_identity_requests').select('id').eq('requester_id',userId).eq('client_id',id).eq('status','Approved').maybeSingle();
+    if (error || !grant) throw new Error('Approved access is required to view full identity details.');
+    const { data: identity, error: identityError } = await supabaseAdmin!.from('ra_clients').select('pan,aadhaar_no').eq('id',id).single();
+    if (identityError) throw new Error('Unable to load identity.');
+    return identity;
+  }
+
+  async saveApprovedIdentity(userId: string, id: string, pan: string, aadhaar: string) {
+    await this.getApprovedIdentity(userId,id);
+    const { error } = await supabaseAdmin!.rpc('save_ra_identity', { p_user_id:userId, p_client_id:id, p_pan:pan?.trim().toUpperCase() || null, p_aadhaar:aadhaar?.trim() || null });
+    if (error) throw new Error(error.message);
+  }
   private canViewAllRecords(access: { role?: string | undefined; isHOD?: boolean | undefined }): boolean {
     const role = String(access.role || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
     return Boolean(access.isHOD) || role === 'admin' || role === 'ceo';
@@ -394,7 +444,7 @@ export class RAService {
         item.subscription_end_date
       );
       return {
-        ...item,
+        ...this.maskIdentity(item),
         creator_name: item.profiles?.full_name || 'Known User',
         branch_name: item.branches?.name || '-',
         calculated_status: calculated.status,
@@ -435,6 +485,8 @@ export class RAService {
     if (!data.client_name || !data.package) {
       throw new Error('Client name and package are required.');
     }
+    if (data.pan && !/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(data.pan.trim().toUpperCase())) throw new Error('Enter a valid 10-character PAN.');
+    if (data.aadhaar_no && !/^[0-9]{12}$/.test(data.aadhaar_no.trim())) throw new Error('Enter a valid 12-digit Aadhaar.');
 
     const payload = {
       client_name: this.sanitizeText(data.client_name),
@@ -468,7 +520,7 @@ export class RAService {
       .single();
 
     if (error) throw error;
-    return inserted;
+    return this.maskIdentity(inserted);
   }
 
   async bulkCreateClients(rows: any[], creatorId: string): Promise<{ inserted: number; failed: Array<{ row: number; error: string }> }> {
@@ -477,6 +529,8 @@ export class RAService {
 
     const client = supabaseAdmin;
     if (!client) throw new Error('Supabase admin client is not configured.');
+    const access = await this.verifyAccess(creatorId);
+    if (!access.authorized) throw new Error('Unauthorized to import RA clients.');
     const { data: branches, error: branchError } = await client.from('branches').select('id, name');
     if (branchError) throw branchError;
     const branchByName = new Map((branches || []).map((branch: any) => [String(branch.name).trim().toLowerCase(), branch.id]));
@@ -485,8 +539,23 @@ export class RAService {
     const failed: Array<{ row: number; error: string }> = [];
     for (let index = 0; index < rows.length; index += 1) {
       const row = { ...rows[index] };
-      if (!row.branch_id && row.branch_name) row.branch_id = branchByName.get(String(row.branch_name).trim().toLowerCase());
       try {
+        const branchName = String(row.branch_name || row.branch || '').trim();
+        if (branchName && !this.canViewAllRecords(access) && branchByName.get(branchName.toLowerCase()) !== access.branchId) {
+          throw new Error('Only management can import clients into another branch or create a new branch.');
+        }
+        if (branchName && this.canViewAllRecords(access)) {
+          const key = branchName.toLowerCase();
+          let branchId = branchByName.get(key);
+          if (!branchId) {
+            const { data: created, error } = await client.from('branches')
+              .upsert({ name: branchName }, { onConflict: 'name' }).select('id').single();
+            if (error) throw new Error(`Unable to create branch "${branchName}": ${error.message}`);
+            branchId = created.id;
+            branchByName.set(key, branchId);
+          }
+          row.branch_id = branchId;
+        }
         await this.createClient(row, creatorId);
         inserted += 1;
       } catch (error: any) {
@@ -502,6 +571,7 @@ export class RAService {
 
     const access = await this.verifyAccess(userId);
     if (!access.authorized) throw new Error('Unauthorized to update RA clients.');
+    if (data.pan !== undefined || data.aadhaar_no !== undefined) throw new Error('Use approved identity access to change PAN or Aadhaar. Other fields remain editable.');
     if (!this.canViewAllRecords(access)) {
       const { data: owned } = await client.from('ra_clients').select('id').eq('id', id).eq('created_by', userId).maybeSingle();
       if (!owned) throw new Error('You can update only clients entered by you.');
@@ -539,7 +609,7 @@ export class RAService {
       .single();
 
     if (error) throw error;
-    return updated;
+    return this.maskIdentity(updated);
   }
 
   async deleteClient(id: string, userId: string): Promise<boolean> {
@@ -768,7 +838,8 @@ export class RAService {
     let results: RATestimonial[] = (data || []).map((item: any) => {
       return {
         ...item,
-        client: item.ra_clients || undefined,
+        ra_clients: item.ra_clients ? this.maskIdentity(item.ra_clients) : undefined,
+        client: item.ra_clients ? this.maskIdentity(item.ra_clients) : undefined,
         creator_name: item.profiles?.full_name || 'Known User',
         branch_name: item.branches?.name || '-'
       };

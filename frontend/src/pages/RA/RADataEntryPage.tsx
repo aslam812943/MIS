@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { Loader2 } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import { raService } from '../../services/ra.service';
+import RAIdentityRequestButton from './RAIdentityRequestButton';
 import { orgService } from '../../services/org.service';
 import { authService } from '../../services/auth.service';
 import type {
@@ -91,6 +93,12 @@ export const RADataEntryPage: React.FC<RADataEntryPageProps> = ({ defaultTab }) 
   const [editingClient, setEditingClient] = useState<RAClient | null>(null);
   const [saving, setSaving] = useState(false);
   const [bulkImporting, setBulkImporting] = useState(false);
+  const [csvPreview, setCsvPreview] = useState<Record<string, string>[] | null>(null);
+  const [csvVerified, setCsvVerified] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [confirmation, setConfirmation] = useState<{ title: string; description: string; run: () => Promise<void> } | null>(null);
+  const [actionBusy, setActionBusy] = useState(false);
+  const [actionProgress, setActionProgress] = useState('');
   const bulkFileRef = useRef<HTMLInputElement | null>(null);
 
   // Modal States - Package
@@ -323,7 +331,7 @@ export const RADataEntryPage: React.FC<RADataEntryPageProps> = ({ defaultTab }) 
   };
 
   // Save Client Form
-  const handleSaveClient = async (e: React.FormEvent) => {
+  const handleSaveClient = async (e: React.FormEvent, confirmed = false) => {
     e.preventDefault();
     if (!formData.client_name.trim()) {
       toast.error('Client name is required');
@@ -334,10 +342,15 @@ export const RADataEntryPage: React.FC<RADataEntryPageProps> = ({ defaultTab }) 
       return;
     }
 
+    if (editingClient && editingClient.kra_updation_status !== formData.kra_updation_status && !confirmed) {
+      setConfirmation({ title: 'Confirm KRA status change', description: `Change ${formData.client_name}'s KRA status to ${formData.kra_updation_status}?`, run: () => handleSaveClient(e, true) });
+      return;
+    }
     try {
       setSaving(true);
       if (editingClient) {
-        await raService.updateClient(editingClient.id, formData);
+        const { pan: _pan, aadhaar_no: _aadhaar, ...otherFields } = formData;
+        await raService.updateClient(editingClient.id, otherFields);
         toast.success(`Client ${formData.client_name} updated successfully!`);
       } else {
         await raService.createClient(formData);
@@ -366,10 +379,21 @@ export const RADataEntryPage: React.FC<RADataEntryPageProps> = ({ defaultTab }) 
       setBulkImporting(true);
       const parsedRows = parseCsv(await file.text());
       if (!parsedRows.length) throw new Error('The CSV does not contain any data rows.');
-      const rows = parsedRows.map(row => ({
+      setCsvVerified(false);
+      setCsvPreview(parsedRows);
+    } catch (err: any) {
+      toast.error(err.message || 'Could not preview CSV.');
+    } finally { setBulkImporting(false); }
+  };
+
+  const saveVerifiedCsv = async () => {
+    if (!csvPreview || !csvVerified) return;
+    try {
+      setBulkImporting(true);
+      const rows = csvPreview.map(row => ({
         ...row,
         amount: Number(row.amount || 0),
-        branch_id: row.branch_id || selectedBranch || undefined
+        branch_id: row.branch_id || (row.branch_name || row.branch ? undefined : selectedBranch || undefined)
       }));
       const result = await raService.bulkCreateClients(rows);
       if (result.failed.length) {
@@ -377,6 +401,11 @@ export const RADataEntryPage: React.FC<RADataEntryPageProps> = ({ defaultTab }) 
       } else {
         toast.success(`${result.inserted} clients imported successfully.`);
       }
+      if (result.failed.length) {
+        // Backend row numbers include the CSV header as row one.
+        setCsvPreview(csvPreview.filter((_, index) => result.failed.some(failure => failure.row === index + 2)));
+        setCsvVerified(false);
+      } else { setCsvPreview(null); setCsvVerified(false); }
       await loadData();
     } catch (err: any) {
       toast.error(err.response?.data?.error || err.message || 'Failed to import CSV.');
@@ -387,16 +416,28 @@ export const RADataEntryPage: React.FC<RADataEntryPageProps> = ({ defaultTab }) 
 
   // Delete Client
   const handleDeleteClient = async (client: RAClient) => {
-    if (!window.confirm(`Are you sure you want to delete client record for "${client.client_name}"?`)) {
-      return;
-    }
-    try {
-      await raService.deleteClient(client.id);
-      toast.success('Client record removed');
-      loadData();
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to delete client');
-    }
+    setConfirmation({ title: 'Delete client?', description: `Permanently remove ${client.client_name}? This cannot be undone.`, run: async () => { await raService.deleteClient(client.id); toast.success('Client record removed'); await loadData(); } });
+  };
+
+  const requestBulkAction = (status?: KRAUpdationStatus) => {
+    const ids = [...selectedIds];
+    if (!ids.length) return;
+    setConfirmation({ title: status ? 'Confirm KRA status change' : 'Delete selected clients?', description: status ? `Set KRA status to ${status} for ${ids.length} selected clients?` : `Permanently delete ${ids.length} selected clients? This cannot be undone.`, run: async () => {
+      let completed = 0, failed = 0;
+      const remaining = new Set(ids);
+      for (const id of ids) {
+        try {
+          if (status) await raService.updateClient(id, { kra_updation_status: status });
+          else await raService.deleteClient(id);
+          completed += 1; remaining.delete(id);
+        } catch { failed += 1; }
+        setActionProgress(`${completed} successful · ${failed} failed · ${ids.length} total`);
+      }
+      setSelectedIds(remaining);
+      if (failed) toast.error(`${completed} successful; ${failed} failed. Failed clients remain selected.`);
+      else toast.success(`${completed} clients ${status ? 'updated' : 'deleted'}`);
+      await loadData();
+    } });
   };
 
   // Open Create Package Modal
@@ -620,6 +661,8 @@ export const RADataEntryPage: React.FC<RADataEntryPageProps> = ({ defaultTab }) 
   return (
     <DashboardLayout>
       <div className="mis-page mis-animate-in max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6 pb-16">
+        {csvPreview && createPortal(<div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"><div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col p-5 gap-4" role="dialog" aria-modal="true" aria-label="Verify CSV import"><h2 className="text-xl font-bold">Verify RA CSV Import</h2><p className="text-sm">Full preview: {csvPreview.length} records. Review every column before saving.</p><div className="overflow-auto max-h-[55vh]"><table className="w-full text-xs"><thead><tr><th className="p-2">Row</th>{Object.keys(csvPreview[0] || {}).map(header => <th key={header} className="p-2 text-left whitespace-nowrap">{header}</th>)}</tr></thead><tbody>{csvPreview.map((row,index)=><tr key={index} className="border-t border-[var(--border)]"><td className="p-2">{index+1}</td>{Object.entries(row).map(([key,value])=><td key={key} className="p-2 whitespace-nowrap">{value || '—'}</td>)}</tr>)}</tbody></table></div><label className="flex gap-2 text-sm"><input type="checkbox" checked={csvVerified} disabled={bulkImporting} onChange={e=>setCsvVerified(e.target.checked)}/>I reviewed these records and confirm they are ready to save.</label><div className="flex justify-end gap-3"><button disabled={bulkImporting} onClick={()=>setCsvPreview(null)} className="px-4 py-2 border rounded-xl">Cancel</button><button disabled={!csvVerified || bulkImporting} onClick={saveVerifiedCsv} className="px-4 py-2 rounded-xl bg-[var(--accent)] text-slate-950 disabled:opacity-50 inline-flex items-center gap-2">{bulkImporting ? <><Loader2 className="w-4 h-4 animate-spin"/>Saving {csvPreview.length} records…</> : 'Save verified records'}</button></div></div></div>, document.body)}
+        {confirmation && createPortal(<div className="fixed inset-0 z-[210] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"><div role="dialog" aria-modal="true" aria-label={confirmation.title} className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl p-6 max-w-md w-full"><h2 className="text-lg font-bold">{confirmation.title}</h2><p className="text-sm mt-3">{confirmation.description}</p>{actionBusy && <p role="status" className="text-sm mt-3">{actionProgress}</p>}<div className="flex justify-end gap-3 mt-5"><button disabled={actionBusy} onClick={()=>setConfirmation(null)} className="px-4 py-2 border rounded-xl">Cancel</button><button disabled={actionBusy} onClick={async ()=>{setActionBusy(true);setActionProgress('Processing…');try{await confirmation.run();setConfirmation(null);}catch(error:any){toast.error(error.response?.data?.error || error.message || 'Action failed.');}finally{setActionBusy(false);}}} className="px-4 py-2 rounded-xl bg-[var(--accent)] text-slate-950 inline-flex items-center gap-2">{actionBusy ? <><Loader2 className="w-4 h-4 animate-spin"/>Processing…</> : 'Confirm'}</button></div></div></div>, document.body)}
         {/* Header section */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[var(--bg-card)] p-6 rounded-2xl shadow-sm border border-[var(--border)]">
           <div>
@@ -680,7 +723,7 @@ export const RADataEntryPage: React.FC<RADataEntryPageProps> = ({ defaultTab }) 
               disabled={bulkImporting}
               className="inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--accent)]/30 bg-[var(--accent)]/10 px-3.5 py-2 text-sm font-semibold text-[var(--accent)] transition hover:bg-[var(--accent)] hover:text-slate-950 disabled:opacity-50"
             >
-              {bulkImporting ? 'Importing...' : '↑ Bulk Upload CSV'}
+              {bulkImporting ? <span className="inline-flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin"/>Reading CSV…</span> : '↑ Bulk Upload CSV'}
             </button>
 
             <button
@@ -846,9 +889,11 @@ export const RADataEntryPage: React.FC<RADataEntryPageProps> = ({ defaultTab }) 
                 </div>
               ) : (
                 <div className="overflow-x-auto">
+                  {selectedIds.size > 0 && <div className="p-3 flex flex-wrap items-center gap-3 border-b border-[var(--border)]"><strong>{selectedIds.size} selected</strong><button onClick={()=>requestBulkAction()} className="px-3 py-2 rounded-xl bg-rose-500/10 text-rose-500">Delete selected</button><select value="" aria-label="Update selected clients KRA status" onChange={e=>requestBulkAction(e.target.value as KRAUpdationStatus)} className="px-3 py-2 rounded-xl bg-[var(--bg-base)]"><option value="">Update KRA status…</option>{KRA_STATUSES.map(status=><option key={status}>{status}</option>)}</select><RAIdentityRequestButton ids={[...selectedIds]}/><button onClick={()=>setSelectedIds(new Set())}>Clear selection</button></div>}
                   <table className="w-full text-left text-sm">
                     <thead className="text-xs uppercase bg-[var(--panel-inset-soft)] text-[var(--text-secondary)] border-b border-[var(--border)]">
                       <tr>
+                        <th className="py-3 px-4"><input type="checkbox" aria-label="Select all visible clients" checked={filteredClients.length > 0 && filteredClients.every(client=>selectedIds.has(client.id))} onChange={e=>{const next=new Set(selectedIds);filteredClients.forEach(client=>e.target.checked?next.add(client.id):next.delete(client.id));setSelectedIds(next);}}/></th>
                         <th className="py-3 px-4">Client Details</th>
                         <th className="py-3 px-4">Package</th>
                         <th className="py-3 px-4">Validity Range</th>
@@ -862,6 +907,7 @@ export const RADataEntryPage: React.FC<RADataEntryPageProps> = ({ defaultTab }) 
                     <tbody className="divide-y divide-[var(--border)]">
                       {filteredClients.map((client) => (
                         <tr key={client.id} className="hover:bg-[var(--bg-hover-2)] transition text-[var(--text-primary)]">
+                          <td className="py-3 px-4"><input type="checkbox" aria-label={`Select ${client.client_name}`} checked={selectedIds.has(client.id)} onChange={e=>{const next=new Set(selectedIds);if(e.target.checked)next.add(client.id);else next.delete(client.id);setSelectedIds(next);}}/></td>
                           {/* Client Info */}
                           <td className="py-3 px-4">
                             <div className="font-semibold text-[var(--text-primary)]">
@@ -1624,9 +1670,11 @@ export const RADataEntryPage: React.FC<RADataEntryPageProps> = ({ defaultTab }) 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
                       <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">PAN Card Number</label>
+                      {editingClient && <p className="text-xs text-[var(--text-muted)] mb-2">Identity fields are locked. Select this client in the directory to request access. Open approved access from Identity Request History in the sidebar.</p>}
                       <input
                         type="text"
                         value={formData.pan}
+                        disabled={Boolean(editingClient)}
                         onChange={(e) => setFormData({ ...formData, pan: e.target.value.toUpperCase() })}
                         placeholder="ABCDE1234F"
                         maxLength={10}
@@ -1634,12 +1682,14 @@ export const RADataEntryPage: React.FC<RADataEntryPageProps> = ({ defaultTab }) 
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">Aadhaar (Last 4 / Full)</label>
+                      <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">Aadhaar Number</label>
                       <input
                         type="text"
                         value={formData.aadhaar_no}
+                        disabled={Boolean(editingClient)}
+                        maxLength={12}
                         onChange={(e) => setFormData({ ...formData, aadhaar_no: e.target.value })}
-                        placeholder="1234 5678 9012"
+                        placeholder="12-digit Aadhaar"
                         className="w-full px-3.5 py-2.5 text-sm font-mono rounded-xl border border-[var(--border)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:ring-1 focus:ring-[var(--accent)] outline-none"
                       />
                     </div>

@@ -32,6 +32,7 @@ export const ROUTES = {
   RA_KYC: '/ra-kyc',
   RA_TESTIMONIALS: '/ra-testimonials',
   RA_REPORTS: '/ra-reports',
+  RA_IDENTITY_HISTORY: '/ra-identity-history',
   TASKS: '/tasks',
   CREATOR_DASHBOARD: '/creator/dashboard',
   CREATOR_PLANNER: '/creator/planner',

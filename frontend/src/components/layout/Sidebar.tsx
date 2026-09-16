@@ -605,6 +605,7 @@ export const Sidebar: React.FC = () => {
               label="RA Dashboard"
               onClick={closeOnMobile}
             />
+            <NavItem to={ROUTES.RA_IDENTITY_HISTORY} icon={<IconShield/>} label="Identity Request History" onClick={closeOnMobile}/>
           </>
         )}
 

@@ -349,6 +349,11 @@ router.post('/notifications/run-check', requireAuth, requireAdmin, notificationC
  * RA (Research Analyst) Department endpoints
  */
 router.get('/ra/dashboard', requireAuth, (req, res) => raController.getDashboardStats(req, res));
+router.get('/ra/identity-requests', requireAuth, (req,res)=>raController.identityAccess(req,res));
+router.post('/ra/identity-requests', requireAuth, (req,res)=>raController.identityAccess(req,res));
+router.post('/ra/identity-requests/:id/:action', requireAuth, (req,res)=>raController.identityAccess(req,res));
+router.get('/ra/identity-requests/:id/:action', requireAuth, (req,res)=>raController.identityAccess(req,res));
+router.put('/ra/identity-requests/:id/:action', requireAuth, (req,res)=>raController.identityAccess(req,res));
 router.get('/ra/clients', requireAuth, (req, res) => raController.getClients(req, res));
 router.post('/ra/clients/bulk', requireAuth, (req, res) => raController.bulkCreateClients(req, res));
 router.post('/ra/clients', requireAuth, (req, res) => raController.createClient(req, res));
