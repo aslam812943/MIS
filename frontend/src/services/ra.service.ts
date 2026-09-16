@@ -9,9 +9,10 @@ import type {
 } from '../types/ra.types';
 
 export const raService = {
+  revokeIdentityAccess: async (id:string) => (await api.post(`/admin/ra/identity-requests/${id}/revoke`)).data,
   getIdentityRequests: async () => (await api.get('/admin/ra/identity-requests')).data,
   requestIdentityAccess: async (ids:string[], reason:string) => (await api.post('/admin/ra/identity-requests',{client_ids:ids,reason})).data,
-  decideIdentityRequest: async (id:string, approve:boolean, note:string) => (await api.post(`/admin/ra/identity-requests/${id}/decision`,{approve,note})).data,
+  decideIdentityRequest: async (id:string, approve:boolean, note:string, approvedClientIds?:string[]) => (await api.post(`/admin/ra/identity-requests/${id}/decision`,{approve,note,approved_client_ids:approvedClientIds})).data,
   getApprovedIdentity: async (id:string) => (await api.get(`/admin/ra/identity-requests/${id}/identity`)).data,
   saveApprovedIdentity: async (id:string, pan:string, aadhaar:string) => (await api.put(`/admin/ra/identity-requests/${id}/identity`,{pan,aadhaar_no:aadhaar})).data,
   // ── Package Catalog ───────────────────────────
