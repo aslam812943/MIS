@@ -41,6 +41,7 @@ import RADashboardPage from './pages/RA/RADashboardPage';
 import RADataEntryPage from './pages/RA/RADataEntryPage';
 import RATestimonialsPage from './pages/RA/RATestimonialsPage';
 import RAReportsPage from './pages/RA/RAReportsPage';
+import RAIdentityHistoryPage from './pages/RA/RAIdentityHistoryPage';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 
 import { ROUTES } from './constants/routes';
@@ -377,6 +378,7 @@ function App() {
             </ProtectedRoute>
           }
         />
+        <Route path={ROUTES.RA_IDENTITY_HISTORY} element={<ProtectedRoute><RAIdentityHistoryPage/></ProtectedRoute>}/>
 
         
         {/* Privilege Account Department Routes */}

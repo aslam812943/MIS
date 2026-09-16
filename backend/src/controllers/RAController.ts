@@ -2,6 +2,22 @@ import type { Request, Response } from 'express';
 import { raService } from '../services/RAService.js';
 
 export class RAController {
+  async identityAccess(req: Request, res: Response): Promise<void> {
+    const userId = (req as any).user?.id;
+    if (!userId) { res.status(401).json({ error:'Unauthorized' }); return; }
+    res.setHeader('Cache-Control','no-store');
+    try {
+      const action = String(req.params.action || '');
+      if (req.method === 'GET' && !action) res.json(await raService.getIdentityRequests(userId));
+      else if (req.method === 'POST' && !action) { await raService.requestIdentityAccess(userId,req.body.client_ids,req.body.reason); res.json({ message:'Requests submitted' }); }
+      else if (action === 'decision') {
+        if (typeof req.body.approve !== 'boolean') throw new Error('Choose approve or reject.');
+        await raService.decideIdentityRequest(userId,String(req.params.id),req.body.approve,req.body.note); res.json({ message:'Decision saved' });
+      } else if (action === 'identity' && req.method === 'GET') res.json(await raService.getApprovedIdentity(userId,String(req.params.id)));
+      else if (action === 'identity' && req.method === 'PUT') { await raService.saveApprovedIdentity(userId,String(req.params.id),req.body.pan,req.body.aadhaar_no); res.json({ message:'Identity saved. Approval is now closed.' }); }
+      else res.status(400).json({ error:'Invalid identity action' });
+    } catch (error:any) { res.status(400).json({ error:error.message || 'Identity operation failed' }); }
+  }
   // ── Package Endpoints ─────────────────────────
   async getPackages(req: Request, res: Response): Promise<void> {
     try {
