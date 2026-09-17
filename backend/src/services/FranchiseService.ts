@@ -8,7 +8,7 @@ export class FranchiseError extends Error {
 }
 export type FranchiseAccess = {
   userId: string; external: boolean; ids: string[] | null;
-  canManage: boolean; canManageUsers: boolean; canWrite: boolean;
+  canManage: boolean; canManageUsers: boolean; canWrite: boolean; canEnterSales: boolean;
   canSubmitFinance: boolean; canApproveSales: boolean; canApproveFinance: boolean;
 };
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -88,11 +88,13 @@ export class FranchiseService {
     const admin = p.role === 'admin';
     const manager = franchiseTeam && p.role === 'hod';
     let ids: string[] | null = null;
+    let sharedStaffSession = false;
     if (external) {
       const member = this.check(await db.from('franchise_users').select('franchise_id,membership_role,shared_access,franchises(status)').eq('user_id', userId).eq('status', 'active').maybeSingle());
       if (!member || (member.franchises as any)?.status !== 'Active' || member.membership_role !== (p.role === 'franchise_owner' ? 'owner' : 'staff')) throw new FranchiseError('Access denied: your franchise or membership is inactive.', 403);
       ids = [member.franchise_id];
       if (sessionRole && sessionRole !== p.role && !(p.role === 'franchise_owner' && sessionRole === 'franchise_staff' && member.shared_access)) throw new FranchiseError('Access denied: invalid franchise role.',403);
+      sharedStaffSession = p.role === 'franchise_owner' && sessionRole === 'franchise_staff' && member.shared_access === true;
     } else if (!LEADERS.includes(p.role) && !franchiseTeam && !financeTeam) {
       throw new FranchiseError('Access denied: Franchise department access required.', 403);
     } else if (franchiseTeam && !manager) {
@@ -101,6 +103,7 @@ export class FranchiseService {
     }
     return { userId, external, ids, canManage: admin || manager, canManageUsers: admin,
       canWrite: external || admin || franchiseTeam || financeTeam,
+      canEnterSales: p.role === 'franchise_staff' || sharedStaffSession || franchiseTeam,
       canSubmitFinance: admin || franchiseTeam || financeTeam,
       canApproveSales: admin || manager, canApproveFinance: admin || financeTeam };
   }
@@ -309,7 +312,7 @@ export class FranchiseService {
   }
   async updateRecord(a: FranchiseAccess, rawKind: string, id: string, body: any) {
     const kind = this.kind(rawKind);
-    this.require(a.canWrite);
+    this.require(kind === 'sales' ? a.canEnterSales : a.canWrite);
     if (!['sales', 'expenses'].includes(kind)) throw new FranchiseError('Earnings and payments cannot be edited. Reject or reverse an unpaid earning and submit a corrected record.');
     const db = this.client();
     const old = this.check(await db.from(TABLES[kind]).select('*').eq('id', idField(id)).maybeSingle());
@@ -399,7 +402,7 @@ export class FranchiseService {
   }
   async createRecord(a: FranchiseAccess, rawKind: string, body: any) {
     const kind = this.kind(rawKind), db = this.client();
-    this.require(a.canWrite);
+    this.require(kind === 'sales' ? a.canEnterSales : a.canWrite);
     const f = await this.owned(a, body.franchise_id, true);
     if (kind === 'sales') {
       const product = this.check(await db.from('franchise_products').select('*').eq('id', idField(body.product_id, 'product')).maybeSingle());
@@ -438,7 +441,7 @@ export class FranchiseService {
     return this.check(await db.from('franchise_payments').select('*').eq('id', id).single());
   }
   async removeSale(a: FranchiseAccess, id: string) {
-    this.require(a.canWrite);
+    this.require(a.canEnterSales);
     const db = this.client();
     const old = this.check(await db.from('sales').select('*').eq('id', idField(id)).maybeSingle());
     if (!old?.franchise_id) throw new FranchiseError('Sale not found.', 404);

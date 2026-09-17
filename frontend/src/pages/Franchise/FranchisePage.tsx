@@ -10,7 +10,6 @@ import { ROUTES } from '../../constants/routes';
 import { franchiseService, type FranchiseBootstrap, type FranchiseDashboard, type FranchiseFilters, type FranchiseKind, type FranchiseRow } from '../../services/franchise.service';
 import { useTheme } from '../../context/ThemeContext';
 import {parseFranchiseCsv,franchiseCsvFields,parseSalesCsv,salesCsvFields} from '../../utils/franchiseCsv';
-import {downloadCsvTemplate} from '../../utils/csvBulkImportHelpers';
 import './franchise.css';
 
 Chart.register(...registerables);
@@ -306,13 +305,13 @@ export default function FranchisePage({ dashboardView = false }: { dashboardView
     ...(recordKind === 'earnings' ? [{ key: 'reference', label: 'Reference' }, { key: 'product_name', label: 'Product' }, { key: 'earning_type', label: 'Earning type' }, ...(!external ? [{ key: 'company_revenue', label: 'Company revenue', money: true }] : []), { key: 'franchise_amount', label: 'Franchise earnings', money: true }] : []),
     ...(recordKind === 'expenses' ? [{ key: 'owner', label: 'Cost owner' }, { key: 'category', label: 'Category' }, { key: 'description', label: 'Description' }, { key: 'amount', label: 'Amount', money: true }] : []),
     ...(recordKind === 'payments' ? [{ key: 'direction', label: 'Direction' }, { key: 'amount', label: 'Amount', money: true }, { key: 'method', label: 'Method' }, { key: 'reference', label: 'Reference' }, { key: 'status', label: 'Status' }, { key: 'reversal_note', label: 'Reversal reason' }] : [{ key: 'status', label: 'Status' }])];
-  const removable = (row: FranchiseRow) => Boolean(data?.access.canWrite && (row.created_by === data.access.userId || data.access.canApproveSales));
+  const removable = (row: FranchiseRow) => Boolean(data?.access.canEnterSales && (row.created_by === data.access.userId || data.access.canApproveSales));
   const selectedVisibleSales = visibleRecords.filter(row => selectedSales.has(row.id) && removable(row));
   const franchiseColumns = [{ key: 'code', label: 'Code' }, { key: 'name', label: 'Franchise' }, { key: 'owner_name', label: 'Owner' }, { key: 'state', label: 'State' }, { key: 'city', label: 'City' }, { key: 'phone', label: 'Phone' },
     { key: 'email', label: 'Email' }, { key: 'office_display', label: 'Office' }, { key: 'registered_on', label: 'Registered on' }, { key: 'status', label: 'Status' }];
   const franchiseRows = selectedFranchises.filter(x => !search || `${x.name} ${x.owner_name} ${x.code} ${x.email} ${x.phone}`.toLowerCase().includes(search.toLowerCase())).map(x => ({ ...x, office_display: x.has_office ? `${x.office_sqft} sqft` : 'No office' }));
   const performanceColumns = [{ key: 'name', label: 'Franchise' }, { key: 'city', label: 'City' }, { key: 'orders', label: 'Completed sales' }];
-  const canAddRecord = Boolean(data && (recordKind === 'earnings' ? data.access.canSubmitFinance : recordKind === 'payments' ? data.access.canApproveFinance : data.access.canWrite));
+  const canAddRecord = Boolean(data && (recordKind === 'sales' ? data.access.canEnterSales : recordKind === 'earnings' ? data.access.canSubmitFinance : recordKind === 'payments' ? data.access.canApproveFinance : data.access.canWrite));
   const canDecide = Boolean(data && (recordKind === 'sales' ? data.access.canApproveSales : data.access.canApproveFinance));
   const tabs: { id: Tab; label: string; show: boolean }[] = [
     { id: 'franchises', label: 'Franchises', show: !external }, { id: 'sales', label: 'Product sales', show: true }, { id: 'workflow', label: 'How it works', show: true },
@@ -350,7 +349,7 @@ export default function FranchisePage({ dashboardView = false }: { dashboardView
         <section className="fr-card"><h2>Product performance</h2><DataTable columns={[{ key: 'name', label: 'Product' }, { key: 'orders', label: 'Completed orders' }]} rows={dashboard.products} /></section>
       </> : !error && <p role="status">Calculating dashboard…</p> : <>
         <nav className="fr-tabs" aria-label="Franchise sections">{tabs.filter(t => t.show).map(t => <button key={t.id} className={`mis-btn ${tab === t.id ? 'mis-btn-primary' : 'mis-btn-secondary'}`} onClick={() => { setTab(t.id); setRecordStatus(''); setSearch(''); }}>{t.label}</button>)}</nav>
-        {tab === 'franchises' && <section className="fr-card"><div className="fr-heading"><h2>Franchise register</h2><div className="fr-actions"><button className="mis-btn mis-btn-secondary" onClick={() => exportCSV('franchises.csv', franchiseColumns, franchiseRows)}>Export CSV</button>{data.access.canManageUsers && <><a className="mis-btn mis-btn-secondary" href="/samples/franchise-sample.csv" download>Sample CSV</a><button className="mis-btn mis-btn-secondary" onClick={()=>downloadCsvTemplate('franchise-import.csv',franchiseCsvFields.map(key=>({key,label:key})))}>CSV template</button><button className="mis-btn mis-btn-secondary" disabled={saving} onClick={()=>csvInput.current?.click()}>Import CSV</button><input ref={csvInput} type="file" accept=".csv,text/csv" hidden onChange={e=>importCSV(e.target.files?.[0])}/><button className="mis-btn mis-btn-primary" disabled={saving} onClick={() => openFranchise()}>Add franchise</button></>}</div></div>
+        {tab === 'franchises' && <section className="fr-card"><div className="fr-heading"><h2>Franchise register</h2><div className="fr-actions"><button className="mis-btn mis-btn-secondary" onClick={() => exportCSV('franchises.csv', franchiseColumns, franchiseRows)}>Export CSV</button>{data.access.canManageUsers && <><a className="mis-btn mis-btn-secondary" href="/samples/franchise-sample.csv" download>Sample CSV</a><button className="mis-btn mis-btn-secondary" disabled={saving} onClick={()=>csvInput.current?.click()}>Import CSV</button><input ref={csvInput} type="file" accept=".csv,text/csv" hidden onChange={e=>importCSV(e.target.files?.[0])}/><button className="mis-btn mis-btn-primary" disabled={saving} onClick={() => openFranchise()}>Add franchise</button></>}</div></div>
           <p className="fr-muted">Add manually or import CSV. Submit creates the franchise and emails Owner and Staff passwords to its saved email. Both roles use the saved email with their own password.</p>
           {!!importResults.length&&<DataTable columns={[{key:'row',label:'CSV row'},{key:'result',label:'Result'}]} rows={importResults.map(x=>({...x,result:x.success?`${x.franchise.name}: saved; ${x.franchise.emailResults.every((e:FranchiseRow)=>e.sent)?'login email sent':'email failed — use Send login email'}`:x.message}))}/>}
           <input className="mis-input fr-search" placeholder="Search franchise, owner, phone or email" aria-label="Search franchises" value={search} onChange={e => setSearch(e.target.value)} />
@@ -363,13 +362,13 @@ export default function FranchisePage({ dashboardView = false }: { dashboardView
           {recordKind === 'earnings' && !external && <p className="fr-muted">Revenue is actual business earnings. Customer investments are recorded separately in Product sales. Only approved earnings count in the dashboard.</p>}
           {recordKind === 'payments' && <p className="fr-muted">Payments settle existing earnings. They do not create additional revenue. Partial payments are supported.</p>}
           {!!bulkRemovalResults.length && <DataTable columns={[{key:'customer',label:'Customer'},{key:'product',label:'Product'},{key:'result',label:'Removal result'}]} rows={bulkRemovalResults} />}
-          <DataTable columns={recordColumns} rows={visibleRecords} selection={recordKind === 'sales' && data.access.canWrite ? {
+          <DataTable columns={recordColumns} rows={visibleRecords} selection={recordKind === 'sales' && data.access.canEnterSales ? {
             ids: selectedSales, eligible: removable, disabled: saving,
             toggle: id => setSelectedSales(current => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; }),
             toggleAll: () => setSelectedSales(current => { const next = new Set(current); const rows = visibleRecords.filter(removable); const all = rows.every(row => next.has(row.id)); rows.forEach(row => { if (all) next.delete(row.id); else next.add(row.id); }); return next; }),
           } : undefined} actions={canDecide || data.access.canWrite ? row => <>
-            {data.access.canWrite && ['sales', 'expenses'].includes(recordKind) && (row.status === 'Pending' || (recordKind === 'sales' && row.status === 'Completed' && !row.verified_at) || row.status === 'Submitted') && (row.created_by === data.access.userId || canDecide) && <button className="mis-btn mis-btn-secondary" disabled={saving} onClick={() => openRecord(recordKind, row)}>Edit</button>}
-            {recordKind === 'sales' && data.access.canWrite && (row.created_by === data.access.userId || canDecide) && <button className="mis-btn mis-btn-secondary" disabled={saving} onClick={() => setSaleToRemove(row)}>Remove</button>}
+            {(recordKind === 'sales' ? data.access.canEnterSales : data.access.canWrite) && ['sales', 'expenses'].includes(recordKind) && (row.status === 'Pending' || (recordKind === 'sales' && row.status === 'Completed' && !row.verified_at) || row.status === 'Submitted') && (row.created_by === data.access.userId || canDecide) && <button className="mis-btn mis-btn-secondary" disabled={saving} onClick={() => openRecord(recordKind, row)}>Edit</button>}
+            {recordKind === 'sales' && data.access.canEnterSales && (row.created_by === data.access.userId || canDecide) && <button className="mis-btn mis-btn-secondary" disabled={saving} onClick={() => setSaleToRemove(row)}>Remove</button>}
           </> : undefined} /></section>}
         {tab === 'workflow' && <Workflow external={external} />}
       </>}

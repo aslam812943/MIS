@@ -3,7 +3,7 @@ import api from './api';
 export type FranchiseRow = Record<string, any>;
 export type FranchiseKind = 'sales' | 'earnings' | 'expenses' | 'payments';
 export interface FranchiseBootstrap {
-  access: { external: boolean; canManage: boolean; canManageUsers: boolean; canWrite: boolean; canSubmitFinance: boolean; canApproveSales: boolean; canApproveFinance: boolean; userId: string };
+  access: { external: boolean; canManage: boolean; canManageUsers: boolean; canWrite: boolean; canEnterSales: boolean; canSubmitFinance: boolean; canApproveSales: boolean; canApproveFinance: boolean; userId: string };
   franchises: FranchiseRow[]; products: FranchiseRow[]; plans: FranchiseRow[];
   planAssignments: FranchiseRow[]; rules: FranchiseRow[]; users: FranchiseRow[]; memberships: FranchiseRow[]; managers: FranchiseRow[]; branches: FranchiseRow[];
 }
