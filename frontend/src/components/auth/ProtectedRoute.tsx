@@ -1,5 +1,5 @@
 import React from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { authService } from '../../services/auth.service';
 import { ROUTES } from '../../constants/routes';
 
@@ -15,9 +15,15 @@ interface ProtectedRouteProps {
  * @param children The component(s) to render if authenticated.
  */
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
+  const location = useLocation();
   if (!authService.isAuthenticated()) {
     // No user profile found, redirect to login
     return <Navigate to={ROUTES.LOGIN} replace />;
+  }
+
+  if (['franchise_owner', 'franchise_staff'].includes(authService.getCurrentUser()?.role || '') &&
+      !location.pathname.startsWith('/franchise/') && !([ROUTES.PROFILE, ROUTES.NOTIFICATIONS] as string[]).includes(location.pathname)) {
+    return <Navigate to={ROUTES.FRANCHISE_DASHBOARD} replace />;
   }
 
   // Token exists, allow access to the protected content

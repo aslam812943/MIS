@@ -14,11 +14,23 @@ export class EmailService {
       host: process.env.SMTP_HOST,
       port: Number(process.env.SMTP_PORT) || 587,
       secure: process.env.SMTP_PORT === '465',
+      connectionTimeout:10000,greetingTimeout:10000,socketTimeout:15000,
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS,
       },
     });
+  }
+
+  async sendFranchiseCredentials(to: string, name: string, franchise: string, password: string, roles: string[]): Promise<void> {
+    if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) throw new Error('Email delivery is not configured.');
+    const login = `${(process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '')}/franchise/login`;
+    const result = await this.transporter.sendMail({
+      from: `"MIS Admin" <${process.env.SMTP_USER}>`, to,
+      subject: 'Your franchise login details',
+      text: `Hello ${name},\n\nYour franchise ${franchise} is ready.\n\nLogin: ${login}\nEmail: ${to}\nPassword: ${password}\nRole: ${roles.join(' or ')}\n\nSelect the role on the login page. Staff can enter sales; owners can review their franchise dashboard. Please change your password in My Profile after signing in.`,
+    });
+    if (result.rejected?.length || !result.accepted?.length) throw new Error('The mail server did not accept the credential email.');
   }
 
   /**

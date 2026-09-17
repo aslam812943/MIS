@@ -74,7 +74,8 @@ export class ProfileService {
     if (avatar_url) updateData.avatar_url = avatar_url;
 
     try {
-      return await this.userRepository.update(userId, updateData);
+      await this.userRepository.update(userId, updateData);
+      return await this.getProfile(userId);
     } catch (dbError) {
       throw new Error('Profile update failed. Please verify your data.');
     }
@@ -89,9 +90,11 @@ export class ProfileService {
    */
   async changePassword(userId: string, email: string, currentPassword: string, newPassword: string) {
     try {
-      // 1. Verify current password by attempting to sign in
+      const profile = await this.userRepository.findById(userId);
+      if (!profile) throw new Error('User profile not found');
+      // Verify against the account identity, which may differ from its contact email.
       const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-        email,
+        email: profile.email,
         password: currentPassword,
       });
 
@@ -118,6 +121,12 @@ export class ProfileService {
    * Fetches the current user profile.
    */
   async getProfile(userId: string) {
-    return await this.userRepository.findById(userId);
+    const profile = await this.userRepository.findById(userId);
+    if (profile && ['franchise_owner', 'franchise_staff'].includes(profile.role)) {
+      const { data, error } = await client.from('franchise_users').select('login_email').eq('user_id', userId).maybeSingle();
+      if (error) throw new Error('Could not load franchise login');
+      if (data?.login_email) return { ...profile, email: data.login_email };
+    }
+    return profile;
   }
 }

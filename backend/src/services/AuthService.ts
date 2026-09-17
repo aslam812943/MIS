@@ -9,6 +9,23 @@ import { EmailService } from './EmailService.js';
  * Handles the business logic for user authentication via Supabase.
  */
 export class AuthService implements IAuthService {
+  private async matchesLoginRole(user: { id:string;role:string }, role:string):Promise<boolean> {
+    if (user.role===role) return true;
+    if (user.role!=='franchise_owner' || role!=='franchise_staff' || !supabaseAdmin) return false;
+    const {data,error}=await supabaseAdmin.from('franchise_users').select('shared_access,status').eq('user_id',user.id).maybeSingle();
+    return !error && data?.shared_access===true && data.status==='active';
+  }
+  private async resolveLoginEmail(email: string, role: string): Promise<string> {
+    if (!['franchise_owner', 'franchise_staff'].includes(role) || !supabaseAdmin) return email;
+    const { data, error } = await supabaseAdmin.from('franchise_users').select('user_id,status')
+      .eq('login_email', email.trim().toLowerCase()).eq('membership_role', role === 'franchise_owner' ? 'owner' : 'staff').maybeSingle();
+    if (error) throw new Error('Could not verify franchise login. Apply the updated franchise migration.');
+    if (!data) return email;
+    if (data.status !== 'active') throw new Error('Access denied: franchise login disabled');
+    const profile = await this.userRepository.findById(data.user_id);
+    if (!profile) throw new Error('Invalid login credentials');
+    return profile.email;
+  }
   /**
    * @param userRepository Repository for accessing user profile data.
    * @param emailService Service for sending emails.
@@ -29,7 +46,7 @@ export class AuthService implements IAuthService {
    */
   async login(email: string, password: string, role: string): Promise<AuthResponse> {
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-      email,
+      email: await this.resolveLoginEmail(email, role),
       password,
     });
 
@@ -50,15 +67,30 @@ export class AuthService implements IAuthService {
     }
 
     // Role-Based Access Control: Validate selected role against database role
-    if (userProfile.role !== role) {
+    if (!await this.matchesLoginRole(userProfile,role)) {
       // Security: Sign out the user immediately if the role doesn't match
       await supabase.auth.signOut();
       // Secure Message: Don't reveal the user's actual role to prevent mapping
       throw new Error('Access denied: Invalid role selection for this account');
     }
 
+    if (['franchise_owner', 'franchise_staff'].includes(userProfile.role)) {
+      const { FranchiseService } = await import('./FranchiseService.js');
+      try { await new FranchiseService().access(userProfile.id,role); }
+      catch {
+        await supabase.auth.signOut();
+        throw new Error('Access denied: Your franchise or login membership is inactive. Contact the administrator.');
+      }
+    }
+
+    let publicEmail = userProfile.email;
+    if (['franchise_owner', 'franchise_staff'].includes(userProfile.role) && supabaseAdmin) {
+      const { data, error } = await supabaseAdmin.from('franchise_users').select('login_email').eq('user_id', userProfile.id).maybeSingle();
+      if (error) throw new Error('Could not load franchise login');
+      publicEmail = data?.login_email || publicEmail;
+    }
     return {
-      user: userProfile,
+      user: role==='franchise_staff' ? {...userProfile,email:publicEmail,role:UserRole.FRANCHISE_STAFF} : {...userProfile,email:publicEmail},
       session: authData.session as unknown as Record<string, unknown>,
     };
   }
@@ -67,14 +99,14 @@ export class AuthService implements IAuthService {
    * Requests a password reset OTP.
    */
   async requestPasswordReset(email: string, role: string): Promise<void> {
-    const user = await this.userRepository.findByEmail(email);
+    const user = await this.userRepository.findByEmail(await this.resolveLoginEmail(email, role));
 
     if (!user) {
       // Security: Use generic message to prevent user enumeration
       throw new Error('If an account exists with this email and role, you will receive an OTP.');
     }
 
-    if (user.role !== role) {
+    if (!await this.matchesLoginRole(user,role)) {
       throw new Error('If an account exists with this email and role, you will receive an OTP.');
     }
 
@@ -107,10 +139,10 @@ export class AuthService implements IAuthService {
    * Resets the password using the OTP.
    */
   async resetPassword(email: string, otp: string, newPassword: string, role: string): Promise<void> {
-    const user = await this.userRepository.findByEmail(email);
+    const user = await this.userRepository.findByEmail(await this.resolveLoginEmail(email, role));
 
     // Security Fix: Re-verify role to prevent cross-role reset attacks
-    if (!user || user.role !== role) {
+    if (!user || !await this.matchesLoginRole(user,role)) {
       throw new Error('Invalid reset request');
     }
 

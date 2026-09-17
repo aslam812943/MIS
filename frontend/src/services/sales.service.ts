@@ -7,7 +7,9 @@ export type ProductType =
   | 'Child Demat'
   | 'Child Mutual Fund'
   | 'IEPF'
-  | 'SW Global';
+  | 'SW Global'
+  | 'Privilege Customer'
+  | 'Course';
 
 export type SaleStatus = 'Pending' | 'Completed' | 'Cancelled';
 
@@ -22,6 +24,7 @@ export interface Sale {
   status: SaleStatus;
   remarks?: string | null;
   branch_id?: string | null;
+  franchise_id?: string | null;
   created_by?: string | null;
   created_at: string;
   updated_at: string;
@@ -31,7 +34,7 @@ export interface Sale {
 
 export const PRODUCT_TYPES: ProductType[] = [
   'Trading and Demat', 'Mutual Fund', 'Unlisted Shares',
-  'Child Demat', 'Child Mutual Fund', 'IEPF', 'SW Global',
+  'Child Demat', 'Child Mutual Fund', 'IEPF', 'SW Global', 'Privilege Customer', 'Course',
 ];
 
 export const SALE_STATUSES: SaleStatus[] = ['Pending', 'Completed', 'Cancelled'];

@@ -10,6 +10,8 @@ export const UserRole = {
   HR: 'hr',
   CONTENT_CREATOR: 'content_creator',
   SOCIAL_MEDIA_MANAGER: 'social_media_manager',
+  FRANCHISE_OWNER: 'franchise_owner',
+  FRANCHISE_STAFF: 'franchise_staff',
 } as const;
 
 export type UserRole = (typeof UserRole)[keyof typeof UserRole];
