@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import LoginForm from '../components/auth/LoginForm';
 import ForgotPasswordForm from '../components/auth/ForgotPasswordForm';
 import RoleSelector from '../components/auth/RoleSelector';
@@ -8,15 +8,16 @@ import { useTheme } from '../context/ThemeContext';
 import { authService } from '../services/auth.service';
 import { ROUTES } from '../constants/routes';
 
-const LoginPage: React.FC = () => {
-  const [selectedRole, setSelectedRole] = useState<UserRole>(UserRole.ADMIN);
+const LoginPage: React.FC<{ franchise?: boolean }> = ({ franchise = false }) => {
+  const [selectedRole, setSelectedRole] = useState<UserRole>(franchise ? UserRole.FRANCHISE_OWNER : UserRole.ADMIN);
   const [showForgotPassword, setShowForgotPassword] = useState<boolean>(false);
   const { theme, toggleTheme } = useTheme();
 
   // Already logged in — don't show the login form again, go straight to
   // the dashboard (mirrors the check ProtectedRoute does in reverse).
   if (authService.isAuthenticated()) {
-    return <Navigate to={ROUTES.DASHBOARD} replace />;
+    const user = authService.getCurrentUser();
+    return <Navigate to={['franchise_owner', 'franchise_staff'].includes(user?.role || '') || user?.department_name?.toUpperCase() === 'FRANCHISE' ? ROUTES.FRANCHISE_DASHBOARD : ROUTES.DASHBOARD} replace />;
   }
 
   return (
@@ -42,7 +43,8 @@ const LoginPage: React.FC = () => {
 
         <div className="mis-login-grid w-full">
           <div className="flex-1 w-full min-w-0 self-start lg:self-center">
-            <RoleSelector selectedRole={selectedRole} onSelect={setSelectedRole} />
+            <RoleSelector selectedRole={selectedRole} onSelect={setSelectedRole} franchiseOnly={franchise} />
+            {franchise && <Link className="mis-btn mis-btn-secondary mt-4" to={ROUTES.LOGIN}>Company staff login</Link>}
           </div>
 
           <div className="w-full max-w-md flex flex-col items-center shrink-0 mx-auto lg:mx-0 self-start lg:self-center">

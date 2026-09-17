@@ -43,6 +43,7 @@ import RATestimonialsPage from './pages/RA/RATestimonialsPage';
 import RAReportsPage from './pages/RA/RAReportsPage';
 import RAIdentityHistoryPage from './pages/RA/RAIdentityHistoryPage';
 import ProtectedRoute from './components/auth/ProtectedRoute';
+import FranchisePage from './pages/Franchise/FranchisePage';
 
 import { ROUTES } from './constants/routes';
 import AppToaster from './components/common/AppToaster';
@@ -57,6 +58,9 @@ function App() {
       <Routes>
         {/* Authentication Routes */}
         <Route path={ROUTES.LOGIN} element={<LoginPage />} />
+        <Route path={ROUTES.FRANCHISE_LOGIN} element={<LoginPage franchise />} />
+        <Route path={ROUTES.FRANCHISE_DASHBOARD} element={<ProtectedRoute><FranchisePage dashboardView /></ProtectedRoute>} />
+        <Route path={ROUTES.FRANCHISE_MANAGE} element={<ProtectedRoute><FranchisePage /></ProtectedRoute>} />
         
         <Route 
           path={ROUTES.SMM_DASHBOARD} 

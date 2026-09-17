@@ -7,7 +7,8 @@
     "dev": "tsx watch src/server.ts",
     "build": "rimraf dist && tsc",
     "start": "node dist/server.js",
-    "clean": "rimraf dist"
+    "clean": "rimraf dist",
+    "test:franchise": "node --import tsx tests/franchise.test.ts"
   },
   "keywords": [],
   "author": "",

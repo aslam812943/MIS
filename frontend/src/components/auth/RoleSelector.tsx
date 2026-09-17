@@ -9,6 +9,8 @@ interface RoleOption {
 }
 
 const ROLE_OPTIONS: RoleOption[] = [
+  { role: UserRole.FRANCHISE_OWNER, label: 'Franchise Owner', description: 'Your franchise sales, earnings and reports', icon: '🏢' },
+  { role: UserRole.FRANCHISE_STAFF, label: 'Franchise Staff', description: 'Submit franchise customers and product sales', icon: '🤝' },
   {
     role: UserRole.ADMIN,
     label: 'Administrator',
@@ -56,9 +58,10 @@ const ROLE_OPTIONS: RoleOption[] = [
 interface RoleSelectorProps {
   selectedRole: UserRole;
   onSelect: (role: UserRole) => void;
+  franchiseOnly?: boolean;
 }
 
-const RoleSelector: React.FC<RoleSelectorProps> = ({ selectedRole, onSelect }) => {
+const RoleSelector: React.FC<RoleSelectorProps> = ({ selectedRole, onSelect, franchiseOnly = false }) => {
   return (
     <div className="w-full mis-animate-in">
       <div className="text-center mb-2 sm:mb-4">
@@ -71,7 +74,7 @@ const RoleSelector: React.FC<RoleSelectorProps> = ({ selectedRole, onSelect }) =
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2 sm:gap-3">
-        {ROLE_OPTIONS.map((option) => (
+        {ROLE_OPTIONS.filter(option => !franchiseOnly || ['franchise_owner', 'franchise_staff'].includes(option.role)).map((option) => (
           <button
             key={option.role}
             type="button"

@@ -202,16 +202,19 @@ export const Sidebar: React.FC = () => {
         console.error('Failed to load initial task count in sidebar:', err);
       }
     };
-    if (user?.id) {
+    if (user?.id && !['franchise_owner', 'franchise_staff'].includes(user.role)) {
       fetchTasks();
     }
-  }, [user?.id]);
+  }, [user?.id, user?.role]);
 
   const isAdmin = user?.role === 'admin';
   const isLeadership = ['ceo', 'managing_director', 'director', 'executive'].includes(user?.role || '');
   const isHOD = user?.role === 'hod';
   const isHR = user?.role === 'hr' || user?.department_name?.toUpperCase() === 'HR';
   const isEmployee = user?.role === 'employee';
+  const isFranchiseLogin = ['franchise_owner', 'franchise_staff'].includes(user?.role || '');
+  const isFranchiseDept = user?.department_name?.trim().toUpperCase() === 'FRANCHISE';
+  const showFranchise = isFranchiseLogin || isFranchiseDept || isAdmin || isLeadership || user?.department_name?.trim().toUpperCase() === 'FINANCE';
 
   const normalizedDepartment = user?.department_name?.trim().toUpperCase() || '';
   const isCreatorDept = ['CREATIVE', 'MARKETING', 'CONTENT CREATION', 'CONTENT CREATOR'].includes(normalizedDepartment);
@@ -252,7 +255,7 @@ export const Sidebar: React.FC = () => {
   const isPrivilegeUser = user?.department_name?.toUpperCase() === 'PRIVILEGE ACCOUNT' || user?.department_name?.toUpperCase() === 'PRIVILEGE';
   const showPrivilegeDashboard = isAdmin || isLeadership || (isPrivilegeUser && (isHOD || isEmployee));
 
-  const hasDedicatedDeptEntry = isIEPFUser || isSettlementsUser || isKYCUser || isDPUser || isITUser || isFinanceUser || isSalesUser || isCreatorDept || isCreator || isRAUser || isPrivilegeUser || isSWGlobalUser;
+  const hasDedicatedDeptEntry = isFranchiseLogin || isFranchiseDept || isIEPFUser || isSettlementsUser || isKYCUser || isDPUser || isITUser || isFinanceUser || isSalesUser || isCreatorDept || isCreator || isRAUser || isPrivilegeUser || isSWGlobalUser;
 
   const closeOnMobile = () => setSidebarOpen(false);
 
@@ -293,7 +296,9 @@ export const Sidebar: React.FC = () => {
 
         <NavItem
           to={
-            isRAUser
+            isFranchiseLogin || isFranchiseDept
+              ? ROUTES.FRANCHISE_DASHBOARD
+              : isRAUser
               ? ROUTES.RA_DASHBOARD
               : isCreator
               ? ROUTES.CREATOR_DASHBOARD
@@ -329,13 +334,13 @@ export const Sidebar: React.FC = () => {
         )}
 
         {/* Tasks Hub */}
-        <NavItem
+        {!isFranchiseLogin && <NavItem
           to={ROUTES.TASKS}
           icon={<IconTask />}
           label="Tasks"
           count={taskCount}
           onClick={closeOnMobile}
-        />
+        />}
 
         {/* Notifications Hub */}
         <NavItem
@@ -557,6 +562,12 @@ export const Sidebar: React.FC = () => {
             />
           </>
         )}
+
+        {showFranchise && <>
+          <span className="mis-sidebar-section-label">Franchise Department</span>
+          <NavItem to={ROUTES.FRANCHISE_DASHBOARD} icon={<IconIEPFDashboard />} label="Franchise Dashboard" onClick={closeOnMobile} />
+          <NavItem to={ROUTES.FRANCHISE_MANAGE} icon={<IconIEPFEntry />} label={isFranchiseLogin ? 'Sales & Earnings' : 'Franchise Management'} onClick={closeOnMobile} />
+        </>}
 
         {/* Sales Department Navigation */}
         {isSalesUser && (

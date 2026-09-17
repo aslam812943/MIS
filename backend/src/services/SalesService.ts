@@ -3,7 +3,7 @@ import type { Sale, ProductType, SaleStatus } from '../models/sale.model.js';
 
 const PRODUCT_TYPES: ProductType[] = [
   'Trading and Demat', 'Mutual Fund', 'Unlisted Shares',
-  'Child Demat', 'Child Mutual Fund', 'IEPF', 'SW Global',
+  'Child Demat', 'Child Mutual Fund', 'IEPF', 'SW Global', 'Privilege Customer', 'Course',
 ];
 const SALE_STATUSES: SaleStatus[] = ['Pending', 'Completed', 'Cancelled'];
 
@@ -114,6 +114,7 @@ export class SalesService {
 
     const { data: existing, error: fetchError } = await client.from('sales').select('*').eq('id', id).single();
     if (fetchError || !existing) throw new Error('Sale record not found.');
+    if (existing.franchise_id) throw new Error('Locked: manage franchise sales in the Franchise department.');
 
     const isPrivilegedRole = ['admin', 'ceo', 'managing_director', 'director', 'executive', 'hod'].includes(access.role || '');
 
@@ -164,8 +165,9 @@ export class SalesService {
     const access = await this.verifyAccess(requesterId);
     if (!access.authorized) throw new Error('Unauthorized: you must belong to the Sales department to delete sales.');
 
-    const { data: existing, error: fetchError } = await client.from('sales').select('branch_id, status, created_by').eq('id', id).single();
+    const { data: existing, error: fetchError } = await client.from('sales').select('*').eq('id', id).single();
     if (fetchError || !existing) throw new Error('Sale record not found.');
+    if (existing.franchise_id) throw new Error('Locked: franchise sales must be preserved. Manage them in the Franchise department.');
 
     const isPrivilegedRole = ['admin', 'ceo', 'managing_director', 'director', 'executive', 'hod'].includes(access.role || '');
 

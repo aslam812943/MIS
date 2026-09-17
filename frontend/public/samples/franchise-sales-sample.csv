@@ -1,0 +1,3 @@
+client_name,client_contact,product,sale_date,units,sale_value,order_reference,remarks
+Sample Customer One,9876543210,Course,2026-09-17,1,5000,SAMPLE-COURSE-001,Replace sample customer details and reference
+Sample Customer Two,9876543211,Mutual Fund,2026-09-17,1,10000,SAMPLE-MF-001,Use a sale date on or after franchise registration

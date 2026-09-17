@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { apiErrorMessage } from '../utils/apiErrorMessage';
 
 const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? '/api' : 'http://localhost:5000/api');
 
@@ -24,14 +25,15 @@ api.interceptors.request.use(
   }
 );
 
-// Response interceptor to handle global errors (like 401 Unauthorized)
+// Normalize API failures before pages display toasts or error banners.
 api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      // Optional: Clear session and redirect to login on unauthorized
-      // authService.logout();
-      // window.location.href = '/login';
+  response => response,
+  error => {
+    const message = apiErrorMessage(error);
+    error.message = message;
+    if (error.response) {
+      const data = error.response.data;
+      error.response.data = { ...(data && typeof data === 'object' ? data : {}), message };
     }
     return Promise.reject(error);
   }

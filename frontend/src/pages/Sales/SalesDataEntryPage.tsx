@@ -321,8 +321,9 @@ const SalesDataEntryPage: React.FC = () => {
                         <td>
                           <div className="flex gap-2">
                             <button type="button" className="hover:underline text-xs font-bold" style={{ color: 'var(--text-secondary)' }} onClick={() => setViewingRecord(s)}>View</button>
-                            <button type="button" className="hover:underline text-xs font-bold" style={{ color: 'var(--accent)' }} onClick={() => handleEdit(s)}>Edit</button>
-                            <button type="button" className="hover:underline text-xs font-bold" style={{ color: '#ef4444' }} onClick={() => handleDelete(s)}>Delete</button>
+                            {!s.franchise_id && <><button type="button" className="hover:underline text-xs font-bold" style={{ color: 'var(--accent)' }} onClick={() => handleEdit(s)}>Edit</button>
+                            <button type="button" className="hover:underline text-xs font-bold" style={{ color: '#ef4444' }} onClick={() => handleDelete(s)}>Delete</button></>}
+                            {s.franchise_id && <a className="hover:underline text-xs font-bold" style={{ color: 'var(--accent)' }} href="/franchise/manage">Franchise record</a>}
                           </div>
                         </td>
                       </tr>

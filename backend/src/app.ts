@@ -8,6 +8,7 @@ import authRoutes from './routes/authRoutes.js';
 import protectedRoutes from './routes/protectedRoutes.js';
 import externalRoutes from './routes/externalRoutes.js';
 import socialMediaRoutes from './routes/socialMediaRoutes.js';
+import franchiseRoutes from './routes/franchiseRoutes.js';
 
 dotenv.config();
 
@@ -28,6 +29,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/admin', protectedRoutes);
 app.use('/api/external', externalRoutes);
 app.use('/api/social-media', socialMediaRoutes);
+app.use('/api/franchise', franchiseRoutes);
 
 // Health Check
 app.get('/health', (req: Request, res: Response) => {

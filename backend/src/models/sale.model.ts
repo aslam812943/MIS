@@ -5,7 +5,9 @@ export type ProductType =
   | 'Child Demat'
   | 'Child Mutual Fund'
   | 'IEPF'
-  | 'SW Global';
+  | 'SW Global'
+  | 'Privilege Customer'
+  | 'Course';
 
 export type SaleStatus = 'Pending' | 'Completed' | 'Cancelled';
 
@@ -20,6 +22,7 @@ export interface Sale {
   status: SaleStatus;
   remarks?: string | null;
   branch_id?: string | null;
+  franchise_id?: string | null;
   created_by?: string | null;
   created_at: string;
   updated_at: string;

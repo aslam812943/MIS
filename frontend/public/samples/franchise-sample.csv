@@ -1,0 +1,3 @@
+name,owner_name,phone,email,state,city,area,address,postal_code,has_office,office_sqft,registered_on
+Kochi Franchise,Arun Kumar,9876543210,kochi@example.invalid,Kerala,Kochi,Kakkanad,"First floor, Main Road",682030,Yes,450,2026-09-17
+Thrissur Franchise,Meera Nair,9876543211,thrissur@example.invalid,Kerala,Thrissur,Punkunnam,Market Road,680002,No,,2026-09-17
