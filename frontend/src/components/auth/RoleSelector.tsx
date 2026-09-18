@@ -74,7 +74,7 @@ const RoleSelector: React.FC<RoleSelectorProps> = ({ selectedRole, onSelect, fra
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2 sm:gap-3">
-        {ROLE_OPTIONS.filter(option => !franchiseOnly || ['franchise_owner', 'franchise_staff'].includes(option.role)).map((option) => (
+        {ROLE_OPTIONS.filter(option => ['franchise_owner', 'franchise_staff'].includes(option.role) === franchiseOnly).map((option) => (
           <button
             key={option.role}
             type="button"

@@ -1,4 +1,5 @@
 import fs from 'fs';
+import { normalizeRaImportRow, raClientDuplicateKeys, fillRaSubscriptionEndDate } from '../utils/raImport.js';
 import path from 'path';
 import { randomUUID } from 'crypto';
 import { supabaseAdmin } from '../config/supabase.js';
@@ -476,7 +477,15 @@ export class RAService {
     const { data, error } = await query;
     if (error) throw error;
 
-    let results: RAClient[] = (data || []).map((item: any) => {
+    const needsDates = (data || []).some((item: any) => item.subscription_start_date && !item.subscription_end_date);
+    const { data: durationPlans, error: durationError } = needsDates
+      ? await client.from('ra_packages').select('name,duration_days')
+      : { data: [], error: null };
+    if (durationError) throw durationError;
+    let results: RAClient[] = (data || []).map((stored: any) => {
+      const plan = (durationPlans || []).find(plan => plan.name.trim().toLowerCase() === String(stored.package || '').trim().toLowerCase());
+      const item = stored.subscription_start_date && !stored.subscription_end_date && plan && Number.isInteger(Number(plan.duration_days)) && Number(plan.duration_days) > 0
+        ? fillRaSubscriptionEndDate(stored, [plan]) : stored;
       const calculated = this.calculateSubscriptionStatus(
         item.subscription_start_date,
         item.subscription_end_date
@@ -513,22 +522,10 @@ export class RAService {
     return clients.find((c) => c.id === id) || null;
   }
 
-  async createClient(data: Partial<RAClient>, creatorId: string): Promise<RAClient> {
-    const client = supabaseAdmin;
-    if (!client) throw new Error('Supabase admin client is not configured.');
-
-    const access = await this.verifyAccess(creatorId);
-    if (!access.authorized) throw new Error('Unauthorized to add RA clients.');
-
-    if (!data.client_name || !data.package) {
-      throw new Error('Client name and package are required.');
-    }
-    if (data.pan && !/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(data.pan.trim().toUpperCase())) throw new Error('Enter a valid 10-character PAN.');
-    if (data.aadhaar_no && !/^[0-9]{12}$/.test(data.aadhaar_no.trim())) throw new Error('Enter a valid 12-digit Aadhaar.');
-
-    const payload = {
-      client_name: this.sanitizeText(data.client_name),
-      package: this.sanitizeText(data.package),
+  private clientInsertPayload(data: Partial<RAClient>, creatorId: string, access: { role?: string | undefined; isHOD?: boolean | undefined; branchId?: string | undefined }) {
+    return {
+      client_name: this.sanitizeText(data.client_name || ''),
+      package: this.sanitizeText(data.package || ''),
       amount: Number(data.amount) || 0,
       payment_date: data.payment_date || null,
       mobile_number: data.mobile_number ? this.sanitizeText(data.mobile_number) : null,
@@ -550,6 +547,28 @@ export class RAService {
       branch_id: this.canViewAllRecords(access) ? (data.branch_id || access.branchId || null) : (access.branchId || null),
       created_by: creatorId
     };
+  }
+
+  async createClient(data: Partial<RAClient>, creatorId: string): Promise<RAClient> {
+    const client = supabaseAdmin;
+    if (!client) throw new Error('Supabase admin client is not configured.');
+
+    const access = await this.verifyAccess(creatorId);
+    if (!access.authorized) throw new Error('Unauthorized to add RA clients.');
+
+    if (!data.client_name || !data.package) {
+      throw new Error('Client name and package are required.');
+    }
+    if (data.pan && !/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(data.pan.trim().toUpperCase())) throw new Error('Enter a valid 10-character PAN.');
+    if (data.aadhaar_no && !/^[0-9]{12}$/.test(data.aadhaar_no.trim())) throw new Error('Enter a valid 12-digit Aadhaar.');
+
+    if (data.subscription_start_date && !data.subscription_end_date) {
+      const { data: plans, error } = await client.from('ra_packages').select('name,duration_days');
+      if (error) throw error;
+      const dates = fillRaSubscriptionEndDate(normalizeRaImportRow({ ...data }), plans || []);
+      data = { ...data, subscription_start_date: dates.subscription_start_date, subscription_end_date: dates.subscription_end_date };
+    }
+    const payload = this.clientInsertPayload(data, creatorId, access);
 
     const { data: inserted, error } = await client
       .from('ra_clients')
@@ -561,7 +580,7 @@ export class RAService {
     return this.maskIdentity(inserted);
   }
 
-  async bulkCreateClients(rows: any[], creatorId: string): Promise<{ inserted: number; failed: Array<{ row: number; error: string }> }> {
+  async bulkCreateClients(rows: any[], creatorId: string, previewOnly = false): Promise<{ inserted: number; failed: Array<{ row: number; error: string }> }> {
     if (!Array.isArray(rows) || rows.length === 0) throw new Error('The CSV does not contain any client rows.');
     if (rows.length > 500) throw new Error('A maximum of 500 clients can be imported at one time.');
 
@@ -569,20 +588,53 @@ export class RAService {
     if (!client) throw new Error('Supabase admin client is not configured.');
     const access = await this.verifyAccess(creatorId);
     if (!access.authorized) throw new Error('Unauthorized to import RA clients.');
-    const { data: branches, error: branchError } = await client.from('branches').select('id, name');
-    if (branchError) throw branchError;
-    const branchByName = new Map((branches || []).map((branch: any) => [String(branch.name).trim().toLowerCase(), branch.id]));
-
+    // Fetch branches and the first duplicate-check page together.
+    const needsEndDate = rows.some(row => (row.subscription_start_date || row.coverage_start_date) && !(row.subscription_end_date || row.coverage_end_date));
+    const [branchResult, firstPage, planResult] = await Promise.all([
+      client.from('branches').select('id, name'),
+      client.from('ra_clients').select('client_name,package,pan,sw_code,mobile_number,email_id,subscription_start_date,subscription_end_date,created_by').order('id').range(0, 999),
+      needsEndDate ? client.from('ra_packages').select('name,duration_days') : Promise.resolve({ data: [], error: null })
+    ]);
+    if (branchResult.error) throw branchResult.error;
+    const branchByName = new Map((branchResult.data || []).map((branch: any) => [String(branch.name).trim().toLowerCase(), branch.id]));
+    const existingKeys = new Map<string, { name: string; visible: boolean }>();
+    for (let offset = 0; ; offset += 1000) {
+      const { data: existing, error } = offset === 0 ? firstPage : await client.from('ra_clients')
+        .select('client_name,package,pan,sw_code,mobile_number,email_id,subscription_start_date,subscription_end_date,created_by')
+        .order('id').range(offset, offset + 999);
+      if (error) throw new Error(`Unable to check existing clients: ${error.message}`);
+      for (const record of existing || []) for (const key of raClientDuplicateKeys(record)) existingKeys.set(key, { name: record.client_name, visible: this.canViewAllRecords(access) || record.created_by === creatorId });
+      if (!existing || existing.length < 1000) break;
+    }
+    const uploadedKeys = new Map<string, number>();
+    const pending: Array<{ row: number; payload: ReturnType<RAService['clientInsertPayload']> }> = [];
     let inserted = 0;
     const failed: Array<{ row: number; error: string }> = [];
     for (let index = 0; index < rows.length; index += 1) {
-      const row = { ...rows[index] };
       try {
+        let row = normalizeRaImportRow(rows[index]);
+        if (row.subscription_start_date && !row.subscription_end_date) {
+          if (planResult.error) throw new Error('Unable to load plan durations to calculate the end date.');
+          row = fillRaSubscriptionEndDate(row, planResult.data || []);
+        }
+        if (!String(row.client_name || '').trim() || !String(row.package || '').trim()) throw new Error('Client name and package are required.');
+        if (row.pan && !/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(String(row.pan).trim().toUpperCase())) throw new Error('Enter a valid 10-character PAN.');
+        if (row.aadhaar_no && !/^[0-9]{12}$/.test(String(row.aadhaar_no).trim())) throw new Error('Enter a valid 12-digit Aadhaar.');
+        const duplicateKeys = raClientDuplicateKeys(row);
+        const previousRow = duplicateKeys.map(key => uploadedKeys.get(key)).find(value => value !== undefined);
+        if (previousRow !== undefined) throw new Error(`Duplicate in uploaded CSV: matches row ${previousRow}. This row was not imported.`);
+        for (const key of duplicateKeys) uploadedKeys.set(key, index + 2);
+        const existingKey = duplicateKeys.find(key => existingKeys.has(key));
+        if (existingKey) {
+          const match = existingKeys.get(existingKey)!;
+          const reason = existingKey.startsWith('pan:') ? 'PAN' : existingKey.startsWith('sw:') ? 'SW code' : 'client details';
+          throw new Error(`Client already exists in the database${match.visible ? `: "${match.name}"` : ''} (matching ${reason}). Skip this row or edit the existing client.`);
+        }
         const branchName = String(row.branch_name || row.branch || '').trim();
         if (branchName && !this.canViewAllRecords(access) && branchByName.get(branchName.toLowerCase()) !== access.branchId) {
           throw new Error('Only management can import clients into another branch or create a new branch.');
         }
-        if (branchName && this.canViewAllRecords(access)) {
+        if (branchName && this.canViewAllRecords(access) && !previewOnly) {
           const key = branchName.toLowerCase();
           let branchId = branchByName.get(key);
           if (!branchId) {
@@ -594,12 +646,37 @@ export class RAService {
           }
           row.branch_id = branchId;
         }
-        await this.createClient(row, creatorId);
-        inserted += 1;
+        if (!previewOnly) pending.push({ row: index + 2, payload: this.clientInsertPayload(row, creatorId, access) });
       } catch (error: any) {
         failed.push({ row: index + 2, error: error?.message || 'Unable to import row' });
       }
     }
+    // One database write per batch; access is verified once for the entire request.
+    for (let offset = 0; offset < pending.length; offset += 100) {
+      const batch = pending.slice(offset, offset + 100);
+      const { error } = await client.from('ra_clients').insert(batch.map(item => item.payload));
+      if (!error) {
+        inserted += batch.length;
+        continue;
+      }
+      // PostgreSQL rejects the entire statement for constraint/data errors.
+      // Isolate those rows without repeating authorization or returning client data.
+      if (/^(22|23)/.test(error.code || '')) {
+        for (let start = 0; start < batch.length; start += 5) {
+          const outcomes = await Promise.all(batch.slice(start, start + 5).map(async item => {
+            const { error: rowError } = await client.from('ra_clients').insert(item.payload);
+            return { item, error: rowError };
+          }));
+          for (const outcome of outcomes) {
+            if (outcome.error) failed.push({ row: outcome.item.row, error: outcome.error.message });
+            else inserted += 1;
+          }
+        }
+      } else {
+        for (const item of batch) failed.push({ row: item.row, error: `Save was not confirmed: ${error.message}. Check the directory before retrying.` });
+      }
+    }
+    failed.sort((a, b) => a.row - b.row);
     return { inserted, failed };
   }
 
@@ -648,6 +725,26 @@ export class RAService {
 
     if (error) throw error;
     return this.maskIdentity(updated);
+  }
+
+  async bulkClientAction(ids: string[], userId: string, status?: string): Promise<{ affected_ids: string[]; failed_ids: string[] }> {
+    if (!Array.isArray(ids) || !ids.length || ids.length > 500) throw new Error('Select between 1 and 500 clients.');
+    if (ids.some(id => typeof id !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))) throw new Error('Invalid client IDs.');
+    if (status !== undefined && !['Pending', 'In Progress', 'Completed', 'Updated'].includes(status)) throw new Error('Invalid KRA status.');
+    const client = supabaseAdmin;
+    if (!client) throw new Error('Supabase admin client is not configured.');
+    const access = await this.verifyAccess(userId);
+    if (!access.authorized) throw new Error('Unauthorized to manage RA clients.');
+    const uniqueIds = [...new Set(ids)];
+    let query = status === undefined
+      ? client.from('ra_clients').delete().in('id', uniqueIds)
+      : client.from('ra_clients').update({ kra_updation_status: status, updated_at: new Date().toISOString() }).in('id', uniqueIds);
+    if (!this.canViewAllRecords(access)) query = query.eq('created_by', userId);
+    const { data, error } = await query.select('id');
+    if (error) throw error;
+    const affected_ids = (data || []).map(row => row.id as string);
+    const affected = new Set(affected_ids);
+    return { affected_ids, failed_ids: uniqueIds.filter(id => !affected.has(id)) };
   }
 
   async deleteClient(id: string, userId: string): Promise<boolean> {

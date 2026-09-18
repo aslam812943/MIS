@@ -566,7 +566,7 @@ export const Sidebar: React.FC = () => {
         {showFranchise && <>
           <span className="mis-sidebar-section-label">Franchise Department</span>
           <NavItem to={ROUTES.FRANCHISE_DASHBOARD} icon={<IconIEPFDashboard />} label="Franchise Dashboard" onClick={closeOnMobile} />
-          <NavItem to={ROUTES.FRANCHISE_MANAGE} icon={<IconIEPFEntry />} label={isFranchiseLogin ? 'Sales & Earnings' : 'Franchise Management'} onClick={closeOnMobile} />
+          <>{!isFranchiseLogin && <NavItem to={ROUTES.FRANCHISE_MANAGE} icon={<IconIEPFEntry />} label="Franchise Management" onClick={closeOnMobile} />}{!isAdmin && user?.role !== 'ceo' && <NavItem to={ROUTES.FRANCHISE_SALES} icon={<IconIEPFEntry />} label="Product Sales" onClick={closeOnMobile} />}<NavItem to={ROUTES.FRANCHISE_REPORTS} icon={<IconIEPFEntry />} label="Reports" onClick={closeOnMobile} /></>
         </>}
 
         {/* Sales Department Navigation */}

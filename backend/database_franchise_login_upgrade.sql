@@ -3,8 +3,12 @@
 -- Existing accounts and passwords are preserved. New accounts use role mapping.
 BEGIN;
 ALTER TABLE public.franchise_users ADD COLUMN IF NOT EXISTS login_email TEXT;
+-- Existing tables also need the composite unique key used by login upserts.
+CREATE UNIQUE INDEX IF NOT EXISTS franchise_users_branch_user_unique
+ ON public.franchise_users(franchise_id,user_id);
 ALTER TABLE public.franchise_users ADD COLUMN IF NOT EXISTS shared_access BOOLEAN NOT NULL DEFAULT false;
-CREATE UNIQUE INDEX IF NOT EXISTS franchise_role_login_unique
+DROP INDEX IF EXISTS franchise_role_login_unique;
+CREATE INDEX IF NOT EXISTS franchise_role_login_lookup
  ON public.franchise_users(lower(login_email),membership_role)
  WHERE login_email IS NOT NULL;
 CREATE OR REPLACE FUNCTION onboard_franchise(p_data JSONB,p_plan UUID,p_actor UUID,p_users JSONB)
