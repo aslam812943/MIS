@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
+import { franchiseCredentialEmail } from '../utils/franchiseCredentialEmail.js';
 
 dotenv.config();
 
@@ -22,13 +23,13 @@ export class EmailService {
     });
   }
 
-  async sendFranchiseCredentials(to: string, name: string, franchise: string, password: string, roles: string[]): Promise<void> {
+  async sendFranchiseCredentials(to: string, name: string, franchise: string): Promise<void> {
     if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) throw new Error('Email delivery is not configured.');
-    const login = `${(process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '')}/franchise/login`;
+    const content = franchiseCredentialEmail(to, name, franchise, process.env.FRONTEND_URL || 'http://localhost:5173');
     const result = await this.transporter.sendMail({
       from: `"MIS Admin" <${process.env.SMTP_USER}>`, to,
-      subject: 'Your franchise login details',
-      text: `Hello ${name},\n\nYour franchise ${franchise} is ready.\n\nLogin: ${login}\nEmail: ${to}\nPassword: ${password}\nRole: ${roles.join(' or ')}\n\nSelect the role on the login page. Staff can enter sales; owners can review their franchise dashboard. Please change your password in My Profile after signing in.`,
+      subject: 'Your franchise Employee and HOD login details',
+      ...content,
     });
     if (result.rejected?.length || !result.accepted?.length) throw new Error('The mail server did not accept the credential email.');
   }

@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {parseProductSalesCsv} from '../../frontend/src/utils/franchiseProductSalesCsv.ts';
+const branches:any[]=[{id:'a',code:'FR-000001',location:'Kochi'},{id:'b',code:'FR-000002',location:'Kollam'}];
+const products=['Course','Mutual fund','Trading & demat account'];
+const sample=readFileSync(new URL('../../frontend/public/samples/franchise-product-sales-sample.csv',import.meta.url),'utf8');
+assert.equal(parseProductSalesCsv(sample,branches,products,'a').length,3);
+const parsed=parseProductSalesCsv('customer_name,product,amount,sale_date,franchise_code\n"Test, Customer",course,"₹5,000.50",2026-09-18,FR-000002',branches,products,'a');
+assert.equal(parsed[0]!.franchise_id,'b');assert.equal(parsed[0]!.customer_name,'Test, Customer');assert.equal(parsed[0]!.amount,'5000.50');assert.equal(parsed[0]!.product,'Course');
+assert.throws(()=>parseProductSalesCsv('customer_name,product,amount,sale_date,franchise_code\nTest,Course,5000,2026-09-18,UNASSIGNED',branches,products,'a'),/assigned branch/);
+assert.throws(()=>parseProductSalesCsv('customer_name,product,amount,sale_date\nTest,Course,5000,2026-02-31',branches,products,'a'),/valid YYYY/);
+assert.throws(()=>parseProductSalesCsv('customer_name,product,amount,sale_date\nTest,Course,-10,2026-09-18',branches,products,'a'),/invalid amount/);
+assert.throws(()=>parseProductSalesCsv('customer_name,product,amount,sale_date\nTest,Unknown,10,2026-09-18',branches,products,'a'),/supported product/);
+console.log('Franchise CSV sample, quoted amounts, branch resolution, and validation checks passed.');

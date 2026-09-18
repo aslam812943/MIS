@@ -169,7 +169,7 @@ export class RAController {
     }
   }
 
-  async bulkCreateClients(req: Request, res: Response): Promise<void> {
+  async bulkCreateClients(req: Request, res: Response, previewOnly = false): Promise<void> {
     try {
       const userId = (req as any).user?.id;
       if (!userId) {
@@ -177,8 +177,8 @@ export class RAController {
         return;
       }
       const rows = Array.isArray(req.body?.rows) ? req.body.rows : [];
-      const result = await raService.bulkCreateClients(rows, userId);
-      res.status(201).json(result);
+      const result = await raService.bulkCreateClients(rows, userId, previewOnly);
+      res.status(previewOnly ? 200 : 201).json(result);
     } catch (error: any) {
       console.error('Error bulk importing RA clients:', error);
       res.status(400).json({ error: error.message || 'Failed to import clients' });
@@ -201,6 +201,19 @@ export class RAController {
     } catch (error: any) {
       console.error('Error updating RA client:', error);
       res.status(400).json({ error: error.message || 'Failed to update client' });
+    }
+  }
+
+  async bulkClientAction(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = (req as any).user?.id;
+      if (!userId) { res.status(401).json({ error: 'Unauthorized' }); return; }
+      const ids = req.body?.ids;
+      const status = req.method === 'PATCH' ? req.body?.status : undefined;
+      if (req.method === 'PATCH' && typeof status !== 'string') throw new Error('KRA status is required.');
+      res.json(await raService.bulkClientAction(ids, userId, status));
+    } catch (error: any) {
+      res.status(400).json({ error: error.message || 'Unable to process selected clients.' });
     }
   }
 

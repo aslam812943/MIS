@@ -10,21 +10,28 @@ import { EmailService } from './EmailService.js';
  */
 export class AuthService implements IAuthService {
   private async matchesLoginRole(user: { id:string;role:string }, role:string):Promise<boolean> {
-    if (user.role===role) return true;
+    if (user.role===role || (user.role==='franchise_staff' && role==='employee') || (user.role==='franchise_owner' && role==='hod')) return true;
     if (user.role!=='franchise_owner' || role!=='franchise_staff' || !supabaseAdmin) return false;
     const {data,error}=await supabaseAdmin.from('franchise_users').select('shared_access,status').eq('user_id',user.id).maybeSingle();
     return !error && data?.shared_access===true && data.status==='active';
   }
-  private async resolveLoginEmail(email: string, role: string): Promise<string> {
-    if (!['franchise_owner', 'franchise_staff'].includes(role) || !supabaseAdmin) return email;
+  private async resolveLoginIdentity(email: string, role: string): Promise<{ email: string; role: string }> {
+    const membership = ['hod', 'franchise_owner'].includes(role) ? 'owner' : ['employee', 'franchise_staff'].includes(role) ? 'staff' : null;
+    if (!membership || !supabaseAdmin) return { email, role };
     const { data, error } = await supabaseAdmin.from('franchise_users').select('user_id,status')
-      .eq('login_email', email.trim().toLowerCase()).eq('membership_role', role === 'franchise_owner' ? 'owner' : 'staff').maybeSingle();
+      .eq('login_email', email.trim().toLowerCase()).eq('membership_role', membership);
     if (error) throw new Error('Could not verify franchise login. Apply the updated franchise migration.');
-    if (!data) return email;
-    if (data.status !== 'active') throw new Error('Access denied: franchise login disabled');
-    const profile = await this.userRepository.findById(data.user_id);
-    if (!profile) throw new Error('Invalid login credentials');
-    return profile.email;
+    if (!data?.length) return { email, role };
+    const active = data.filter(member => member.status === 'active');
+    const users = [...new Set(active.map(member => member.user_id))];
+    if (users.length !== 1) throw new Error('Access denied: franchise login is disabled or has conflicting role mappings.');
+    const profile = await this.userRepository.findById(users[0]!);
+    const effectiveRole = membership === 'owner' ? 'franchise_owner' : 'franchise_staff';
+    if (!profile || profile.role !== effectiveRole) throw new Error('Invalid login credentials');
+    return { email: profile.email, role: effectiveRole };
+  }
+  private async resolveLoginEmail(email: string, role: string): Promise<string> {
+    return (await this.resolveLoginIdentity(email, role)).email;
   }
   /**
    * @param userRepository Repository for accessing user profile data.
@@ -45,8 +52,10 @@ export class AuthService implements IAuthService {
    * @returns A Promise resolving to an AuthResponse containing user profile and session.
    */
   async login(email: string, password: string, role: string): Promise<AuthResponse> {
+    const identity = await this.resolveLoginIdentity(email, role);
+    role = identity.role;
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-      email: await this.resolveLoginEmail(email, role),
+      email: identity.email,
       password,
     });
 
@@ -85,7 +94,7 @@ export class AuthService implements IAuthService {
 
     let publicEmail = userProfile.email;
     if (['franchise_owner', 'franchise_staff'].includes(userProfile.role) && supabaseAdmin) {
-      const { data, error } = await supabaseAdmin.from('franchise_users').select('login_email').eq('user_id', userProfile.id).maybeSingle();
+      const { data, error } = await supabaseAdmin.from('franchise_users').select('login_email').eq('user_id', userProfile.id).limit(1).maybeSingle();
       if (error) throw new Error('Could not load franchise login');
       publicEmail = data?.login_email || publicEmail;
     }

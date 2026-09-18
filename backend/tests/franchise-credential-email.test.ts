@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import { franchiseCredentialEmail } from '../src/utils/franchiseCredentialEmail';
+const email = franchiseCredentialEmail('owner@example.invalid','A <script>','Kochi & Branch','https://mis.example.invalid');
+assert.ok(email.text.includes('Select role: Employee\nEmail: owner@example.invalid\nPassword: password123\n'));
+assert.ok(email.text.includes('Select role: HOD\nEmail: owner@example.invalid\nPassword: password1234\n'));
+assert.ok(email.html.includes('A &lt;script&gt;'));
+assert.ok(email.html.includes('Kochi &amp; Branch'));
+assert.ok(email.html.includes('https://mis.example.invalid/login'));
+assert.equal(email.html.match(/owner@example.invalid/g)?.length,2);
+assert.throws(()=>franchiseCredentialEmail('owner@example.invalid','Owner','Branch','javascript:alert(1)'));
+console.log('Credential email: both role/password pairs, same email, login URL and HTML escaping passed.');

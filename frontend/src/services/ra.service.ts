@@ -66,6 +66,11 @@ export const raService = {
     return response.data.client || response.data;
   },
 
+  previewClientImport: async (rows: Record<string, unknown>[]): Promise<{ failed: Array<{ row: number; error: string }> }> => {
+    const response = await api.post('/admin/ra/clients/bulk-preview', { rows });
+    return response.data;
+  },
+
   bulkCreateClients: async (rows: Record<string, unknown>[]): Promise<{ inserted: number; failed: Array<{ row: number; error: string }> }> => {
     const response = await api.post('/admin/ra/clients/bulk', { rows });
     return response.data;
@@ -74,6 +79,13 @@ export const raService = {
   updateClient: async (id: string, data: Partial<RAClient>): Promise<RAClient> => {
     const response = await api.put(`/admin/ra/clients/${id}`, data);
     return response.data.client || response.data;
+  },
+
+  bulkClientAction: async (ids: string[], status?: string): Promise<{ affected_ids: string[]; failed_ids: string[] }> => {
+    const response = status === undefined
+      ? await api.delete('/admin/ra/clients', { data: { ids } })
+      : await api.patch('/admin/ra/clients', { ids, status });
+    return response.data;
   },
 
   deleteClient: async (id: string): Promise<void> => {

@@ -45,19 +45,19 @@
   },
   {
     "id": "294d4f77-321e-4b78-adef-a6f0b8a23aad",
-    "name": "Basic",
+    "name": "BASIC",
     "description": null,
     "segment": "Equity",
-    "price": 1500,
+    "price": 1499,
     "duration_days": 30,
     "is_active": true,
     "created_by": "d61e443d-be16-4f94-bba2-73317d0d1a61",
     "created_at": "2026-09-14T07:24:35.403797+00:00",
-    "updated_at": "2026-09-14T07:24:35.403797+00:00"
+    "updated_at": "2026-09-18T10:37:50.167+00:00"
   },
   {
     "id": "62036f2d-3122-4693-9b3e-ebb47fa42cd7",
-    "name": "Pro",
+    "name": "PRO",
     "description": null,
     "segment": "Equity",
     "price": 3999,
@@ -65,18 +65,18 @@
     "is_active": true,
     "created_by": "d61e443d-be16-4f94-bba2-73317d0d1a61",
     "created_at": "2026-09-14T07:25:01.254536+00:00",
-    "updated_at": "2026-09-14T07:25:01.254536+00:00"
+    "updated_at": "2026-09-18T10:29:46.235+00:00"
   },
   {
     "id": "5201518e-b7b8-425c-8ef0-5c1acecb8c72",
-    "name": "Elite",
+    "name": "ELITE",
     "description": null,
     "segment": "Equity",
-    "price": 7999,
+    "price": 11999,
     "duration_days": 365,
     "is_active": true,
     "created_by": "d61e443d-be16-4f94-bba2-73317d0d1a61",
     "created_at": "2026-09-14T07:25:31.973589+00:00",
-    "updated_at": "2026-09-14T07:25:31.973589+00:00"
+    "updated_at": "2026-09-18T10:37:25.081+00:00"
   }
 ]

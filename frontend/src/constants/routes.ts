@@ -6,6 +6,8 @@ export const ROUTES = {
   LOGIN: '/login',
   FRANCHISE_LOGIN: '/franchise/login',
   FRANCHISE_DASHBOARD: '/franchise/dashboard',
+  FRANCHISE_SALES: '/franchise/product-sales',
+  FRANCHISE_REPORTS: '/franchise/reports',
   FRANCHISE_MANAGE: '/franchise/manage',
   DASHBOARD: '/dashboard',
   ADMIN_PANEL: '/admin-panel',

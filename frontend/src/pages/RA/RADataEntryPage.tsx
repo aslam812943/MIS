@@ -4,7 +4,12 @@ import { Loader2 } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import DashboardLayout from '../../components/layout/DashboardLayout';
+import { calculateRaEndDate, fillRaCsvEndDates } from '../../utils/raSubscription';
+import { uploadRaClientsInBatches } from '../../utils/raImportProgress';
+import type { RAImportProgress } from '../../utils/raImportProgress';
+import { parseRaCsv } from '../../utils/raCsv';
 import { raService } from '../../services/ra.service';
+import RACsvPreview from './RACsvPreview';
 import RAIdentityRequestButton from './RAIdentityRequestButton';
 import { orgService } from '../../services/org.service';
 import { authService } from '../../services/auth.service';
@@ -16,31 +21,6 @@ import type {
 } from '../../types/ra.types';
 
 const KRA_STATUSES: KRAUpdationStatus[] = ['Pending', 'In Progress', 'Completed', 'Updated'];
-const REQUIRED_CSV_HEADERS = ['client_name', 'package'];
-
-const parseCsv = (text: string): Record<string, string>[] => {
-  const rows: string[][] = [];
-  let row: string[] = [], value = '', quoted = false;
-  for (let index = 0; index < text.length; index += 1) {
-    const char = text[index];
-    if (char === '"' && quoted && text[index + 1] === '"') { value += '"'; index += 1; }
-    else if (char === '"') quoted = !quoted;
-    else if (char === ',' && !quoted) { row.push(value.trim()); value = ''; }
-    else if ((char === '\n' || char === '\r') && !quoted) {
-      if (char === '\r' && text[index + 1] === '\n') index += 1;
-      row.push(value.trim());
-      if (row.some(cell => cell !== '')) rows.push(row);
-      row = []; value = '';
-    } else value += char;
-  }
-  row.push(value.trim());
-  if (row.some(cell => cell !== '')) rows.push(row);
-  if (rows.length < 2) return [];
-  const headers = rows[0].map(header => header.replace(/^\uFEFF/, '').trim().toLowerCase());
-  const missing = REQUIRED_CSV_HEADERS.filter(header => !headers.includes(header));
-  if (missing.length) throw new Error(`Missing required CSV headers: ${missing.join(', ')}`);
-  return rows.slice(1).map(cells => Object.fromEntries(headers.map((header, index) => [header, cells[index] || ''])));
-};
 
 interface RADataEntryPageProps {
   defaultTab?: 'clients' | 'packages' | 'renewals' | 'payments' | 'kyc';
@@ -90,11 +70,17 @@ export const RADataEntryPage: React.FC<RADataEntryPageProps> = ({ defaultTab }) 
 
   // Modal States - Client
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
+  const [endDateExplicit, setEndDateExplicit] = useState(false);
   const [editingClient, setEditingClient] = useState<RAClient | null>(null);
   const [saving, setSaving] = useState(false);
   const [bulkImporting, setBulkImporting] = useState(false);
   const [csvPreview, setCsvPreview] = useState<Record<string, string>[] | null>(null);
   const [csvVerified, setCsvVerified] = useState(false);
+  const [csvProgress, setCsvProgress] = useState<RAImportProgress | null>(null);
+  const [csvErrors, setCsvErrors] = useState<string[]>([]);
+  const [csvSelected, setCsvSelected] = useState<Set<number>>(new Set());
+  const [csvRowNumbers, setCsvRowNumbers] = useState<number[]>([]);
+  const [csvConflicts, setCsvConflicts] = useState<Set<number>>(new Set());
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [confirmation, setConfirmation] = useState<{ title: string; description: string; run: () => Promise<void> } | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
@@ -163,12 +149,12 @@ export const RADataEntryPage: React.FC<RADataEntryPageProps> = ({ defaultTab }) 
   }, [hasMultiBranchAccess]);
 
   // Load clients, packages catalog, and package stats
-  const loadData = async () => {
+  const loadData = async (refreshPackages = true) => {
     try {
       setLoading(true);
       const [clientData, pkgCatalog, packageData] = await Promise.all([
         raService.getClients({ branchId: selectedBranch || undefined }),
-        raService.getPackages(false).catch(() => []),
+        refreshPackages ? raService.getPackages(false).catch(() => []) : Promise.resolve(packagesList),
         raService.getPackageReport(selectedBranch || undefined).catch(() => ({})),
       ]);
       setClients(clientData);
@@ -249,31 +235,27 @@ export const RADataEntryPage: React.FC<RADataEntryPageProps> = ({ defaultTab }) 
   const handlePackageSelectChange = (packageName: string) => {
     const matched = packagesList.find((p) => p.name === packageName);
     const startStr = formData.subscription_start_date || new Date().toISOString().split('T')[0];
-    const durationDays = matched ? matched.duration_days : 90;
-
-    const startDate = new Date(startStr);
-    const calculatedEnd = new Date(startDate);
-    calculatedEnd.setDate(calculatedEnd.getDate() + durationDays);
+    const calculatedEnd = calculateRaEndDate(startStr, matched?.duration_days || 0);
 
     setFormData((prev) => ({
       ...prev,
       package: packageName,
       amount: matched ? matched.price : prev.amount,
       subscription_start_date: startStr,
-      subscription_end_date: calculatedEnd.toISOString().split('T')[0]
+      subscription_end_date: endDateExplicit ? formData.subscription_end_date : calculatedEnd
     }));
   };
 
   // Open modal for Create Client
   const handleOpenCreateModal = () => {
     setEditingClient(null);
+    setEndDateExplicit(false);
     const todayStr = new Date().toISOString().split('T')[0];
     const firstActivePkg = activePackages[0];
     const defaultDuration = firstActivePkg ? firstActivePkg.duration_days : 90;
     const defaultPrice = firstActivePkg ? firstActivePkg.price : 15000;
 
-    const defaultEnd = new Date();
-    defaultEnd.setDate(defaultEnd.getDate() + defaultDuration);
+    const defaultEnd = calculateRaEndDate(todayStr, defaultDuration);
 
     setFormData({
       client_name: '',
@@ -295,7 +277,7 @@ export const RADataEntryPage: React.FC<RADataEntryPageProps> = ({ defaultTab }) 
       ckyc_number: '',
       remarks: '',
       subscription_start_date: todayStr,
-      subscription_end_date: defaultEnd.toISOString().split('T')[0],
+      subscription_end_date: defaultEnd,
       branch_id: currentUser?.branch_id || '',
     });
     setIsClientModalOpen(true);
@@ -304,6 +286,7 @@ export const RADataEntryPage: React.FC<RADataEntryPageProps> = ({ defaultTab }) 
   // Open modal for Edit Client
   const handleOpenEditModal = (client: RAClient) => {
     setEditingClient(client);
+    setEndDateExplicit(Boolean(client.subscription_end_date));
     setFormData({
       client_name: client.client_name,
       package: client.package || '',
@@ -377,36 +360,53 @@ export const RADataEntryPage: React.FC<RADataEntryPageProps> = ({ defaultTab }) 
 
     try {
       setBulkImporting(true);
-      const parsedRows = parseCsv(await file.text());
+      setCsvProgress(null);
+      const columnIssues = new Map<number, string>();
+      const parsedRows = fillRaCsvEndDates(parseRaCsv(await file.text(), (row, error) => columnIssues.set(row, error)), packagesList);
       if (!parsedRows.length) throw new Error('The CSV does not contain any data rows.');
+      const result = await raService.previewClientImport(parsedRows.map(row => ({
+        ...row,
+        branch_id: row.branch_id || (row.branch_name ? undefined : selectedBranch || undefined)
+      })));
+      const issues = new Map(result.failed.map(failure => [failure.row, failure.error]));
+      for (const [row, error] of columnIssues) issues.set(row, error);
       setCsvVerified(false);
       setCsvPreview(parsedRows);
+      setCsvErrors(parsedRows.map((_, index) => issues.get(index + 2) || ''));
+      setCsvRowNumbers(parsedRows.map((_, index) => index + 2));
+      setCsvConflicts(new Set(parsedRows.flatMap((_, index) => columnIssues.has(index + 2) ? [index] : [])));
+      setCsvSelected(new Set(parsedRows.flatMap((_, index) => issues.has(index + 2) ? [] : [index])));
     } catch (err: any) {
-      toast.error(err.message || 'Could not preview CSV.');
+      toast.error(err.response?.data?.error || err.message || 'Could not preview CSV.');
     } finally { setBulkImporting(false); }
   };
 
   const saveVerifiedCsv = async () => {
-    if (!csvPreview || !csvVerified) return;
+    if (!csvPreview || !csvVerified || !csvSelected.size) return;
     try {
       setBulkImporting(true);
-      const rows = csvPreview.map(row => ({
-        ...row,
-        amount: Number(row.amount || 0),
-        branch_id: row.branch_id || (row.branch_name || row.branch ? undefined : selectedBranch || undefined)
+      const selectedIndexes = [...csvSelected].sort((a, b) => a - b);
+      const rows = selectedIndexes.map(index => ({
+        ...csvPreview[index],
+        branch_id: csvPreview[index]!.branch_id || (csvPreview[index]!.branch_name ? undefined : selectedBranch || undefined)
       }));
-      const result = await raService.bulkCreateClients(rows);
+      const result = await uploadRaClientsInBatches(rows, raService.bulkCreateClients, setCsvProgress);
       if (result.failed.length) {
-        toast.error(`${result.inserted} imported; ${result.failed.length} failed. First error: row ${result.failed[0].row} — ${result.failed[0].error}`);
-      } else {
-        toast.success(`${result.inserted} clients imported successfully.`);
-      }
-      if (result.failed.length) {
-        // Backend row numbers include the CSV header as row one.
-        setCsvPreview(csvPreview.filter((_, index) => result.failed.some(failure => failure.row === index + 2)));
+        const failures = new Map(result.failed.map(failure => [selectedIndexes[failure.row - 2]!, failure.error.replace(/matches row (\d+)/, (_, row) => `matches row ${csvRowNumbers[selectedIndexes[Number(row) - 2]!]}`)]));
+        const retained = csvPreview.flatMap((_, index) => !csvSelected.has(index) || failures.has(index) ? [index] : []);
+        setCsvPreview(retained.map(index => csvPreview[index]!));
+        setCsvRowNumbers(retained.map(index => csvRowNumbers[index]!));
+        setCsvErrors(retained.map(index => failures.get(index) || csvErrors[index] || ''));
+        setCsvConflicts(new Set(retained.flatMap((index, position) => csvConflicts.has(index) ? [position] : [])));
+        setCsvSelected(new Set());
         setCsvVerified(false);
-      } else { setCsvPreview(null); setCsvVerified(false); }
-      await loadData();
+        toast.error(`${result.inserted} imported; ${result.failed.length} selected rows have issues. Review the highlighted rows.`);
+      } else {
+        toast.success(`${result.inserted} clients imported; ${csvPreview.length - selectedIndexes.length} rows skipped.`);
+        setCsvPreview(null);
+        setCsvVerified(false);
+      }
+      void loadData(false);
     } catch (err: any) {
       toast.error(err.response?.data?.error || err.message || 'Failed to import CSV.');
     } finally {
@@ -416,7 +416,7 @@ export const RADataEntryPage: React.FC<RADataEntryPageProps> = ({ defaultTab }) 
 
   // Delete Client
   const handleDeleteClient = async (client: RAClient) => {
-    setConfirmation({ title: 'Delete client?', description: `Permanently remove ${client.client_name}? This cannot be undone.`, run: async () => { await raService.deleteClient(client.id); toast.success('Client record removed'); await loadData(); } });
+    setConfirmation({ title: 'Delete client?', description: `Permanently remove ${client.client_name}? This cannot be undone.`, run: async () => { await raService.deleteClient(client.id); setClients(previous => previous.filter(row => row.id !== client.id)); toast.success('Client record removed'); void raService.getPackageReport(selectedBranch || undefined).then(setPackagesStats).catch(() => {}); } });
   };
 
   const requestBulkAction = (status?: KRAUpdationStatus) => {
@@ -425,18 +425,29 @@ export const RADataEntryPage: React.FC<RADataEntryPageProps> = ({ defaultTab }) 
     setConfirmation({ title: status ? 'Confirm KRA status change' : 'Delete selected clients?', description: status ? `Set KRA status to ${status} for ${ids.length} selected clients?` : `Permanently delete ${ids.length} selected clients? This cannot be undone.`, run: async () => {
       let completed = 0, failed = 0;
       const remaining = new Set(ids);
-      for (const id of ids) {
+      setActionProgress(`0 of ${ids.length} clients ${status ? 'updated' : 'deleted'}…`);
+      for (let offset = 0; offset < ids.length; offset += 500) {
+        const batch = ids.slice(offset, offset + 500);
         try {
-          if (status) await raService.updateClient(id, { kra_updation_status: status });
-          else await raService.deleteClient(id);
-          completed += 1; remaining.delete(id);
-        } catch { failed += 1; }
+          const result = await raService.bulkClientAction(batch, status);
+          completed += result.affected_ids.length;
+          failed += result.failed_ids.length;
+          result.affected_ids.forEach(id => remaining.delete(id));
+          setClients(previous => previous.flatMap(client => {
+            if (!result.affected_ids.includes(client.id)) return [client];
+            return status ? [{ ...client, kra_updation_status: status }] : [];
+          }));
+        } catch (error: any) {
+          failed += ids.length - offset;
+          toast.error(error.response?.data?.error || error.message || 'Batch action failed.');
+          break;
+        }
         setActionProgress(`${completed} successful · ${failed} failed · ${ids.length} total`);
       }
       setSelectedIds(remaining);
       if (failed) toast.error(`${completed} successful; ${failed} failed. Failed clients remain selected.`);
       else toast.success(`${completed} clients ${status ? 'updated' : 'deleted'}`);
-      await loadData();
+      void raService.getPackageReport(selectedBranch || undefined).then(setPackagesStats).catch(() => {});
     } });
   };
 
@@ -661,7 +672,10 @@ export const RADataEntryPage: React.FC<RADataEntryPageProps> = ({ defaultTab }) 
   return (
     <DashboardLayout>
       <div className="mis-page mis-animate-in max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6 pb-16">
-        {csvPreview && createPortal(<div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"><div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col p-5 gap-4" role="dialog" aria-modal="true" aria-label="Verify CSV import"><h2 className="text-xl font-bold">Verify RA CSV Import</h2><p className="text-sm">Full preview: {csvPreview.length} records. Review every column before saving.</p><div className="overflow-auto max-h-[55vh]"><table className="w-full text-xs"><thead><tr><th className="p-2">Row</th>{Object.keys(csvPreview[0] || {}).map(header => <th key={header} className="p-2 text-left whitespace-nowrap">{header}</th>)}</tr></thead><tbody>{csvPreview.map((row,index)=><tr key={index} className="border-t border-[var(--border)]"><td className="p-2">{index+1}</td>{Object.entries(row).map(([key,value])=><td key={key} className="p-2 whitespace-nowrap">{value || '—'}</td>)}</tr>)}</tbody></table></div><label className="flex gap-2 text-sm"><input type="checkbox" checked={csvVerified} disabled={bulkImporting} onChange={e=>setCsvVerified(e.target.checked)}/>I reviewed these records and confirm they are ready to save.</label><div className="flex justify-end gap-3"><button disabled={bulkImporting} onClick={()=>setCsvPreview(null)} className="px-4 py-2 border rounded-xl">Cancel</button><button disabled={!csvVerified || bulkImporting} onClick={saveVerifiedCsv} className="px-4 py-2 rounded-xl bg-[var(--accent)] text-slate-950 disabled:opacity-50 inline-flex items-center gap-2">{bulkImporting ? <><Loader2 className="w-4 h-4 animate-spin"/>Saving {csvPreview.length} records…</> : 'Save verified records'}</button></div></div></div>, document.body)}
+        {csvPreview && createPortal(
+          <RACsvPreview rows={csvPreview} rowNumbers={csvRowNumbers} errors={csvErrors} conflicts={csvConflicts} selected={csvSelected} verified={csvVerified} busy={bulkImporting} progress={csvProgress} onSelect={setCsvSelected} onVerify={setCsvVerified} onCancel={() => setCsvPreview(null)} onSave={saveVerifiedCsv} />,
+          document.body
+        )}
         {confirmation && createPortal(<div className="fixed inset-0 z-[210] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"><div role="dialog" aria-modal="true" aria-label={confirmation.title} className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl p-6 max-w-md w-full"><h2 className="text-lg font-bold">{confirmation.title}</h2><p className="text-sm mt-3">{confirmation.description}</p>{actionBusy && <p role="status" className="text-sm mt-3">{actionProgress}</p>}<div className="flex justify-end gap-3 mt-5"><button disabled={actionBusy} onClick={()=>setConfirmation(null)} className="px-4 py-2 border rounded-xl">Cancel</button><button disabled={actionBusy} onClick={async ()=>{setActionBusy(true);setActionProgress('Processing…');try{await confirmation.run();setConfirmation(null);}catch(error:any){toast.error(error.response?.data?.error || error.message || 'Action failed.');}finally{setActionBusy(false);}}} className="px-4 py-2 rounded-xl bg-[var(--accent)] text-slate-950 inline-flex items-center gap-2">{actionBusy ? <><Loader2 className="w-4 h-4 animate-spin"/>Processing…</> : 'Confirm'}</button></div></div></div>, document.body)}
         {/* Header section */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[var(--bg-card)] p-6 rounded-2xl shadow-sm border border-[var(--border)]">
@@ -884,8 +898,8 @@ export const RADataEntryPage: React.FC<RADataEntryPageProps> = ({ defaultTab }) 
                   <svg className="w-12 h-12 mx-auto text-[var(--text-muted)] mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                   </svg>
-                  <p className="font-semibold text-base">No client records match your filters.</p>
-                  <p className="text-xs mt-1">Try resetting the filters or onboard a new client.</p>
+                  <p className="font-semibold text-base">{clients.length ? 'No client records match your filters.' : 'No clients have been loaded for this view.'}</p>
+                  <p className="text-xs mt-1">{clients.length ? 'Try resetting the filters.' : 'Upload a CSV and review the selected rows before saving, or add a new client.'}</p>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
@@ -1524,10 +1538,10 @@ export const RADataEntryPage: React.FC<RADataEntryPageProps> = ({ defaultTab }) 
         )}
 
         {/* ── CLIENT ADD / EDIT MODAL (19 Parameters) ─────── */}
-        {isClientModalOpen && (
-          <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 sm:p-6 bg-black/75 backdrop-blur-sm overflow-y-auto" style={{ minHeight: '100vh', width: '100vw' }}>
-            <div className="relative w-full max-w-4xl bg-[var(--bg-surface)] border border-[var(--border)] rounded-2xl shadow-2xl overflow-hidden my-auto">
-              <div className="flex items-center justify-between p-6 border-b border-[var(--border)] bg-[var(--panel-inset-soft)]">
+        {isClientModalOpen && createPortal(
+          <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 sm:p-6 bg-black/75 backdrop-blur-sm">
+            <div className="relative w-full max-w-4xl bg-[var(--bg-surface)] border border-[var(--border)] rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[calc(100dvh-3rem)]" role="dialog" aria-modal="true" aria-label="RA client record">
+              <div className="flex items-center justify-between shrink-0 p-6 border-b border-[var(--border)] bg-[var(--panel-inset-soft)]">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-[var(--accent-bg)] rounded-xl text-[var(--accent)] border border-[var(--accent-bg-2)]">
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1551,7 +1565,7 @@ export const RADataEntryPage: React.FC<RADataEntryPageProps> = ({ defaultTab }) 
                 </button>
               </div>
 
-              <form onSubmit={handleSaveClient} className="p-6 space-y-6 max-h-[75vh] overflow-y-auto">
+              <form onSubmit={handleSaveClient} className="p-6 space-y-6 min-h-0 overflow-y-auto">
                 {/* Package & Subscription Row */}
                 <div className="p-4 rounded-xl bg-[var(--bg-base)] border border-[var(--border)] space-y-4">
                   <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--accent)]">
@@ -1608,7 +1622,11 @@ export const RADataEntryPage: React.FC<RADataEntryPageProps> = ({ defaultTab }) 
                       <input
                         type="date"
                         value={formData.subscription_start_date}
-                        onChange={(e) => setFormData({ ...formData, subscription_start_date: e.target.value })}
+                        onChange={(e) => {
+                          const start = e.target.value;
+                          const plan = packagesList.find(plan => plan.name === formData.package);
+                          setFormData({ ...formData, subscription_start_date: start, subscription_end_date: endDateExplicit ? formData.subscription_end_date : calculateRaEndDate(start, plan?.duration_days || 0) });
+                        }}
                         className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-[var(--border)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:ring-1 focus:ring-[var(--accent)] outline-none"
                       />
                     </div>
@@ -1617,7 +1635,11 @@ export const RADataEntryPage: React.FC<RADataEntryPageProps> = ({ defaultTab }) 
                       <input
                         type="date"
                         value={formData.subscription_end_date}
-                        onChange={(e) => setFormData({ ...formData, subscription_end_date: e.target.value })}
+                        onChange={(e) => {
+                          setEndDateExplicit(Boolean(e.target.value));
+                          const plan = packagesList.find(plan => plan.name === formData.package);
+                          setFormData({ ...formData, subscription_end_date: e.target.value || calculateRaEndDate(formData.subscription_start_date, plan?.duration_days || 0) });
+                        }}
                         className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-[var(--border)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:ring-1 focus:ring-[var(--accent)] outline-none"
                       />
                     </div>
@@ -1790,7 +1812,8 @@ export const RADataEntryPage: React.FC<RADataEntryPageProps> = ({ defaultTab }) 
                 </div>
               </form>
             </div>
-          </div>
+          </div>,
+          document.body
         )}
 
         {packageToDelete && createPortal(
@@ -1825,10 +1848,10 @@ export const RADataEntryPage: React.FC<RADataEntryPageProps> = ({ defaultTab }) 
         )}
 
         {/* ── PACKAGE CREATE / EDIT MODAL ────────────────── */}
-        {isPackageModalOpen && (
-          <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 sm:p-6 bg-black/75 backdrop-blur-sm overflow-y-auto" style={{ minHeight: '100vh', width: '100vw' }}>
-            <div className="relative w-full max-w-lg bg-[var(--bg-surface)] border border-[var(--border)] rounded-2xl shadow-2xl overflow-hidden my-auto">
-              <div className="flex items-center justify-between p-6 border-b border-[var(--border)] bg-[var(--panel-inset-soft)]">
+        {isPackageModalOpen && createPortal(
+          <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 sm:p-6 bg-black/75 backdrop-blur-sm">
+            <div className="relative w-full max-w-lg bg-[var(--bg-surface)] border border-[var(--border)] rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[calc(100dvh-3rem)]" role="dialog" aria-modal="true" aria-label="RA package">
+              <div className="flex items-center justify-between shrink-0 p-6 border-b border-[var(--border)] bg-[var(--panel-inset-soft)]">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-[var(--accent-bg)] rounded-xl text-[var(--accent)] border border-[var(--accent-bg-2)]">
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1854,7 +1877,7 @@ export const RADataEntryPage: React.FC<RADataEntryPageProps> = ({ defaultTab }) 
                 </button>
               </div>
 
-              <form onSubmit={handleSavePackage} className="p-6 space-y-4">
+              <form onSubmit={handleSavePackage} className="p-6 space-y-4 min-h-0 overflow-y-auto">
                 <div>
                   <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">
                     Package Name <span className="text-rose-500">*</span>
@@ -1938,14 +1961,15 @@ export const RADataEntryPage: React.FC<RADataEntryPageProps> = ({ defaultTab }) 
                 </div>
               </form>
             </div>
-          </div>
+          </div>,
+          document.body
         )}
 
         {/* ── QUICK TESTIMONIAL MODAL ──────────────────────── */}
-        {isTestimonialModalOpen && selectedClientForTestimonial && (
-          <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 sm:p-6 bg-black/75 backdrop-blur-sm overflow-y-auto" style={{ minHeight: '100vh', width: '100vw' }}>
-            <div className="relative w-full max-w-lg bg-[var(--bg-surface)] border border-[var(--border)] rounded-2xl shadow-2xl overflow-hidden my-auto">
-              <div className="flex items-center justify-between p-6 border-b border-[var(--border)] bg-[var(--panel-inset-soft)]">
+        {isTestimonialModalOpen && selectedClientForTestimonial && createPortal(
+          <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 sm:p-6 bg-black/75 backdrop-blur-sm">
+            <div className="relative w-full max-w-lg bg-[var(--bg-surface)] border border-[var(--border)] rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[calc(100dvh-3rem)]" role="dialog" aria-modal="true" aria-label="Add client testimonial">
+              <div className="flex items-center justify-between shrink-0 p-6 border-b border-[var(--border)] bg-[var(--panel-inset-soft)]">
                 <div>
                   <h2 className="text-xl font-bold text-[var(--text-primary)]">Add Client Testimonial</h2>
                   <p className="text-xs text-[var(--text-secondary)]">Client: <strong className="text-[var(--text-primary)]">{selectedClientForTestimonial.client_name}</strong> ({selectedClientForTestimonial.package})</p>
@@ -1960,7 +1984,7 @@ export const RADataEntryPage: React.FC<RADataEntryPageProps> = ({ defaultTab }) 
                 </button>
               </div>
 
-              <form onSubmit={handleSaveTestimonial} className="p-6 space-y-4">
+              <form onSubmit={handleSaveTestimonial} className="p-6 space-y-4 min-h-0 overflow-y-auto">
                 <div>
                   <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">Rating (1 to 5 Stars)</label>
                   <div className="flex items-center gap-2">
@@ -2043,7 +2067,8 @@ export const RADataEntryPage: React.FC<RADataEntryPageProps> = ({ defaultTab }) 
                 </div>
               </form>
             </div>
-          </div>
+          </div>,
+          document.body
         )}
       </div>
     </DashboardLayout>

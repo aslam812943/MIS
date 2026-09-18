@@ -60,6 +60,8 @@ function App() {
         <Route path={ROUTES.LOGIN} element={<LoginPage />} />
         <Route path={ROUTES.FRANCHISE_LOGIN} element={<LoginPage franchise />} />
         <Route path={ROUTES.FRANCHISE_DASHBOARD} element={<ProtectedRoute><FranchisePage dashboardView /></ProtectedRoute>} />
+        <Route path={ROUTES.FRANCHISE_SALES} element={<ProtectedRoute><FranchisePage portalView="sales" /></ProtectedRoute>} />
+        <Route path={ROUTES.FRANCHISE_REPORTS} element={<ProtectedRoute><FranchisePage portalView="reports" /></ProtectedRoute>} />
         <Route path={ROUTES.FRANCHISE_MANAGE} element={<ProtectedRoute><FranchisePage /></ProtectedRoute>} />
         
         <Route 
