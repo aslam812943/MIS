@@ -7,6 +7,7 @@ import { taskService } from '../../services/task.service';
 import { raService } from '../../services/ra.service';
 import { useLayout } from './LayoutContext';
 import { useTheme } from '../../context/ThemeContext';
+import { getHomeDashboardRoute, hasAllDashboardAccess } from '../../utils/dashboardAccess';
 
 /* ── SVG Icon Components ─────────────────────────────────── */
 const IconDashboard = () => (
@@ -208,13 +209,12 @@ export const Sidebar: React.FC = () => {
   }, [user?.id, user?.role]);
 
   const isAdmin = user?.role === 'admin';
-  const isLeadership = ['ceo', 'managing_director', 'director', 'executive'].includes(user?.role || '');
+  const canSeeAllDepartments = hasAllDashboardAccess(user);
   const isHOD = user?.role === 'hod';
   const isHR = user?.role === 'hr' || user?.department_name?.toUpperCase() === 'HR';
-  const isEmployee = user?.role === 'employee';
   const isFranchiseLogin = ['franchise_owner', 'franchise_staff'].includes(user?.role || '');
   const isFranchiseDept = user?.department_name?.trim().toUpperCase() === 'FRANCHISE';
-  const showFranchise = isFranchiseLogin || isFranchiseDept || isAdmin || isLeadership || user?.department_name?.trim().toUpperCase() === 'FINANCE';
+  const showFranchise = isFranchiseLogin || isFranchiseDept || canSeeAllDepartments;
 
   const normalizedDepartment = user?.department_name?.trim().toUpperCase() || '';
   const isCreatorDept = ['CREATIVE', 'MARKETING', 'CONTENT CREATION', 'CONTENT CREATOR'].includes(normalizedDepartment);
@@ -224,36 +224,36 @@ export const Sidebar: React.FC = () => {
   const showHRDashboard = isAdmin || isHR;
 
   const isIEPFUser = user?.department_name?.toUpperCase() === 'IEPF';
-  const showIEPFDashboard = isAdmin || isLeadership || (isIEPFUser && (isHOD || isEmployee));
+  const showIEPFDashboard = canSeeAllDepartments || isIEPFUser;
 
   const isKYCUser = user?.department_name?.toUpperCase() === 'KYC';
-  const showKYCDashboard = isAdmin || isLeadership || (isKYCUser && (isHOD || isEmployee));
+  const showKYCDashboard = canSeeAllDepartments || isKYCUser;
 
   const isDPUser = user?.department_name?.toUpperCase() === 'DP';
-  const showDPDashboard = isAdmin || isLeadership || (isDPUser && (isHOD || isEmployee));
+  const showDPDashboard = canSeeAllDepartments || isDPUser;
 
   const isITUser = user?.department_name?.toUpperCase() === 'IT';
-  const showITDashboard = isAdmin || isLeadership || (isITUser && (isHOD || isEmployee));
+  const showITDashboard = canSeeAllDepartments || isITUser;
 
   const isFinanceUser = user?.department_name?.toUpperCase() === 'FINANCE';
-  const showFinanceDashboard = isAdmin || isLeadership || (isFinanceUser && (isHOD || isEmployee));
+  const showFinanceDashboard = canSeeAllDepartments || isFinanceUser;
 
-  const isRAUser = user?.department_name?.toUpperCase() === 'RA' || user?.department_name?.toUpperCase() === 'RESEARCH ANALYST';
-  const showRADashboard = isAdmin || isLeadership || (isRAUser && (isHOD || isEmployee));
+  const isRAUser = ['RA', 'RESEARCH ANALYST', 'RESEARCH & ANALYSIS', 'RESEARCH'].includes(normalizedDepartment);
+  const showRADashboard = canSeeAllDepartments || isRAUser;
 
   const isSalesUser = user?.department_name?.toUpperCase() === 'SALES';
-  const showSalesDashboard = isAdmin || isLeadership || (isSalesUser && (isHOD || isEmployee));
+  const showSalesDashboard = canSeeAllDepartments || isSalesUser;
 
   const isSettlementsUser = user?.department_name?.toUpperCase() === 'SETTLEMENTS';
-  const showSettlementsDashboard = isAdmin || isLeadership || (isSettlementsUser && (isHOD || isEmployee));
+  const showSettlementsDashboard = canSeeAllDepartments || isSettlementsUser;
 
   
   
   const isSWGlobalUser = user?.department_name?.toUpperCase() === 'SW GLOBAL' || user?.department_name?.toUpperCase() === 'SW-GLOBAL' || user?.department_name?.toUpperCase() === 'GLOBAL';
-  const showSWGlobalDashboard = isAdmin || isLeadership || (isSWGlobalUser && (isHOD || isEmployee));
+  const showSWGlobalDashboard = canSeeAllDepartments || isSWGlobalUser;
 
   const isPrivilegeUser = user?.department_name?.toUpperCase() === 'PRIVILEGE ACCOUNT' || user?.department_name?.toUpperCase() === 'PRIVILEGE';
-  const showPrivilegeDashboard = isAdmin || isLeadership || (isPrivilegeUser && (isHOD || isEmployee));
+  const showPrivilegeDashboard = canSeeAllDepartments || isPrivilegeUser;
 
   const hasDedicatedDeptEntry = isFranchiseLogin || isFranchiseDept || isIEPFUser || isSettlementsUser || isKYCUser || isDPUser || isITUser || isFinanceUser || isSalesUser || isCreatorDept || isCreator || isRAUser || isPrivilegeUser || isSWGlobalUser;
 
@@ -267,7 +267,7 @@ export const Sidebar: React.FC = () => {
     <aside className={`mis-sidebar${sidebarOpen ? ' open' : ''}`}>
       {/* Brand Header */}
       <div className="mis-sidebar-header">
-        <NavLink to={ROUTES.DASHBOARD} className="mis-sidebar-logo" onClick={closeOnMobile}>
+        <NavLink to={getHomeDashboardRoute(user)} className="mis-sidebar-logo" onClick={closeOnMobile}>
           <div className="mis-logo-icon">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <polygon points="12 2 2 7 12 12 22 7 12 2"/>
@@ -295,40 +295,18 @@ export const Sidebar: React.FC = () => {
         <span className="mis-sidebar-section-label">Main</span>
 
         <NavItem
-          to={
-            isFranchiseLogin || isFranchiseDept
-              ? ROUTES.FRANCHISE_DASHBOARD
-              : isRAUser
-              ? ROUTES.RA_DASHBOARD
-              : isCreator
-              ? ROUTES.CREATOR_DASHBOARD
-              : isPrivilegeUser
-              ? ROUTES.PRIVILEGE_DASHBOARD
-              : isSWGlobalUser
-              ? ROUTES.SW_GLOBAL_DASHBOARD
-              : ROUTES.DASHBOARD
-          }
+          to={getHomeDashboardRoute(user)}
           icon={<IconDashboard />}
           label="Dashboard"
           onClick={closeOnMobile}
         />
 
         {/* Generic Data Entry if no dedicated department */}
-        {(!hasDedicatedDeptEntry && !isAdmin && !isLeadership) && (
+        {(!hasDedicatedDeptEntry && !canSeeAllDepartments) && (
           <NavItem
             to={ROUTES.DATA_ENTRY}
             icon={<IconDataEntry />}
             label="Data Entry"
-            onClick={closeOnMobile}
-          />
-        )}
-
-        {/* Verification Hub */}
-        {(!isAdmin && !isLeadership && isHOD && !isCreator && !isRAUser && !isPrivilegeUser && !isSWGlobalUser) && (
-          <NavItem
-            to={ROUTES.VERIFY_ENTRIES}
-            icon={<IconVerify />}
-            label="Verify Entries"
             onClick={closeOnMobile}
           />
         )}
@@ -393,6 +371,18 @@ export const Sidebar: React.FC = () => {
           </>
         )}
 
+        {canSeeAllDepartments && !isCreator && (
+          <>
+            <span className="mis-sidebar-section-label">Content Creation</span>
+            <NavItem
+              to={ROUTES.CREATOR_DASHBOARD}
+              icon={<IconDashboard />}
+              label="Creator Dashboard"
+              onClick={closeOnMobile}
+            />
+          </>
+        )}
+
         {/* Content Review / Approvals */}
         {isSMM && (
           <NavItem
@@ -404,7 +394,7 @@ export const Sidebar: React.FC = () => {
         )}
 
         {/* Social Media Manager / Lead - Creator Performance */}
-        {(isSMM || isAdmin) && (
+        {(isSMM || canSeeAllDepartments) && (
           <NavItem
             to={ROUTES.SMM_DASHBOARD}
             icon={<IconDashboard />}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { authService } from '../../services/auth.service';
-import { ROUTES } from '../../constants/routes';
+import { getHomeDashboardRoute } from '../../utils/dashboardAccess';
 import { UserRole } from '../../types/user.types';
 
 interface LoginFormProps {
@@ -33,7 +33,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ selectedRole, onForgotPassword })
 
     try {
       const result = await authService.login(email, password, selectedRole);
-      window.location.href = ['franchise_owner', 'franchise_staff'].includes(result.user.role) || result.user.department_name?.toUpperCase() === 'FRANCHISE' ? ROUTES.FRANCHISE_DASHBOARD : ROUTES.DASHBOARD;
+      window.location.href = getHomeDashboardRoute(result.user);
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Login failed. Please check your credentials.';
       setError(errorMessage);

@@ -518,7 +518,7 @@ const IEPFDataEntryPage: React.FC = () => {
 
   return (
     <DashboardLayout>
-      <div className="mis-page mis-animate-in max-w-5xl mx-auto">
+      <div className="mis-page mis-animate-in max-w-7xl mx-auto">
 
         {/* ── Header ────────────────────────────────────────── */}
         <header className="mis-page-header-row mb-6">
@@ -979,7 +979,15 @@ const IEPFDataEntryPage: React.FC = () => {
               ) : claims.length === 0 ? (
                 <div className="mis-empty py-16">No IEPF claim records found matching criteria.</div>
               ) : (
-                <table className="mis-table">
+                <table className="mis-table table-fixed min-w-[1080px]">
+                  <colgroup>
+                    <col className="w-[14%]" />
+                    <col className="w-[15%]" />
+                    <col className="w-[14%]" />
+                    <col className="w-[16%]" />
+                    <col className="w-[19%]" />
+                    <col className="w-[22%]" />
+                  </colgroup>
                   <thead>
                     <tr>
                       <th>Claim ID / Date</th>
@@ -1041,8 +1049,8 @@ const IEPFDataEntryPage: React.FC = () => {
                               </div>
                             )}
                           </td>
-                          <td>
-                            <div className="flex gap-2 justify-end">
+                          <td className="whitespace-nowrap">
+                            <div className="flex gap-2 justify-end items-center">
                               <button
                                 type="button"
                                 onClick={() => setViewingRecord(claim)}

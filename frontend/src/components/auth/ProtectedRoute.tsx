@@ -2,6 +2,7 @@ import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { authService } from '../../services/auth.service';
 import { ROUTES } from '../../constants/routes';
+import { canAccessDashboardPath, getHomeDashboardRoute } from '../../utils/dashboardAccess';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -21,9 +22,15 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
     return <Navigate to={ROUTES.LOGIN} replace />;
   }
 
-  if (['franchise_owner', 'franchise_staff'].includes(authService.getCurrentUser()?.role || '') &&
+  const user = authService.getCurrentUser();
+
+  if (['franchise_owner', 'franchise_staff'].includes(user?.role || '') &&
       !location.pathname.startsWith('/franchise/') && !([ROUTES.PROFILE, ROUTES.NOTIFICATIONS] as string[]).includes(location.pathname)) {
     return <Navigate to={ROUTES.FRANCHISE_DASHBOARD} replace />;
+  }
+
+  if (user && !canAccessDashboardPath(user, location.pathname)) {
+    return <Navigate to={getHomeDashboardRoute(user)} replace />;
   }
 
   // Token exists, allow access to the protected content
