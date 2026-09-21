@@ -7,6 +7,7 @@ import { UserRole } from '../types/user.types';
 import { useTheme } from '../context/ThemeContext';
 import { authService } from '../services/auth.service';
 import { ROUTES } from '../constants/routes';
+import { getHomeDashboardRoute } from '../utils/dashboardAccess';
 
 const LoginPage: React.FC<{ franchise?: boolean }> = ({ franchise = false }) => {
   const [selectedRole, setSelectedRole] = useState<UserRole>(franchise ? UserRole.FRANCHISE_OWNER : UserRole.ADMIN);
@@ -17,7 +18,7 @@ const LoginPage: React.FC<{ franchise?: boolean }> = ({ franchise = false }) => 
   // the dashboard (mirrors the check ProtectedRoute does in reverse).
   if (authService.isAuthenticated()) {
     const user = authService.getCurrentUser();
-    return <Navigate to={['franchise_owner', 'franchise_staff'].includes(user?.role || '') || user?.department_name?.toUpperCase() === 'FRANCHISE' ? ROUTES.FRANCHISE_DASHBOARD : ROUTES.DASHBOARD} replace />;
+    return <Navigate to={getHomeDashboardRoute(user)} replace />;
   }
 
   return (

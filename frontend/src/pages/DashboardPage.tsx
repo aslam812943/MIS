@@ -123,7 +123,8 @@ const DashboardPage: React.FC = () => {
   const user = authService.getCurrentUser();
   const role = user?.role || '';
   const isAdmin = role === 'admin';
-  const isLeadership = ['ceo', 'managing_director', 'director', 'executive'].includes(role);
+  // Only Admin and CEO may use the organization-wide dashboard.
+  const isLeadership = role === 'ceo';
   const isHR = role === 'hr';
   const isEmployee = role === 'employee';
   const isSMM = role === 'social_media_manager';

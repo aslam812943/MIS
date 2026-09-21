@@ -14,11 +14,9 @@ const ROLE_LABELS: Record<string, string> = {
   executive: 'Executive',
 };
 
-// These roles aren't tied to one department (their profile's department_id
-// is always null, same as 'hr') — they can browse every department's
-// dashboard today, so their checklist spans every department's widgets at
-// once instead of drilling into a single one.
-const ALL_DEPARTMENTS_ROLES = ['ceo', 'managing_director', 'director', 'executive'];
+// CEO is organization-wide and can browse every department dashboard, so the
+// checklist spans every department's widgets instead of a single department.
+const ALL_DEPARTMENTS_ROLES = ['ceo'];
 
 // A plain employee's dashboard starts with nothing visible until admin opts
 // specific widgets in; every other role starts fully visible until admin
@@ -31,7 +29,7 @@ const positionLabel = (p: Position): string =>
   p.department_name ? `${p.department_name} — ${roleLabel(p)}` : roleLabel(p);
 
 /** Department-scoped positions (hod/employee/regional_manager) drill down
- * one department at a time; org-wide positions (hr, ceo/md/director/executive)
+ * one department at a time; the organization-wide CEO position
  * are shown as flat top-level entries since there's nothing to drill into. */
 const splitPositions = (positions: Position[]): { departmentGroups: Map<string, Position[]>; orgWide: Position[] } => {
   const departmentGroups = new Map<string, Position[]>();

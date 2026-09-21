@@ -994,17 +994,28 @@ const POGeneratorComponent: React.FC<{
               </div>
 
               <div className="overflow-x-auto rounded-lg border" style={{ borderColor: 'var(--border)', background: 'var(--bg-card)' }}>
-                <table className="w-full text-xs">
+                <table className="w-full min-w-[1160px] table-fixed text-xs">
+                  <colgroup>
+                    <col className="w-9" />
+                    <col />
+                    <col className="w-[128px]" />
+                    <col className="w-[90px]" />
+                    <col className="w-[116px]" />
+                    <col className="w-[126px]" />
+                    <col className="w-[108px]" />
+                    <col className="w-[140px]" />
+                    <col className="w-12" />
+                  </colgroup>
                   <thead>
                     <tr style={{ background: 'var(--table-header-bg)', borderBottom: '1px solid var(--border)', color: 'var(--text-muted)' }}>
                       <th className="p-2 text-center w-8">#</th>
-                      <th className="p-2 text-left min-w-[200px]">Item Description & Specs *</th>
-                      <th className="p-2 text-center w-24">HSN/SAC</th>
-                      <th className="p-2 text-center w-16">Qty</th>
-                      <th className="p-2 text-center w-20">Unit</th>
-                      <th className="p-2 text-right w-28">Rate (₹)</th>
-                      <th className="p-2 text-center w-20">GST %</th>
-                      <th className="p-2 text-right w-24">Total (₹)</th>
+                      <th className="p-2 text-left">Item Description & Specs *</th>
+                      <th className="p-2 text-center">HSN/SAC</th>
+                      <th className="p-2 text-center">Qty</th>
+                      <th className="p-2 text-center">Unit</th>
+                      <th className="p-2 text-right">Rate (₹)</th>
+                      <th className="p-2 text-center">GST %</th>
+                      <th className="p-2 text-right">Total (₹)</th>
                       <th className="p-2 text-center w-8"></th>
                     </tr>
                   </thead>
@@ -1032,23 +1043,30 @@ const POGeneratorComponent: React.FC<{
                               placeholder="8504"
                               value={item.hsnSac}
                               onChange={e => handleUpdateItem(item.id, 'hsnSac', e.target.value)}
-                              className="mis-input text-xs font-mono text-center"
+                              className="mis-input w-full min-w-0 px-3 text-xs font-mono text-center"
                             />
                           </td>
                           <td className="p-2">
                             <input
-                              type="number"
-                              min={1}
+                              type="text"
+                              inputMode="numeric"
+                              pattern="[0-9]*"
                               value={item.qty}
-                              onChange={e => handleUpdateItem(item.id, 'qty', Math.max(1, Number(e.target.value)))}
-                              className="mis-input text-xs text-center font-bold"
+                              onChange={e => {
+                                const digits = e.target.value.replace(/\D/g, '');
+                                handleUpdateItem(item.id, 'qty', digits === '' ? '' : Number(digits));
+                              }}
+                              onBlur={e => {
+                                if (!e.target.value || Number(e.target.value) < 1) handleUpdateItem(item.id, 'qty', 1);
+                              }}
+                              className="mis-input w-full min-w-0 px-3 text-xs text-center font-bold"
                             />
                           </td>
                           <td className="p-2">
                             <select
                               value={item.unit}
                               onChange={e => handleUpdateItem(item.id, 'unit', e.target.value)}
-                              className="mis-select text-xs py-1"
+                              className="mis-select w-full min-w-0 text-xs py-1"
                             >
                               <option value="Nos">Nos</option>
                               <option value="Pcs">Pcs</option>
@@ -1066,14 +1084,14 @@ const POGeneratorComponent: React.FC<{
                               step={0.01}
                               value={item.rate}
                               onChange={e => handleUpdateItem(item.id, 'rate', Number(e.target.value))}
-                              className="mis-input text-xs font-mono font-bold text-right"
+                              className="mis-input w-full min-w-0 text-xs font-mono font-bold text-right"
                             />
                           </td>
                           <td className="p-2">
                             <select
                               value={item.gstRate}
                               onChange={e => handleUpdateItem(item.id, 'gstRate', Number(e.target.value))}
-                              className="mis-select text-xs py-1 font-bold"
+                              className="mis-select w-full min-w-0 text-xs py-1 font-bold"
                             >
                               <option value={0}>0%</option>
                               <option value={5}>5%</option>
@@ -1082,7 +1100,7 @@ const POGeneratorComponent: React.FC<{
                               <option value={28}>28%</option>
                             </select>
                           </td>
-                          <td className="p-2 text-right font-mono font-bold" style={{ color: 'var(--text-primary)' }}>
+                          <td className="p-2 text-right font-mono font-bold whitespace-nowrap" style={{ color: 'var(--text-primary)' }}>
                             ₹{itemTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </td>
                           <td className="p-2 text-center">
