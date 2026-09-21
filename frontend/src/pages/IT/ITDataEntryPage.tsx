@@ -375,6 +375,7 @@ const POGeneratorComponent: React.FC<{
   // Settings
   const [gstType, setGstType] = useState<'intra' | 'inter'>('intra');
   const [letterheadMarginMm, setLetterheadMarginMm] = useState<number>(0);
+  const [printOrientation, setPrintOrientation] = useState<'portrait' | 'landscape'>('portrait');
   const [notes, setNotes] = useState<string>(
     '1. Invoice must quote this Purchase Order number and include valid GSTIN.\n2. Goods must be delivered in original sealed packaging with manufacturer warranty certificates.\n3. Payment will be released via NEFT/RTGS after physical verification, installation, and inspection.\n4. All disputes are subject to Thrissur jurisdiction only.'
   );
@@ -584,6 +585,11 @@ const POGeneratorComponent: React.FC<{
             .no-print {
               display: none !important;
             }
+            #po-document-sheet {
+              border: none !important;
+              box-shadow: none !important;
+              min-height: 0 !important;
+            }
           `;
           clonedDoc.head.appendChild(customStyle);
         }
@@ -607,20 +613,32 @@ const POGeneratorComponent: React.FC<{
       const printWidth = pageWidth - (margin * 2);
       const printHeight = (canvas.height * printWidth) / canvas.width;
 
-      if (printHeight <= (pageHeight - (margin * 2))) {
-        pdf.addImage(imgData, 'PNG', margin, margin, printWidth, printHeight);
+      const availableHeight = pageHeight - (margin * 2);
+
+      if (printHeight <= availableHeight * 1.15) {
+        // A small overflow is normally caused by browser pixel rounding or the
+        // preview's minimum height. Fit it on one A4 page instead of creating a
+        // second page containing only the footer/bottom border.
+        const fittedHeight = Math.min(printHeight, availableHeight);
+        const fittedWidth = printHeight > availableHeight
+          ? (canvas.width * fittedHeight) / canvas.height
+          : printWidth;
+        const x = (pageWidth - fittedWidth) / 2;
+        pdf.addImage(imgData, 'PNG', x, margin, fittedWidth, fittedHeight);
       } else {
         let heightLeft = printHeight;
         let position = margin;
 
         pdf.addImage(imgData, 'PNG', margin, position, printWidth, printHeight);
-        heightLeft -= (pageHeight - (margin * 2));
+        heightLeft -= availableHeight;
 
-        while (heightLeft > 0) {
+        // Ignore sub-millimetre canvas rounding so it cannot create a blank or
+        // repeated-looking final page.
+        while (heightLeft > 0.75) {
           position = heightLeft - printHeight + margin;
           pdf.addPage();
           pdf.addImage(imgData, 'PNG', margin, position, printWidth, printHeight);
-          heightLeft -= (pageHeight - (margin * 2));
+          heightLeft -= availableHeight;
         }
       }
 
@@ -639,7 +657,87 @@ const POGeneratorComponent: React.FC<{
   };
 
   const handlePrint = () => {
-    window.print();
+    if (!sheetRef.current) {
+      toast.error('PO Document element not found.');
+      return;
+    }
+
+    const printWindow = window.open('', '_blank', 'width=1200,height=900');
+    if (!printWindow) {
+      toast.error('Print window was blocked. Please allow pop-ups and try again.');
+      return;
+    }
+
+    printWindow.opener = null;
+    const printedSheet = sheetRef.current.cloneNode(true) as HTMLElement;
+    printedSheet.removeAttribute('id');
+
+    const printStyle = printWindow.document.createElement('style');
+    printStyle.textContent = `
+      @page { size: A4 ${printOrientation}; margin: 8mm; }
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0;
+        padding: 0;
+        background: #ffffff;
+        color: #000000;
+        font-family: Arial, Helvetica, sans-serif;
+      }
+      body {
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+      }
+      .po-print-sheet {
+        width: ${printOrientation === 'landscape' ? '260mm' : '194mm'} !important;
+        min-height: 0 !important;
+        height: auto !important;
+        margin: 0 auto !important;
+        padding: 0 !important;
+        border: none !important;
+        box-shadow: none !important;
+        background: #ffffff !important;
+        color: #000000 !important;
+        overflow: visible !important;
+      }
+      .po-print-sheet table { border-collapse: collapse !important; }
+      .po-print-sheet table,
+      .po-print-sheet tr,
+      .po-print-sheet td,
+      .po-print-sheet th {
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
+      }
+      .no-print { display: none !important; }
+      @media print {
+        html, body { width: 100%; height: auto; }
+        body {
+          display: block;
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
+        .po-print-sheet { margin: 0 auto !important; }
+      }
+    `;
+
+    printedSheet.classList.add('po-print-sheet');
+    printWindow.document.title = poNumber || 'Purchase Order';
+    printWindow.document.head.appendChild(printStyle);
+    printWindow.document.body.appendChild(printedSheet);
+
+    const printWhenReady = async () => {
+      const images = Array.from(printWindow.document.images);
+      await Promise.all(images.map(image => image.complete
+        ? Promise.resolve()
+        : new Promise<void>(resolve => {
+            image.addEventListener('load', () => resolve(), { once: true });
+            image.addEventListener('error', () => resolve(), { once: true });
+          })));
+      printWindow.focus();
+      printWindow.print();
+    };
+
+    window.setTimeout(() => void printWhenReady(), 250);
   };
 
   const handleExportWord = () => {
@@ -709,7 +807,18 @@ const POGeneratorComponent: React.FC<{
           PRINT CSS (Only prints pristine PO sheet with deep bold contrast)
           ════════════════════════════════════════════════════════════ */}
       <style>{`
+        @page {
+          size: A4 ${printOrientation};
+          margin: 8mm;
+        }
         @media print {
+          html, body {
+            width: 100% !important;
+            height: auto !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            background: #ffffff !important;
+          }
           body * {
             visibility: hidden !important;
           }
@@ -723,11 +832,21 @@ const POGeneratorComponent: React.FC<{
             left: 0 !important;
             top: 0 !important;
             width: 100% !important;
+            min-height: 0 !important;
+            height: auto !important;
             margin: 0 !important;
-            padding: 6mm !important;
+            padding: 0 !important;
             box-shadow: none !important;
             border: none !important;
             color: #000000 !important;
+            overflow: visible !important;
+          }
+          #po-document-sheet table,
+          #po-document-sheet tr,
+          #po-document-sheet td,
+          #po-document-sheet th {
+            break-inside: avoid !important;
+            page-break-inside: avoid !important;
           }
           .no-print {
             display: none !important;
@@ -750,6 +869,19 @@ const POGeneratorComponent: React.FC<{
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            <label className="flex items-center gap-2 rounded-lg border px-2.5 h-[34px]" style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}>
+              <span className="text-xs font-semibold">Print layout</span>
+              <select
+                value={printOrientation}
+                onChange={e => setPrintOrientation(e.target.value as 'portrait' | 'landscape')}
+                className="bg-transparent text-xs font-bold outline-none"
+                style={{ color: 'var(--text-primary)' }}
+                aria-label="Print orientation"
+              >
+                <option value="portrait">Portrait</option>
+                <option value="landscape">Landscape</option>
+              </select>
+            </label>
             <button
               type="button"
               onClick={handleNewPO}
@@ -1392,12 +1524,12 @@ const POGeneratorComponent: React.FC<{
             <tbody>
               <tr>
                 {/* Vendor Box */}
-                <td style={{ width: '50%', verticalAlign: 'top', border: '1.5px solid #000000', padding: '10px 12px', backgroundColor: '#ffffff', borderRadius: '4px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1.5px solid #000000', paddingBottom: '4px', marginBottom: '6px' }}>
-                    <span style={{ fontSize: '10.5px', fontWeight: '900', color: '#000000', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                <td style={{ width: 'calc(50% - 6px)', verticalAlign: 'top', border: '1.5px solid #000000', padding: '10px 12px', backgroundColor: '#ffffff', borderRadius: '4px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', minWidth: 0, borderBottom: '1.5px solid #000000', paddingBottom: '5px', marginBottom: '6px' }}>
+                    <span style={{ minWidth: 0, fontSize: '10.5px', lineHeight: '1.2', fontWeight: '900', color: '#000000', textTransform: 'uppercase', letterSpacing: '0.5px', whiteSpace: 'nowrap' }}>
                       VENDOR / SUPPLIER DETAILS
                     </span>
-                    <span style={{ fontSize: '9.5px', fontWeight: '900', backgroundColor: '#000000', color: '#ffffff', padding: '1px 6px', borderRadius: '3px' }}>
+                    <span style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', height: '18px', minWidth: '28px', fontSize: '9.5px', lineHeight: '18px', fontWeight: '900', backgroundColor: '#000000', color: '#ffffff', padding: '0 6px', borderRadius: '3px', verticalAlign: 'middle' }}>
                       TO
                     </span>
                   </div>
@@ -1420,12 +1552,12 @@ const POGeneratorComponent: React.FC<{
                 <td style={{ width: '12px', border: 'none' }}></td>
 
                 {/* Delivery Box */}
-                <td style={{ width: '50%', verticalAlign: 'top', border: '1.5px solid #000000', padding: '10px 12px', backgroundColor: '#ffffff', borderRadius: '4px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1.5px solid #000000', paddingBottom: '4px', marginBottom: '6px' }}>
-                    <span style={{ fontSize: '10.5px', fontWeight: '900', color: '#000000', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                <td style={{ width: 'calc(50% - 6px)', verticalAlign: 'top', border: '1.5px solid #000000', padding: '10px 12px', backgroundColor: '#ffffff', borderRadius: '4px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', minWidth: 0, borderBottom: '1.5px solid #000000', paddingBottom: '5px', marginBottom: '6px' }}>
+                    <span style={{ minWidth: 0, fontSize: '10.5px', lineHeight: '1.2', fontWeight: '900', color: '#000000', textTransform: 'uppercase', letterSpacing: '0.5px', whiteSpace: 'nowrap' }}>
                       DELIVERY / SHIP TO
                     </span>
-                    <span style={{ fontSize: '9.5px', fontWeight: '900', backgroundColor: '#000000', color: '#ffffff', padding: '1px 6px', borderRadius: '3px' }}>
+                    <span style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', height: '18px', minWidth: '76px', fontSize: '9.5px', lineHeight: '18px', fontWeight: '900', backgroundColor: '#000000', color: '#ffffff', padding: '0 6px', borderRadius: '3px', verticalAlign: 'middle' }}>
                       DESTINATION
                     </span>
                   </div>
