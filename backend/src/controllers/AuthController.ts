@@ -19,14 +19,15 @@ export class AuthController {
    */
   login = async (req: Request, res: Response): Promise<void> => {
     try {
-      const { email, password, role } = req.body;
+      const identifier = req.body.email || req.body.identifier;
+      const { password, role } = req.body;
 
-      if (!email || !password || !role) {
-        res.status(HttpStatus.BAD_REQUEST).json({ message: 'Email, password, and role are required' });
+      if (!identifier || !password || !role) {
+        res.status(HttpStatus.BAD_REQUEST).json({ message: 'Email/Username, password, and role are required' });
         return;
       }
 
-      const loginResult = await this.authService.login(email, password, role);
+      const loginResult = await this.authService.login(identifier, password, role);
 
       // Generate secure JWT token
       const token = jwt.sign(
@@ -54,9 +55,10 @@ export class AuthController {
         role: loginResult.user.role
       });
 
-      // Send user data back (but not the session token as it's in the cookie)
+      // Send user data and token back
       res.status(HttpStatus.OK).json({
         user: loginResult.user,
+        token,
         message: 'Login successful'
       });
     } catch (error) {

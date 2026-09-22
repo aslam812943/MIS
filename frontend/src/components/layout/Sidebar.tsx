@@ -203,7 +203,7 @@ export const Sidebar: React.FC = () => {
         console.error('Failed to load initial task count in sidebar:', err);
       }
     };
-    if (user?.id && !['franchise_owner', 'franchise_staff'].includes(user.role)) {
+    if (user?.id && !['franchise_owner', 'franchise_staff', 'dealer_calculation'].includes(user.role)) {
       fetchTasks();
     }
   }, [user?.id, user?.role]);
@@ -213,6 +213,7 @@ export const Sidebar: React.FC = () => {
   const isHOD = user?.role === 'hod';
   const isHR = user?.role === 'hr' || user?.department_name?.toUpperCase() === 'HR';
   const isFranchiseLogin = ['franchise_owner', 'franchise_staff'].includes(user?.role || '');
+  const isDealerCalculation = user?.role === 'dealer_calculation';
   const isFranchiseDept = user?.department_name?.trim().toUpperCase() === 'FRANCHISE';
   const showFranchise = isFranchiseLogin || isFranchiseDept || canSeeAllDepartments;
 
@@ -255,7 +256,7 @@ export const Sidebar: React.FC = () => {
   const isPrivilegeUser = user?.department_name?.toUpperCase() === 'PRIVILEGE ACCOUNT' || user?.department_name?.toUpperCase() === 'PRIVILEGE';
   const showPrivilegeDashboard = canSeeAllDepartments || isPrivilegeUser;
 
-  const hasDedicatedDeptEntry = isFranchiseLogin || isFranchiseDept || isIEPFUser || isSettlementsUser || isKYCUser || isDPUser || isITUser || isFinanceUser || isSalesUser || isCreatorDept || isCreator || isRAUser || isPrivilegeUser || isSWGlobalUser;
+  const hasDedicatedDeptEntry = isDealerCalculation || isFranchiseLogin || isFranchiseDept || isIEPFUser || isSettlementsUser || isKYCUser || isDPUser || isITUser || isFinanceUser || isSalesUser || isCreatorDept || isCreator || isRAUser || isPrivilegeUser || isSWGlobalUser;
 
   const closeOnMobile = () => setSidebarOpen(false);
 
@@ -301,6 +302,18 @@ export const Sidebar: React.FC = () => {
           onClick={closeOnMobile}
         />
 
+        {(isDealerCalculation || canSeeAllDepartments) && (
+          <>
+            <span className="mis-sidebar-section-label">Dealer Brokerage</span>
+            <NavItem
+              to={ROUTES.DEALER_CALCULATION}
+              icon={<IconDashboard />}
+              label="Dealer Calculation"
+              onClick={closeOnMobile}
+            />
+          </>
+        )}
+
         {/* Generic Data Entry if no dedicated department */}
         {(!hasDedicatedDeptEntry && !canSeeAllDepartments) && (
           <NavItem
@@ -312,7 +325,7 @@ export const Sidebar: React.FC = () => {
         )}
 
         {/* Tasks Hub */}
-        {!isFranchiseLogin && <NavItem
+        {!isFranchiseLogin && !isDealerCalculation && <NavItem
           to={ROUTES.TASKS}
           icon={<IconTask />}
           label="Tasks"
@@ -321,7 +334,7 @@ export const Sidebar: React.FC = () => {
         />}
 
         {/* Notifications Hub */}
-        <NavItem
+        {!isDealerCalculation && <NavItem
           to={ROUTES.NOTIFICATIONS}
           icon={
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
@@ -332,7 +345,7 @@ export const Sidebar: React.FC = () => {
           label="Notifications"
           count={unreadCount}
           onClick={closeOnMobile}
-        />
+        />}
 
         {/* Creator Hub */}
         {isCreator && (

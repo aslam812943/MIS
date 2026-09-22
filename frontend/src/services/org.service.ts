@@ -44,7 +44,8 @@ export interface Module {
 export interface User {
   id: string;
   email: string;
-  role: 'admin' | 'ceo' | 'managing_director' | 'director' | 'executive' | 'hod' | 'regional_manager' | 'employee' | 'hr';
+  login_username?: string;
+  role: 'admin' | 'ceo' | 'managing_director' | 'director' | 'executive' | 'hod' | 'regional_manager' | 'employee' | 'hr' | 'content_creator' | 'social_media_manager' | 'franchise_owner' | 'franchise_staff' | 'dealer_calculation';
   full_name?: string;
   phone_number?: string;
   branch_id?: string;

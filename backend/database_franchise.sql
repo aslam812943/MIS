@@ -4,7 +4,7 @@ BEGIN;
 ALTER TABLE profiles DROP CONSTRAINT IF EXISTS profiles_role_check;
 ALTER TABLE profiles ADD CONSTRAINT profiles_role_check CHECK (role IN (
   'admin','ceo','managing_director','director','executive','hod','regional_manager',
-  'employee','hr','content_creator','social_media_manager','franchise_owner','franchise_staff'
+  'employee','hr','content_creator','social_media_manager','franchise_owner','franchise_staff','dealer_calculation'
 ));
 
 INSERT INTO departments(name) VALUES ('Franchise') ON CONFLICT(name) DO NOTHING;

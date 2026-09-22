@@ -29,7 +29,8 @@ CREATE TABLE IF NOT EXISTS modules (
 CREATE TABLE IF NOT EXISTS profiles (
     id UUID REFERENCES auth.users ON DELETE CASCADE PRIMARY KEY,
     email TEXT NOT NULL,
-    role TEXT DEFAULT 'employee' CHECK (role IN ('admin', 'ceo', 'managing_director', 'director', 'executive', 'hod', 'regional_manager', 'employee', 'hr')),
+    login_username TEXT UNIQUE,
+    role TEXT DEFAULT 'employee' CHECK (role IN ('admin', 'ceo', 'managing_director', 'director', 'executive', 'hod', 'regional_manager', 'employee', 'hr', 'content_creator', 'social_media_manager', 'franchise_owner', 'franchise_staff', 'dealer_calculation')),
     full_name TEXT,
     phone_number TEXT,
     avatar_url TEXT,

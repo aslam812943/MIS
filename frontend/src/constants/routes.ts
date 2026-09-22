@@ -9,6 +9,7 @@ export const ROUTES = {
   FRANCHISE_SALES: '/franchise/product-sales',
   FRANCHISE_REPORTS: '/franchise/reports',
   FRANCHISE_MANAGE: '/franchise/manage',
+  DEALER_CALCULATION: '/dealer-calculation',
   DASHBOARD: '/dashboard',
   ADMIN_PANEL: '/admin-panel',
   PROFILE: '/profile',

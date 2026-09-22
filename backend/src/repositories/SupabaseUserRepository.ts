@@ -8,6 +8,7 @@ import type { IUserRepository } from './interfaces/IUserRepository.js';
 interface ProfileRow {
   id: string;
   email: string;
+  login_username?: string;
   role: string;
   full_name?: string;
   phone_number?: string;
@@ -141,6 +142,7 @@ export class SupabaseUserRepository implements IUserRepository {
     return {
       id: data.id,
       email: data.email,
+      login_username: data.login_username,
       role: data.role as UserRole,
       full_name: data.full_name,
       phone_number: data.phone_number,

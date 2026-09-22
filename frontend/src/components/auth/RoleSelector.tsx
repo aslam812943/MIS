@@ -9,6 +9,7 @@ interface RoleOption {
 }
 
 const ROLE_OPTIONS: RoleOption[] = [
+  { role: UserRole.DEALER_CALCULATION, label: 'Dealer Calculation', description: 'Brokerage calculations, uploads, clients and reports', icon: '📈' },
   { role: UserRole.FRANCHISE_OWNER, label: 'Franchise Owner', description: 'Your franchise sales, earnings and reports', icon: '🏢' },
   { role: UserRole.FRANCHISE_STAFF, label: 'Franchise Staff', description: 'Submit franchise customers and product sales', icon: '🤝' },
   {

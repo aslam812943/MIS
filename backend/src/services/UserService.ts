@@ -60,8 +60,8 @@ export class UserService {
 
     const { email, role, full_name, branch_id, department_id, allowed_modules, password } = userData;
 
-    if (['franchise_owner', 'franchise_staff'].includes(role || '') && (branch_id || department_id || allowed_modules?.length)) {
-      throw new Error('Franchise logins use franchise memberships. Leave branch, department and modules empty.');
+    if (['franchise_owner', 'franchise_staff', 'dealer_calculation'].includes(role || '') && (branch_id || department_id || allowed_modules?.length)) {
+      throw new Error('This login role does not use MIS branch, department or module assignments. Leave them empty.');
     }
 
     if (!email || !role || !password) {
@@ -174,6 +174,7 @@ export class UserService {
           profile = await this.userRepository.create({
             id: authUser.id,
             email: sanitizedEmail,
+            login_username: role === 'dealer_calculation' ? sanitizedEmail.split('@')[0] : undefined,
             role: role as UserRole,
             full_name: sanitizedName,
             phone_number: userData.phone_number?.trim(),
@@ -292,7 +293,7 @@ export class UserService {
       throw new Error(`Invalid role: ${userData.role}`);
     }
 
-    if (['franchise_owner', 'franchise_staff'].includes(userData.role || targetUser.role)) {
+    if (['franchise_owner', 'franchise_staff', 'dealer_calculation'].includes(userData.role || targetUser.role)) {
       userData.branch_id = null as unknown as undefined;
       userData.department_id = null as unknown as undefined;
       userData.allowed_modules = [];

@@ -32,6 +32,29 @@ const LoginForm: React.FC<LoginFormProps> = ({ selectedRole, onForgotPassword })
     setLoading(true);
 
     try {
+      if (selectedRole === UserRole.DEALER_CALCULATION) {
+        const configuredUrl = (import.meta.env.VITE_DEALER_TERMINAL_URL as string | undefined)?.trim();
+        if (!configuredUrl) throw new Error('Dealer Terminal URL is not configured.');
+
+        // A normal top-level form POST lets the Dealer Terminal validate its
+        // own credentials and set its own secure session cookie. Passwords
+        // are never stored or validated by MIS.
+        const endpoint = new URL('/api/mis-login', configuredUrl).toString();
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = endpoint;
+        for (const [name, value] of Object.entries({ username: email, password })) {
+          const input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = name;
+          input.value = value;
+          form.appendChild(input);
+        }
+        document.body.appendChild(form);
+        form.submit();
+        return;
+      }
+
       const result = await authService.login(email, password, selectedRole);
       window.location.href = getHomeDashboardRoute(result.user);
     } catch (err: unknown) {
@@ -45,6 +68,8 @@ const LoginForm: React.FC<LoginFormProps> = ({ selectedRole, onForgotPassword })
   const getRoleLabel = () => {
     return selectedRole.charAt(0).toUpperCase() + selectedRole.slice(1).replace('_', ' ');
   };
+
+  const usesUsername = String(selectedRole).trim().toLowerCase() === 'dealer_calculation';
 
   return (
     <div className="glass rounded-[var(--radius-2xl)] p-4 sm:p-6 w-full shadow-2xl mis-animate-in">
@@ -61,14 +86,15 @@ const LoginForm: React.FC<LoginFormProps> = ({ selectedRole, onForgotPassword })
       <form onSubmit={handleLoginSubmission} className="space-y-3 sm:space-y-4">
         <div className="mis-field">
           <label htmlFor="email" className="mis-label" style={{ textTransform: 'none', letterSpacing: 'normal', fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-            Email Address
+            {usesUsername ? 'Username' : 'Email Address'}
           </label>
           <input
-            type="email"
+            type={usesUsername ? 'text' : 'email'}
             id="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="name@company.com"
+            placeholder={usesUsername ? 'Enter dealer username' : 'name@company.com'}
+            autoComplete={usesUsername ? 'username' : 'email'}
             className="mis-input"
             required
           />

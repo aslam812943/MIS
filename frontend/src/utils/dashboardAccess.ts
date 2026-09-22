@@ -30,6 +30,7 @@ const DEPARTMENT_DASHBOARDS: Record<string, string> = {
 };
 
 const ROLE_DASHBOARDS: Record<string, string> = {
+  dealer_calculation: ROUTES.DEALER_CALCULATION,
   franchise_owner: ROUTES.FRANCHISE_DASHBOARD,
   franchise_staff: ROUTES.FRANCHISE_DASHBOARD,
   content_creator: ROUTES.CREATOR_DASHBOARD,
@@ -72,6 +73,7 @@ export const canAccessDashboardPath = (user: User, pathname: string): boolean =>
   if (pathname === ROUTES.SMM_DASHBOARD) return user.role === 'social_media_manager';
   if (pathname === ROUTES.CREATOR_DASHBOARD && user.role === 'content_creator') return true;
   if (pathname === ROUTES.FRANCHISE_DASHBOARD && ['franchise_owner', 'franchise_staff'].includes(user.role)) return true;
+  if (pathname === ROUTES.DEALER_CALCULATION) return user.role === 'dealer_calculation';
 
   const owners = DASHBOARD_OWNERS[pathname];
   return owners ? owners.includes(normalizeDepartment(user.department_name)) : true;
