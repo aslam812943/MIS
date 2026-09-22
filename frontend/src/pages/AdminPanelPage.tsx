@@ -15,7 +15,7 @@ import DashboardPermissionsTab from '../components/admin/DashboardPermissionsTab
 // to grant these roles multi-branch/multi-department access). A Department
 // selection isn't meaningful for them, so the field is hidden and not
 // required for these roles.
-const DEPARTMENT_OPTIONAL_ROLES = ['admin', 'hr', 'ceo', 'managing_director', 'director', 'executive', 'franchise_owner', 'franchise_staff'];
+const DEPARTMENT_OPTIONAL_ROLES = ['admin', 'hr', 'ceo', 'managing_director', 'director', 'executive', 'franchise_owner', 'franchise_staff', 'dealer_calculation'];
 const isOrgWideRole = (role: string) => DEPARTMENT_OPTIONAL_ROLES.includes(role);
 
 // Mirrors the backend's UserService validation so obviously-invalid input
@@ -267,11 +267,11 @@ const AdminPanelPage: React.FC = () => {
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
     const deptRequired = !isOrgWideRole(userData.role);
-    if (!userData.full_name || !userData.email || !userData.password || !userData.phone_number || !userData.branch_id || (deptRequired && !userData.department_id) || !userData.joining_date) {
+    if (!userData.full_name || !userData.email || !userData.password || !userData.phone_number || (deptRequired && !userData.branch_id) || (deptRequired && !userData.department_id) || !userData.joining_date) {
       toast.error(
         deptRequired
           ? 'All fields (Name, Email, Password, Phone, Branch, Department, Joining Date) are required.'
-          : 'All fields (Name, Email, Password, Phone, Branch, Joining Date) are required.'
+          : 'Name, Email, Password, Phone and Joining Date are required.'
       );
       return;
     }
@@ -397,7 +397,7 @@ const AdminPanelPage: React.FC = () => {
     e.preventDefault();
     if (!editingId) return;
     const deptRequired = !isOrgWideRole(userData.role);
-    if (!userData.full_name || !userData.email || !userData.phone_number || !userData.branch_id || (deptRequired && !userData.department_id) || !userData.joining_date) {
+    if (!userData.full_name || !userData.email || !userData.phone_number || (deptRequired && !userData.branch_id) || (deptRequired && !userData.department_id) || !userData.joining_date) {
       toast.error('All fields except password are required.');
       return;
     }
@@ -844,7 +844,7 @@ const AdminPanelPage: React.FC = () => {
                             // department — clear a stale selection made before the
                             // role was switched, so it can't be silently submitted.
                             department_id: isOrgWideRole(nextRole) ? '' : userData.department_id,
-                            ...(['franchise_owner', 'franchise_staff'].includes(nextRole) ? { branch_id: '', allowed_modules: [] } : {}),
+                            ...(['franchise_owner', 'franchise_staff', 'dealer_calculation'].includes(nextRole) ? { branch_id: '', allowed_modules: [] } : {}),
                           });
                         }}
                       >
@@ -859,6 +859,7 @@ const AdminPanelPage: React.FC = () => {
                         <option value="employee">Branch Employee</option>
                         <option value="franchise_owner">Franchise Owner</option>
                         <option value="franchise_staff">Franchise Staff</option>
+                        <option value="dealer_calculation">Dealer Calculation</option>
                       </select>
                     </div>
                     <div className="mis-field">
@@ -866,7 +867,7 @@ const AdminPanelPage: React.FC = () => {
                       <select
                         className="mis-select"
                         value={userData.branch_id}
-                        disabled={['franchise_owner', 'franchise_staff'].includes(userData.role)}
+                        disabled={['franchise_owner', 'franchise_staff', 'dealer_calculation'].includes(userData.role)}
                         onChange={(e) => setUserData({ ...userData, branch_id: e.target.value })}
                       >
                         <option value="">— None —</option>
@@ -876,7 +877,11 @@ const AdminPanelPage: React.FC = () => {
                   </div>
                   {isOrgWideRole(userData.role) ? (
                     <p className="mis-alert mis-alert-info m-0 text-xs">
-                      {['franchise_owner', 'franchise_staff'].includes(userData.role) ? 'Franchise logins need no branch or department. Link this user in Franchise Management → Login access.' : "Department isn't required for this role — it operates across the whole organisation rather than one department."}
+                      {['franchise_owner', 'franchise_staff'].includes(userData.role)
+                        ? 'Franchise logins need no branch or department. Link this user in Franchise Management → Login access.'
+                        : userData.role === 'dealer_calculation'
+                          ? 'This login opens the shared Dealer Calculation terminal and does not need an MIS branch or department.'
+                          : "Department isn't required for this role — it operates across the whole organisation rather than one department."}
                     </p>
                   ) : (
                     <div className="mis-field">

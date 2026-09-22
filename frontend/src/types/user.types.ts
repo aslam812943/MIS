@@ -12,6 +12,7 @@ export const UserRole = {
   SOCIAL_MEDIA_MANAGER: 'social_media_manager',
   FRANCHISE_OWNER: 'franchise_owner',
   FRANCHISE_STAFF: 'franchise_staff',
+  DEALER_CALCULATION: 'dealer_calculation',
 } as const;
 
 export type UserRole = (typeof UserRole)[keyof typeof UserRole];
@@ -19,6 +20,7 @@ export type UserRole = (typeof UserRole)[keyof typeof UserRole];
 export interface User {
   id: string;
   email: string;
+  login_username?: string;
   role: UserRole;
   full_name?: string;
   phone_number?: string;

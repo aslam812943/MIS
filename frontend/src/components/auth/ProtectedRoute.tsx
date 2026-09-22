@@ -29,6 +29,11 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
     return <Navigate to={ROUTES.FRANCHISE_DASHBOARD} replace />;
   }
 
+  if (user?.role === 'dealer_calculation' &&
+      !([ROUTES.DEALER_CALCULATION, ROUTES.PROFILE] as string[]).includes(location.pathname)) {
+    return <Navigate to={ROUTES.DEALER_CALCULATION} replace />;
+  }
+
   if (user && !canAccessDashboardPath(user, location.pathname)) {
     return <Navigate to={getHomeDashboardRoute(user)} replace />;
   }

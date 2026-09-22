@@ -44,6 +44,7 @@ import RAReportsPage from './pages/RA/RAReportsPage';
 import RAIdentityHistoryPage from './pages/RA/RAIdentityHistoryPage';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import FranchisePage from './pages/Franchise/FranchisePage';
+import DealerCalculationPage from './pages/DealerCalculationPage';
 
 import { ROUTES } from './constants/routes';
 import AppToaster from './components/common/AppToaster';
@@ -63,6 +64,7 @@ function App() {
         <Route path={ROUTES.FRANCHISE_SALES} element={<ProtectedRoute><FranchisePage portalView="sales" /></ProtectedRoute>} />
         <Route path={ROUTES.FRANCHISE_REPORTS} element={<ProtectedRoute><FranchisePage portalView="reports" /></ProtectedRoute>} />
         <Route path={ROUTES.FRANCHISE_MANAGE} element={<ProtectedRoute><FranchisePage /></ProtectedRoute>} />
+        <Route path={ROUTES.DEALER_CALCULATION} element={<ProtectedRoute><DealerCalculationPage /></ProtectedRoute>} />
         
         <Route 
           path={ROUTES.SMM_DASHBOARD} 
