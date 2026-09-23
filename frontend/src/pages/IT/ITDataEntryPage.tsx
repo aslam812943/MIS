@@ -354,8 +354,8 @@ const POGeneratorComponent: React.FC<{
   // Company / Buyer Info
   const [companyName] = useState<string>('SHAREWEALTH SECURITIES LTD.');
   const [companyAddress] = useState<string>('Sharewealth House, 4th Floor, ST Stand Road, Thrissur - 680001, Kerala');
-  const [companyGstin] = useState<string>('32AABCS8800M1ZF');
-  const [companyPan] = useState<string>('AABCS8800M');
+  const [companyGstin] = useState<string>('32AAKCS3101P1ZC');
+  const [companyPan] = useState<string>('AAKCS3101P');
   const [companyCin] = useState<string>('U67120KL2005PLC018045');
   const [companyContact] = useState<string>('Email: it@sharewealthindia.com | Phone: +91 487 242 0400');
 
