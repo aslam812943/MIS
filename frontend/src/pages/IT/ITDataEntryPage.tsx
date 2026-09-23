@@ -347,8 +347,8 @@ const POGeneratorComponent: React.FC<{
   const [poDate, setPoDate] = useState<string>(todayStr);
   const [quotationRef, setQuotationRef] = useState<string>('QTN-2026-09');
   const [quotationDate, setQuotationDate] = useState<string>(todayStr);
-  const [paymentTerms, setPaymentTerms] = useState<string>('30 Days after Delivery & Invoice');
-  const [deliveryTimeline, setDeliveryTimeline] = useState<string>('Within 7-10 Business Days');
+  const [paymentTerms, setPaymentTerms] = useState<string>('');
+  const [deliveryTimeline, setDeliveryTimeline] = useState<string>('');
   const [subject, setSubject] = useState<string>('Purchase Order for IT Infrastructure Hardware & Support Services');
 
   // Company / Buyer Info
@@ -368,9 +368,9 @@ const POGeneratorComponent: React.FC<{
   const [vendorContact, setVendorContact] = useState<string>('contact@synapsewave.in | +91 98470 12345');
 
   // Consignee / Delivery (Ship To) Info
-  const [shipToName, setShipToName] = useState<string>('Sharewealth Securities Ltd. (IT Dept)');
-  const [shipToAddress, setShipToAddress] = useState<string>('Sharewealth House, Main Server Room, Thrissur - 680001, Kerala');
-  const [shipToContact, setShipToContact] = useState<string>('Attn: IT Infrastructure Team | Phone: +91 487 242 0400');
+  const [shipToName, setShipToName] = useState<string>('');
+  const [shipToAddress, setShipToAddress] = useState<string>('');
+  const [shipToContact, setShipToContact] = useState<string>('');
 
   // Settings
   const [gstType, setGstType] = useState<'intra' | 'inter'>('intra');
@@ -487,6 +487,8 @@ const POGeneratorComponent: React.FC<{
   };
 
   const totals = calculateTotals();
+  const hasDeliveryDetails = [shipToName, shipToAddress, shipToContact, paymentTerms, deliveryTimeline]
+    .some(value => value.trim().length > 0);
 
   const handleSignatureUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1427,20 +1429,14 @@ const POGeneratorComponent: React.FC<{
           {/* Top Letterhead Spacer if configured */}
           {letterheadMarginMm > 0 && (
             <div
+              aria-hidden="true"
               style={{
                 height: `${letterheadMarginMm * 3.78}px`,
                 width: '100%',
-                borderBottom: '2px dashed #000000',
                 marginBottom: '20px',
-                textAlign: 'center',
-                fontSize: '11px',
-                fontWeight: '900',
-                color: '#000000',
-                lineHeight: `${letterheadMarginMm * 3.78}px`
+                backgroundColor: '#ffffff'
               }}
-            >
-              ↑ Letterhead Area — {letterheadMarginMm} mm blank space reserved for pre-printed letterhead
-            </div>
+            />
           )}
 
           {/* Company Header Table (Shown when Letterhead Spacing is 0) */}
@@ -1524,7 +1520,7 @@ const POGeneratorComponent: React.FC<{
             <tbody>
               <tr>
                 {/* Vendor Box */}
-                <td style={{ width: 'calc(50% - 6px)', verticalAlign: 'top', border: '1.5px solid #000000', padding: '10px 12px', backgroundColor: '#ffffff', borderRadius: '4px' }}>
+                <td style={{ width: hasDeliveryDetails ? 'calc(50% - 6px)' : '100%', verticalAlign: 'top', border: '1.5px solid #000000', padding: '10px 12px', backgroundColor: '#ffffff', borderRadius: '4px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', minWidth: 0, borderBottom: '1.5px solid #000000', paddingBottom: '5px', marginBottom: '6px' }}>
                     <span style={{ minWidth: 0, fontSize: '10.5px', lineHeight: '1.2', fontWeight: '900', color: '#000000', textTransform: 'uppercase', letterSpacing: '0.5px', whiteSpace: 'nowrap' }}>
                       VENDOR / SUPPLIER DETAILS
@@ -1549,10 +1545,10 @@ const POGeneratorComponent: React.FC<{
                   )}
                 </td>
 
-                <td style={{ width: '12px', border: 'none' }}></td>
+                {hasDeliveryDetails && <td style={{ width: '12px', border: 'none' }}></td>}
 
-                {/* Delivery Box */}
-                <td style={{ width: 'calc(50% - 6px)', verticalAlign: 'top', border: '1.5px solid #000000', padding: '10px 12px', backgroundColor: '#ffffff', borderRadius: '4px' }}>
+                {/* Delivery Box: omitted entirely when no delivery information is entered */}
+                {hasDeliveryDetails && <td style={{ width: 'calc(50% - 6px)', verticalAlign: 'top', border: '1.5px solid #000000', padding: '10px 12px', backgroundColor: '#ffffff', borderRadius: '4px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', minWidth: 0, borderBottom: '1.5px solid #000000', paddingBottom: '5px', marginBottom: '6px' }}>
                     <span style={{ minWidth: 0, fontSize: '10.5px', lineHeight: '1.2', fontWeight: '900', color: '#000000', textTransform: 'uppercase', letterSpacing: '0.5px', whiteSpace: 'nowrap' }}>
                       DELIVERY / SHIP TO
@@ -1561,19 +1557,25 @@ const POGeneratorComponent: React.FC<{
                       DESTINATION
                     </span>
                   </div>
-                  <div style={{ fontSize: '12.5px', fontWeight: '900', color: '#000000' }}>
-                    {shipToName}
-                  </div>
-                  <div style={{ fontSize: '11px', fontWeight: '700', color: '#000000', marginTop: '3px', lineHeight: '1.4', whiteSpace: 'pre-wrap' }}>
-                    {shipToAddress}
-                  </div>
-                  <div style={{ fontSize: '10.5px', fontWeight: '800', color: '#000000', marginTop: '5px' }}>
-                    <strong>Instructions:</strong> {shipToContact}
-                  </div>
-                  <div style={{ fontSize: '10.5px', fontWeight: '800', color: '#000000', marginTop: '3px' }}>
-                    <strong>Payment Terms:</strong> {paymentTerms} &nbsp;|&nbsp; <strong>Timeline:</strong> {deliveryTimeline}
-                  </div>
-                </td>
+                  {shipToName.trim() && (
+                    <div style={{ fontSize: '12.5px', fontWeight: '900', color: '#000000' }}>{shipToName}</div>
+                  )}
+                  {shipToAddress.trim() && (
+                    <div style={{ fontSize: '11px', fontWeight: '700', color: '#000000', marginTop: '3px', lineHeight: '1.4', whiteSpace: 'pre-wrap' }}>{shipToAddress}</div>
+                  )}
+                  {shipToContact.trim() && (
+                    <div style={{ fontSize: '10.5px', fontWeight: '800', color: '#000000', marginTop: '5px' }}>
+                      <strong>Instructions:</strong> {shipToContact}
+                    </div>
+                  )}
+                  {(paymentTerms.trim() || deliveryTimeline.trim()) && (
+                    <div style={{ fontSize: '10.5px', fontWeight: '800', color: '#000000', marginTop: '3px' }}>
+                      {paymentTerms.trim() && <><strong>Payment Terms:</strong> {paymentTerms}</>}
+                      {paymentTerms.trim() && deliveryTimeline.trim() && <>&nbsp;|&nbsp;</>}
+                      {deliveryTimeline.trim() && <><strong>Timeline:</strong> {deliveryTimeline}</>}
+                    </div>
+                  )}
+                </td>}
               </tr>
             </tbody>
           </table>
@@ -1751,10 +1753,8 @@ const POGeneratorComponent: React.FC<{
             </tbody>
           </table>
 
-          {/* Footer Notice */}
-          <div style={{ marginTop: '20px', paddingTop: '8px', borderTop: '1.5px solid #000000', textAlign: 'center', fontSize: '9px', fontWeight: '800', color: '#000000', fontFamily: 'monospace' }}>
-            This is a computer-generated Purchase Order issued by Sharewealth Securities Ltd. IT Department.
-          </div>
+          {/* Reserved blank footer space */}
+          <div aria-hidden="true" style={{ height: '32px', marginTop: '20px', backgroundColor: '#ffffff' }} />
         </div>
         <ConfirmModal
           isOpen={poConfirmModal.isOpen}
