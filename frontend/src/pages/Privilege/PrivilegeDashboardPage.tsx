@@ -9,6 +9,7 @@ import { authService } from '../../services/auth.service';
 import { orgService } from '../../services/org.service';
 import type { Branch } from '../../services/org.service';
 import type { PrivilegeAccount, PrivilegeUpload, PrivilegeDashboardStats } from '../../types/privilege.types';
+import { currencyAmount, privilegePortfolioMetrics } from '../../utils/privilegeMetrics';
 
 import {
   Users,
@@ -136,12 +137,7 @@ export const PrivilegeDashboardPage: React.FC = () => {
     [a.name, a.code, a.mobile_no, a.scheme, a.rm, a.dealer, a.branch, a.location, a.stocks].join(' ').toLowerCase().includes(query.toLowerCase())
   );
 
-  const aum = periodAccounts.reduce((sum, a) => sum + Number(a.aum || 0), 0);
-  const used = periodAccounts.reduce((sum, a) => sum + Number(a.utilised || 0), 0);
-  const available = Math.max(0, aum - used);
-  const ratio = aum > 0 ? (used / aum) * 100 : 0;
-  const totalAccounts = periodAccounts.length;
-  const avgUtilised = totalAccounts ? used / totalAccounts : 0;
+  const { totalAUM: aum, totalUtilised: used, availableCapital: available, utilisationRatio: ratio, totalAccounts, avgUtilised } = privilegePortfolioMetrics(periodAccounts);
   const topAccounts = [...periodAccounts].sort((a, b) => Number(b.utilised) - Number(a.utilised)).slice(0, 5);
   const selectedBranchName = selectedBranch === 'all'
     ? (canViewAllBranches ? 'All Branches' : 'My Entries')
@@ -495,7 +491,8 @@ export const PrivilegeDashboardPage: React.FC = () => {
                     <div className="space-y-3.5 py-1">
                       {topAccounts.length > 0 ? (
                         topAccounts.map((item) => {
-                          const itemRatio = Number(item.aum) > 0 ? (Number(item.utilised) / Number(item.aum)) * 100 : 0;
+                          const accountAum = currencyAmount(item.aum);
+                          const itemRatio = accountAum > 0 ? (currencyAmount(item.utilised) / accountAum) * 100 : 0;
                           return <div key={item.code} className="flex items-center gap-3">
                             <span className="w-20 sm:w-24 text-xs font-semibold text-[var(--text-primary)] truncate">
                               {item.name}

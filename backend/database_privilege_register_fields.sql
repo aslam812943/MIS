@@ -11,6 +11,21 @@ ALTER TABLE privilege_accounts
   ADD COLUMN IF NOT EXISTS trading_started BOOLEAN NOT NULL DEFAULT FALSE,
   ADD COLUMN IF NOT EXISTS remarks TEXT;
 
+-- Prevent invalid new or updated records even if they bypass the application.
+-- NOT VALID preserves existing legacy data until it can be reviewed.
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'privilege_accounts_utilised_not_above_aum'
+      AND conrelid = 'privilege_accounts'::regclass
+  ) THEN
+    ALTER TABLE privilege_accounts
+      ADD CONSTRAINT privilege_accounts_utilised_not_above_aum
+      CHECK (utilised <= aum) NOT VALID;
+  END IF;
+END $$;
+
 CREATE UNIQUE INDEX IF NOT EXISTS idx_privilege_accounts_sl_no
   ON privilege_accounts(sl_no) WHERE sl_no IS NOT NULL;
 

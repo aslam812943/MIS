@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS privilege_accounts (
     occupation VARCHAR(255) NOT NULL,
     contact VARCHAR(255) NOT NULL,
     aum NUMERIC(16, 2) NOT NULL CHECK (aum >= 0),
-    utilised NUMERIC(16, 2) NOT NULL CHECK (utilised >= 0),
+    utilised NUMERIC(16, 2) NOT NULL CHECK (utilised >= 0 AND utilised <= aum),
     returns NUMERIC(8, 2) NOT NULL,
     stocks TEXT NOT NULL,
     branch_id UUID REFERENCES branches(id) ON DELETE SET NULL,

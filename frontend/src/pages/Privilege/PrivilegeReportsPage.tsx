@@ -6,6 +6,7 @@ import { Download, FileBarChart, Filter, Printer, RefreshCw, Search, TrendingUp,
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import { privilegeService } from '../../services/privilege.service';
 import type { PrivilegeAccount } from '../../types/privilege.types';
+import { currencyAmount, privilegePortfolioMetrics, sumCurrency } from '../../utils/privilegeMetrics';
 
 type Filters = {
   search: string; from: string; to: string; branch: string; rm: string; dealer: string;
@@ -33,7 +34,9 @@ const ranking = (accounts: PrivilegeAccount[], key: keyof PrivilegeAccount, metr
     const rawName = String(account[key] || '').trim() || 'Not assigned';
     const groupKey = normalize(rawName);
     const current = groups.get(groupKey) || { name: displayName(rawName), count: 0, aum: 0, utilised: 0 };
-    current.count += 1; current.aum += Number(account.aum || 0); current.utilised += Number(account.utilised || 0);
+    current.count += 1;
+    current.aum = sumCurrency([current.aum, account.aum]);
+    current.utilised = sumCurrency([current.utilised, account.utilised]);
     groups.set(groupKey, current);
   });
   return [...groups.values()].sort((a, b) => metric === 'aum' ? b.aum - a.aum || b.count - a.count : b.count - a.count || b.aum - a.aum);
@@ -69,8 +72,7 @@ const PrivilegeReportsPage: React.FC = () => {
       && (!filters.maxAum || Number(a.aum) <= Number(filters.maxAum));
   }), [accounts, filters]);
 
-  const totalAum = filtered.reduce((sum, a) => sum + Number(a.aum || 0), 0);
-  const totalUsed = filtered.reduce((sum, a) => sum + Number(a.utilised || 0), 0);
+  const { totalAUM: totalAum, totalUtilised: totalUsed } = privilegePortfolioMetrics(filtered);
   const rmRanking = useMemo(() => ranking(filtered, 'rm', resultMetric), [filtered, resultMetric]);
   const dealerRanking = useMemo(() => ranking(filtered, 'dealer', resultMetric), [filtered, resultMetric]);
   const branchRanking = useMemo(() => ranking(filtered, 'branch', resultMetric), [filtered, resultMetric]);
@@ -87,7 +89,7 @@ const PrivilegeReportsPage: React.FC = () => {
     autoTable(doc, { startY: 27, head: [['FILTERED CLIENTS', 'TOTAL AUM', 'FUNDS UTILISED', 'TOP RM']], body: [[filtered.length, pdfMoney(totalAum), pdfMoney(totalUsed), rmRanking[0]?.name || 'N/A']], theme: 'grid', styles: { halign: 'center', fontSize: 9, cellPadding: 3 }, headStyles: { fillColor: [15, 118, 110] } });
     autoTable(doc, { startY: (doc as any).lastAutoTable.finalY + 6, head: [['RM', 'Clients', 'AUM', 'Utilised']], body: rmRanking.map(x => [x.name, x.count, pdfMoney(x.aum), pdfMoney(x.utilised)]), theme: 'striped', styles: { fontSize: 7, cellPadding: 2 }, headStyles: { fillColor: [30, 41, 59] }, tableWidth: 130 });
     autoTable(doc, { startY: (doc as any).lastAutoTable.finalY + 7, head: [['Sl', 'Code', 'Client', 'Date', 'Mobile', 'Scheme', 'RM', 'Dealer', 'Branch', 'Location', 'Occupation', 'Trading', 'AUM', 'Utilised', 'Returns', 'Stocks']], body: filtered.map(a => [a.sl_no, a.code, a.name, a.account_date, a.mobile_no, a.scheme, a.rm, a.dealer, a.branch, a.location, a.occupation, a.trading_started ? 'Yes' : 'No', pdfMoney(a.aum), pdfMoney(a.utilised), a.returns, a.stocks]), theme: 'striped', margin: { left: 8, right: 8 }, styles: { fontSize: 5.2, cellPadding: 1.25, overflow: 'linebreak', valign: 'middle' }, headStyles: { fillColor: [13, 148, 136], halign: 'center' }, horizontalPageBreak: true, horizontalPageBreakRepeat: [0, 1, 2], didDrawPage: data => { doc.setFontSize(7); doc.setTextColor(110); doc.text(`MIS Portal · Privilege Report · Page ${data.pageNumber}`, 148.5, 205, { align: 'center' }); } });
-    autoTable(doc, { startY: (doc as any).lastAutoTable.finalY + 7, head: [['Branch', 'Accounts', 'AUM', 'Funds Utilised', 'Available', 'Utilisation']], body: branchAnalysis.map(x => [x.name, x.count, pdfMoney(x.aum), pdfMoney(x.utilised), pdfMoney(Math.max(0, x.aum - x.utilised)), `${x.aum ? (x.utilised / x.aum * 100).toFixed(1) : '0.0'}%`]), theme: 'grid', styles: { fontSize: 7, cellPadding: 2 }, headStyles: { fillColor: [30, 41, 59] } });
+    autoTable(doc, { startY: (doc as any).lastAutoTable.finalY + 7, head: [['Branch', 'Accounts', 'AUM', 'Funds Utilised', 'Available', 'Utilisation']], body: branchAnalysis.map(x => [x.name, x.count, pdfMoney(x.aum), pdfMoney(x.utilised), pdfMoney(currencyAmount(x.aum - x.utilised)), `${x.aum ? (x.utilised / x.aum * 100).toFixed(1) : '0.0'}%`]), theme: 'grid', styles: { fontSize: 7, cellPadding: 2 }, headStyles: { fillColor: [30, 41, 59] } });
     doc.save(`privilege-detailed-report-${new Date().toISOString().slice(0, 10)}.pdf`);
     toast.success(`PDF generated with ${filtered.length} clients`);
   };
@@ -139,7 +141,7 @@ const PrivilegeReportsPage: React.FC = () => {
           <table className="w-full min-w-[900px] text-sm">
             <thead className="bg-[var(--table-header-bg)] text-xs uppercase tracking-wider text-[var(--text-muted)]"><tr><th className="px-6 py-3 text-left">Branch</th><th className="px-6 py-3 text-right">Accounts</th><th className="px-6 py-3 text-right">AUM</th><th className="px-6 py-3 text-right">Funds Utilised</th><th className="px-6 py-3 text-right">Available</th><th className="px-6 py-3 text-right">Utilisation</th><th className="report-actions px-6 py-3 text-right">View</th></tr></thead>
             <tbody className="divide-y divide-[var(--border)]">{branchAnalysis.map(branch => {
-              const available = Math.max(0, branch.aum - branch.utilised);
+              const available = currencyAmount(branch.aum - branch.utilised);
               const utilisation = branch.aum > 0 ? branch.utilised / branch.aum * 100 : 0;
               return <tr key={normalize(branch.name)} className="hover:bg-[var(--bg-hover)]"><td className="px-6 py-3 font-semibold text-[var(--text-primary)]">{branch.name}</td><td className="px-6 py-3 text-right text-[var(--text-secondary)] tabular-nums">{branch.count}</td><td className="px-6 py-3 text-right font-semibold text-[var(--text-primary)]">{money(branch.aum)}</td><td className="px-6 py-3 text-right text-[var(--text-primary)]">{money(branch.utilised)}</td><td className="px-6 py-3 text-right text-[var(--text-secondary)]">{money(available)}</td><td className="px-6 py-3 text-right font-semibold text-[var(--accent)]">{utilisation.toFixed(1)}%</td><td className="report-actions px-6 py-3 text-right"><button type="button" onClick={() => { set('branch', branch.name); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[var(--accent-bg)] text-[var(--accent)] hover:bg-[var(--accent)] hover:text-slate-950 transition">Open</button></td></tr>;
             })}</tbody>
@@ -154,7 +156,7 @@ const PrivilegeReportsPage: React.FC = () => {
         <div className="print-summary"><div><div className="print-label">Filtered clients</div><div className="print-value">{filtered.length}</div></div><div><div className="print-label">Total AUM</div><div className="print-value">{money(totalAum)}</div></div><div><div className="print-label">Funds utilised</div><div className="print-value">{money(totalUsed)}</div></div><div><div className="print-label">Top RM</div><div className="print-value">{rmRanking[0]?.name || '—'}</div></div></div>
         <div className="print-section"><h2>RM Performance Summary</h2><table className="print-table"><thead><tr><th>Rank</th><th>RM</th><th>Clients</th><th>AUM</th><th>Funds Utilised</th></tr></thead><tbody>{rmRanking.map((row,index)=><tr key={row.name}><td>{index+1}</td><td>{row.name}</td><td>{row.count}</td><td>{money(row.aum)}</td><td>{money(row.utilised)}</td></tr>)}</tbody></table></div>
         <div className="print-section page"><h2>Detailed Client Report ({filtered.length} clients)</h2><table className="print-table"><thead><tr>{['Sl','Code','Client','Date','Mobile','Scheme','RM','Dealer','Branch','Trading','AUM','Utilised'].map(h=><th key={h}>{h}</th>)}</tr></thead><tbody>{filtered.map(a=><tr key={a.code}>{[a.sl_no,a.code,a.name,a.account_date,a.mobile_no,a.scheme,a.rm,a.dealer,a.branch,a.trading_started?'Yes':'No',money(a.aum),money(a.utilised)].map((v,i)=><td key={i}>{v || '—'}</td>)}</tr>)}</tbody></table></div>
-        <div className="print-section page"><h2>Branch-wise Analysis</h2><table className="print-table"><thead><tr><th>Branch</th><th>Accounts</th><th>AUM</th><th>Funds Utilised</th><th>Available</th><th>Utilisation</th></tr></thead><tbody>{branchAnalysis.map(row=><tr key={row.name}><td>{row.name}</td><td>{row.count}</td><td>{money(row.aum)}</td><td>{money(row.utilised)}</td><td>{money(Math.max(0,row.aum-row.utilised))}</td><td>{row.aum?(row.utilised/row.aum*100).toFixed(1):'0.0'}%</td></tr>)}</tbody></table></div>
+        <div className="print-section page"><h2>Branch-wise Analysis</h2><table className="print-table"><thead><tr><th>Branch</th><th>Accounts</th><th>AUM</th><th>Funds Utilised</th><th>Available</th><th>Utilisation</th></tr></thead><tbody>{branchAnalysis.map(row=><tr key={row.name}><td>{row.name}</td><td>{row.count}</td><td>{money(row.aum)}</td><td>{money(row.utilised)}</td><td>{money(currencyAmount(row.aum-row.utilised))}</td><td>{row.aum?(row.utilised/row.aum*100).toFixed(1):'0.0'}%</td></tr>)}</tbody></table></div>
       </section>
     </div>
   </DashboardLayout>;

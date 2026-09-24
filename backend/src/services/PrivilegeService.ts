@@ -5,6 +5,17 @@ import crypto from 'crypto';
 
 const client = supabaseAdmin || supabase;
 
+const currencyAmount = (value: unknown): number => {
+  const amount = Number(value);
+  return Number.isFinite(amount) ? Math.round(amount * 100) / 100 : 0;
+};
+
+const sumCurrency = (values: Iterable<unknown>): number => {
+  let paise = 0;
+  for (const value of values) paise += Math.round(currencyAmount(value) * 100);
+  return paise / 100;
+};
+
 const friendlyDatabaseError = (error: any, action: string): Error => {
   const details = `${error?.message || ''} ${error?.details || ''}`.toLowerCase();
   if (error?.code === '23505' || details.includes('duplicate key')) {
@@ -99,11 +110,11 @@ export class PrivilegeService {
     const accounts = await this.getAccounts(userId, undefined, branchId);
     
     const totalAccounts = accounts.length;
-    const totalAUM = accounts.reduce((sum, a) => sum + (Number(a.aum) || 0), 0);
-    const totalUtilised = accounts.reduce((sum, a) => sum + (Number(a.utilised) || 0), 0);
+    const totalAUM = sumCurrency(accounts.map(account => account.aum));
+    const totalUtilised = sumCurrency(accounts.map(account => account.utilised));
     const avgUtilised = totalAccounts > 0 ? totalUtilised / totalAccounts : 0;
     const utilisationRatio = totalAUM > 0 ? (totalUtilised / totalAUM) * 100 : 0;
-    const availableCapital = Math.max(0, totalAUM - totalUtilised);
+    const availableCapital = currencyAmount(totalAUM - totalUtilised);
 
     // Top accounts for utilisation bars
     const topAccounts = accounts.slice(0, 5).map(a => {
