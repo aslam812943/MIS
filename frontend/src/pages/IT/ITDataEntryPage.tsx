@@ -365,7 +365,8 @@ const POGeneratorComponent: React.FC<{
   const [vendorAddress, setVendorAddress] = useState<string>('Door No. 12/450, Cyber Valley, InfoPark, Kochi - 682042, Kerala');
   const [vendorGstin, setVendorGstin] = useState<string>('32AAAAA0000A1Z5');
   const [vendorState, setVendorState] = useState<string>('Kerala (32)');
-  const [vendorContact, setVendorContact] = useState<string>('contact@synapsewave.in | +91 98470 12345');
+  const [vendorEmail, setVendorEmail] = useState<string>('');
+  const [vendorPhone, setVendorPhone] = useState<string>('');
 
   // Consignee / Delivery (Ship To) Info
   const [shipToName, setShipToName] = useState<string>('');
@@ -422,8 +423,10 @@ const POGeneratorComponent: React.FC<{
       if (addr) setVendorAddress(addr);
       if (found.gstin || found.gst_number) setVendorGstin(found.gstin || found.gst_number);
       if (found.state) setVendorState(found.state);
-      const contact = [found.contact_person, found.phone, found.email].filter(Boolean).join(' | ');
-      if (contact) setVendorContact(contact);
+      // The vendor master stores these as POC fields.  Keep them separate so
+      // the generated PO never falls back to a sample contact value.
+      setVendorEmail(found.poc_email || found.email || '');
+      setVendorPhone(found.poc_phone || found.phone || '');
     }
   };
 
@@ -521,7 +524,8 @@ const POGeneratorComponent: React.FC<{
         setVendorName('');
         setVendorAddress('');
         setVendorGstin('');
-        setVendorContact('');
+        setVendorEmail('');
+        setVendorPhone('');
         setItems([{
           id: Date.now().toString(),
           description: '',
@@ -1061,6 +1065,22 @@ const POGeneratorComponent: React.FC<{
                     className="mis-input text-xs"
                   />
                 </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <input
+                    type="email"
+                    placeholder="Vendor Email"
+                    value={vendorEmail}
+                    onChange={e => setVendorEmail(e.target.value)}
+                    className="mis-input text-xs"
+                  />
+                  <input
+                    type="tel"
+                    placeholder="Vendor Phone Number"
+                    value={vendorPhone}
+                    onChange={e => setVendorPhone(e.target.value)}
+                    className="mis-input text-xs"
+                  />
+                </div>
               </div>
 
               {/* Delivery Section */}
@@ -1538,9 +1558,12 @@ const POGeneratorComponent: React.FC<{
                   <div style={{ fontSize: '11px', fontWeight: '800', color: '#000000', marginTop: '5px', fontFamily: 'monospace' }}>
                     <strong>GSTIN:</strong> {vendorGstin || '—'} &nbsp;|&nbsp; <strong>State:</strong> {vendorState || '—'}
                   </div>
-                  {vendorContact && (
+                  {(vendorEmail.trim() || vendorPhone.trim()) && (
                     <div style={{ fontSize: '10.5px', fontWeight: '800', color: '#000000', marginTop: '3px' }}>
-                      <strong>Contact:</strong> {vendorContact}
+                      <strong>Contact:</strong>{' '}
+                      {vendorEmail.trim() && <><strong>Email:</strong> {vendorEmail.trim()}</>}
+                      {vendorEmail.trim() && vendorPhone.trim() && <>&nbsp;|&nbsp;</>}
+                      {vendorPhone.trim() && <><strong>Phone:</strong> {vendorPhone.trim()}</>}
                     </div>
                   )}
                 </td>
