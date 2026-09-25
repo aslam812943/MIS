@@ -27,7 +27,14 @@ api.interceptors.request.use(
 
 // Normalize API failures before pages display toasts or error banners.
 api.interceptors.response.use(
-  response => response,
+  response => {
+    // Every successful API response represents the newest data synchronized
+    // into the current signed-in workspace. The shared sidebar listens for it.
+    window.dispatchEvent(new CustomEvent('mis-data-updated', {
+      detail: { updatedAt: new Date().toISOString() },
+    }));
+    return response;
+  },
   error => {
     const message = apiErrorMessage(error);
     error.message = message;

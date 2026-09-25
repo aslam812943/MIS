@@ -256,12 +256,11 @@ export class IEPFService {
 
     const isPrivilegedRole = ['admin', 'ceo', 'managing_director', 'director', 'executive', 'hod'].includes(access.role || '');
 
-    // ── SECURITY GATE 1: IDOR & BRANCH BOUNDARIES ────────────────────
-    // Non-admin/executives (Employees/HODs) are locked to their own branch files
-    if (access.role === 'employee' || access.role === 'hod') {
-      if (existingClaim.branch_id !== access.branchId) {
-        throw new Error('Unauthorized: You cannot access or modify claims belonging to other branch offices.');
-      }
+    // ── SECURITY GATE 1: CREATOR LOCK (FOR EMPLOYEES) ────────────────
+    // Employees can work only on claims they registered. HODs and executives
+    // deliberately retain department-wide oversight, including other branches.
+    if (access.role === 'employee' && existingClaim.created_by !== updaterId) {
+      throw new Error('Unauthorized: You can only edit claims that you registered.');
     }
 
     // ── SECURITY GATE 2: STATE LOCK (FINALIZED RECORDS) ───────────────
@@ -270,13 +269,7 @@ export class IEPFService {
       throw new Error('Locked: Finalized claims (Closed/Approved/Rejected) cannot be modified by standard employees.');
     }
 
-    // ── SECURITY GATE 3: CREATOR LOCK (FOR EMPLOYEES) ────────────────
-    // Standard employees can only edit active claims they originally registered
-    if (access.role === 'employee' && existingClaim.created_by !== updaterId) {
-      throw new Error('Unauthorized: You can only edit claims that you registered.');
-    }
-
-    // ── SECURITY GATE 4: STATUS TRANSITION POLICIES ──────────────────
+    // ── SECURITY GATE 3: STATUS TRANSITION POLICIES ──────────────────
     // Employees are allowed to update status. Restriction bypassed.
 
     // Apply validations
@@ -370,12 +363,6 @@ export class IEPFService {
 
     const isPrivilegedRole = ['admin', 'ceo', 'managing_director', 'director', 'executive', 'hod'].includes(access.role || '');
 
-    if (access.role === 'employee' || access.role === 'hod') {
-      if (existingClaim.branch_id !== access.branchId) {
-        throw new Error('Unauthorized: You cannot access or modify claims belonging to other branch offices.');
-      }
-    }
-
     const isFinalized = ['Closed', 'Approved', 'Rejected'].includes(existingClaim.status);
     if (isFinalized && !isPrivilegedRole) {
       throw new Error('Locked: Finalized claims (Closed/Approved/Rejected) cannot be deleted by standard employees.');
@@ -410,11 +397,10 @@ export class IEPFService {
       .select('*, branches(name), profiles:created_by(full_name, email)')
       .order('created_at', { ascending: false });
 
-    // Filter by branch if user is branch-locked (employees/HODs)
-    if (access.role === 'employee' || access.role === 'hod') {
-      if (access.branchId) {
-        query = query.eq('branch_id', access.branchId);
-      }
+    // Employees see only records they entered. HODs see every IEPF record,
+    // so they can review and manage their whole team's work.
+    if (access.role === 'employee') {
+      query = query.eq('created_by', requesterId);
     }
 
     // Apply filters
@@ -462,12 +448,10 @@ export class IEPFService {
     
     let targetBranchId: string | undefined = branchIdFilter;
     if (access.role === 'employee') {
-      // Deny rather than silently show unfiltered company-wide data if this
-      // employee has no branch assigned (e.g. their branch was deleted,
-      // which nulls branch_id via ON DELETE SET NULL) — falling through to
-      // "no filter" here would leak every branch's aggregate KPIs to them.
-      if (!access.branchId) throw new Error('Unauthorized: No branch assigned — dashboard unavailable.');
-      targetBranchId = access.branchId;
+      // Dashboard totals must match the employee's own claim list, rather
+      // than exposing every colleague's claims in the same branch.
+      query = query.eq('created_by', requesterId);
+      targetBranchId = undefined;
     }
 
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
