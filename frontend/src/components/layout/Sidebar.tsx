@@ -8,6 +8,7 @@ import { raService } from '../../services/ra.service';
 import { useLayout } from './LayoutContext';
 import { useTheme } from '../../context/ThemeContext';
 import { getHomeDashboardRoute, hasAllDashboardAccess } from '../../utils/dashboardAccess';
+import { SOFTWARE_VERSION } from '../../config/appInfo';
 
 /* ── SVG Icon Components ─────────────────────────────────── */
 const IconDashboard = () => (
@@ -157,6 +158,7 @@ export const Sidebar: React.FC = () => {
   const { sidebarOpen, setSidebarOpen } = useLayout();
   const { theme, toggleTheme } = useTheme();
   const user = authService.getCurrentUser();
+  const [lastDataUpdatedAt, setLastDataUpdatedAt] = useState(() => new Date());
   const [unreadCount, setUnreadCount] = useState(0);
   const [identityPendingCount,setIdentityPendingCount]=useState(0);
   useEffect(()=>{
@@ -170,6 +172,20 @@ export const Sidebar: React.FC = () => {
   },[user?.id,user?.role]);
   const [taskCount, setTaskCount] = useState(0);
   const navRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    const updateTimestamp = (event: Event) => {
+      const updatedAt = (event as CustomEvent<{ updatedAt?: string }>).detail?.updatedAt;
+      setLastDataUpdatedAt(updatedAt ? new Date(updatedAt) : new Date());
+    };
+    window.addEventListener('mis-data-updated', updateTimestamp);
+    return () => window.removeEventListener('mis-data-updated', updateTimestamp);
+  }, []);
+
+  const lastUpdatedLabel = new Intl.DateTimeFormat(undefined, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(lastDataUpdatedAt);
 
   useLayoutEffect(() => {
     const nav = navRef.current;
@@ -764,6 +780,11 @@ export const Sidebar: React.FC = () => {
             </div>
           </div>
         )}
+
+        <div className="mis-software-status" aria-label={`Software version ${SOFTWARE_VERSION}; last data updated ${lastUpdatedLabel}`}>
+          <span>Version {SOFTWARE_VERSION}</span>
+          <span>Last data updated: {lastUpdatedLabel}</span>
+        </div>
 
         <button
           type="button"

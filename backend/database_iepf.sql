@@ -35,33 +35,58 @@ ALTER TABLE iepf_claims ENABLE ROW LEVEL SECURITY;
 -- Allow service role full access (Backend bypasses RLS using service_role key)
 CREATE POLICY "Allow service role full access" ON iepf_claims FOR ALL TO service_role USING (true) WITH CHECK (true);
 
--- Allow authenticated users in the IEPF department (or admins) to read claims
-CREATE POLICY "IEPF staff can view department claims" ON iepf_claims FOR SELECT TO authenticated
+-- Employees can read only claims they created. IEPF HODs and executives can
+-- read every IEPF claim for team oversight.
+CREATE POLICY "IEPF claim visibility by role" ON iepf_claims FOR SELECT TO authenticated
     USING (
         EXISTS (
             SELECT 1 FROM profiles 
             WHERE profiles.id = auth.uid() 
-              AND (profiles.role = 'admin' OR profiles.department_id = (SELECT id FROM departments WHERE name ILIKE 'IEPF'))
+              AND (
+                profiles.role IN ('admin', 'ceo', 'managing_director', 'director', 'executive')
+                OR (profiles.department_id = (SELECT id FROM departments WHERE name ILIKE 'IEPF')
+                    AND (profiles.role = 'hod' OR iepf_claims.created_by = auth.uid()))
+              )
         )
     );
 
--- Allow authenticated users in the IEPF department to insert claims
-CREATE POLICY "IEPF staff can insert claims" ON iepf_claims FOR INSERT TO authenticated
+-- Users must create claims as themselves; this prevents impersonating another employee.
+CREATE POLICY "IEPF staff can create own claims" ON iepf_claims FOR INSERT TO authenticated
     WITH CHECK (
         EXISTS (
             SELECT 1 FROM profiles 
             WHERE profiles.id = auth.uid() 
-              AND (profiles.role = 'admin' OR profiles.department_id = (SELECT id FROM departments WHERE name ILIKE 'IEPF'))
+              AND (profiles.role IN ('admin', 'ceo', 'managing_director', 'director', 'executive')
+                   OR profiles.department_id = (SELECT id FROM departments WHERE name ILIKE 'IEPF'))
         )
+        AND created_by = auth.uid()
     );
 
--- Allow authenticated users in the IEPF department to update claims
-CREATE POLICY "IEPF staff can update claims" ON iepf_claims FOR UPDATE TO authenticated
+-- Employees can update only their own claims; IEPF HODs and executives manage all.
+CREATE POLICY "IEPF claim updates by role" ON iepf_claims FOR UPDATE TO authenticated
     USING (
         EXISTS (
             SELECT 1 FROM profiles 
             WHERE profiles.id = auth.uid() 
-              AND (profiles.role = 'admin' OR profiles.department_id = (SELECT id FROM departments WHERE name ILIKE 'IEPF'))
+              AND (
+                profiles.role IN ('admin', 'ceo', 'managing_director', 'director', 'executive')
+                OR (profiles.department_id = (SELECT id FROM departments WHERE name ILIKE 'IEPF')
+                    AND (profiles.role = 'hod' OR iepf_claims.created_by = auth.uid()))
+              )
+        )
+    );
+
+-- Match delete access to update access.
+CREATE POLICY "IEPF claim deletes by role" ON iepf_claims FOR DELETE TO authenticated
+    USING (
+        EXISTS (
+            SELECT 1 FROM profiles
+            WHERE profiles.id = auth.uid()
+              AND (
+                profiles.role IN ('admin', 'ceo', 'managing_director', 'director', 'executive')
+                OR (profiles.department_id = (SELECT id FROM departments WHERE name ILIKE 'IEPF')
+                    AND (profiles.role = 'hod' OR iepf_claims.created_by = auth.uid()))
+              )
         )
     );
 
